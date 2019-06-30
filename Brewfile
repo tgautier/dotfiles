@@ -1,0 +1,102 @@
+# Formulae
+tap "homebrew/bundle"
+tap "homebrew/cask-fonts"
+tap "homebrew/cask-versions"
+tap "homebrew/cask"
+tap "homebrew/core"
+tap "homebrew/services"
+tap "thoughtbot/formulae"
+
+# Packages
+brew "autoconf"
+brew "automake"
+brew "awscli"
+brew "caddy"
+brew "cairo"
+brew "calicoctl"
+brew "cmake"
+brew "confuse"
+brew "coreutils"
+brew "ctags"
+brew "curl"
+brew "fontconfig"
+brew "freetype"
+brew "gdbm"
+brew "gettext"
+brew "git"
+brew "glib"
+brew "gnupg"
+brew "graphviz"
+brew "hivemind"
+brew "htop"
+brew "imagemagick"
+brew "jpeg"
+brew "jpegoptim"
+brew "jq"
+brew "kops"
+brew "kubectx"
+brew "kubernetes-helm"
+brew "libevent"
+brew "libffi"
+brew "libpng"
+brew "librsvg"
+brew "libtiff"
+brew "libtool"
+brew "libxslt"
+brew "libyaml"
+brew "mas"
+brew "mkcert"
+brew "node"
+brew "openssl"
+brew "optipng"
+brew "overmind"
+brew "pango"
+brew "pcre"
+brew "perl"
+brew "pgcli"
+brew "pinentry-mac"
+brew "pinentry"
+brew "pixman"
+brew "pkg-config"
+brew "postgresql"
+brew "python"
+brew "stern"
+brew "thoughtbot/formulae/rcm"
+brew "tree"
+brew "unixodbc"
+brew "unzip"
+brew "urlview"
+brew "watch"
+brew "wxmac"
+brew "yarn"
+brew "zsh-completions"
+brew "zsh"
+
+# Cask
+cask "adobe-creative-cloud"
+cask "chromedriver"
+cask "dash"
+cask "docker-edge"
+cask "encryptme"
+cask "font-fira-code"
+cask "font-source-code-pro"
+cask "google-chrome"
+cask "iterm2"
+cask "ngrok"
+cask "postman"
+cask "slack"
+cask "tableplus"
+
+# Mac App Store
+mas "Affinity Designer", id: 824171161
+mas "Affinity Photo", id: 824183456
+mas "Better", id: 1121192229
+mas "Keynote", id: 409183694
+mas "Magnet", id: 441258766
+mas "Monosnap", id: 540348655
+mas "Numbers", id: 409203825
+mas "Pages", id: 409201541
+mas "Reeder", id: 1449412482
+mas "Tweetbot", id: 1384080005
+mas "Ulysses", id: 1225570693
+mas "Xcode", id: 497799835

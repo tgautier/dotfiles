@@ -63,14 +63,14 @@ export PROMPT='%F{235}%B%c%b%f$(_currentKubernetesContextName)$(_currentEnvironm
 [[ -r ${HOME}/.zcompletion ]] && source ${HOME}/.zcompletion
 [[ -r ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
-alias kxec=kubectl exec -it
+alias k=kubectl
+alias kctx=kubectx
 alias kforward=kubectl port-forward
 alias kns=kubens
-alias kctx=kubectx
+alias kxec=kubectl exec -it
 alias la='ls -lah'
 alias ll='ls -lh'
 alias ls='ls -G'
-alias serve="ruby -run -e httpd . -p 8000"
 
 cdroot() {
   cd $(git root)

@@ -1,0 +1,8 @@
+#! /usr/bin/env sh
+
+brew update && brew upgrade && brew cleanup && brew doctor
+
+asdf update
+asdf plugin-update --all 
+
+mas upgrade

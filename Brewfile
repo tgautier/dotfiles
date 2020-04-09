@@ -1,13 +1,3 @@
-# Formulae
-tap "homebrew/bundle"
-tap "homebrew/cask-fonts"
-tap "homebrew/cask-versions"
-tap "homebrew/cask"
-tap "homebrew/core"
-tap "homebrew/services"
-tap "thoughtbot/formulae"
-
-# Packages
 brew "autoconf"
 brew "automake"
 brew "awscli"
@@ -27,6 +17,7 @@ brew "git"
 brew "glib"
 brew "gnupg"
 brew "graphviz"
+brew "heroku/brew/heroku"
 brew "hivemind"
 brew "htop"
 brew "imagemagick"
@@ -35,7 +26,6 @@ brew "jpegoptim"
 brew "jq"
 brew "kops"
 brew "kubectx"
-brew "kubernetes-helm"
 brew "libevent"
 brew "libffi"
 brew "libpng"
@@ -47,7 +37,8 @@ brew "libyaml"
 brew "mas"
 brew "mkcert"
 brew "node"
-brew "openssl"
+brew "nss"
+brew "openssl@1.1"
 brew "optipng"
 brew "overmind"
 brew "pango"
@@ -60,6 +51,7 @@ brew "pixman"
 brew "pkg-config"
 brew "postgresql"
 brew "python"
+brew "sops"
 brew "stern"
 brew "thoughtbot/formulae/rcm"
 brew "tree"
@@ -71,33 +63,42 @@ brew "wxmac"
 brew "yarn"
 brew "zsh-completions"
 brew "zsh"
-
-# Cask
+cask "1password"
 cask "adobe-creative-cloud"
 cask "chromedriver"
 cask "dash"
 cask "docker-edge"
-cask "encryptme"
-cask "firefox-developer-edition"
+cask "expressvpn"
+cask "firefox"
 cask "font-fira-code"
 cask "font-source-code-pro"
 cask "google-chrome"
 cask "iterm2"
 cask "ngrok"
+cask "parsec"
 cask "postman"
+cask "roon"
+cask "setapp"
 cask "slack"
 cask "tableplus"
-
-# Mac App Store
-mas "Affinity Designer", id: 824171161
-mas "Affinity Photo", id: 824183456
-mas "Better", id: 1121192229
+cask "tidal"
+cask "visual-studio-code"
+cask "vlc"
+cask "whatsapp"
 mas "Keynote", id: 409183694
 mas "Magnet", id: 441258766
 mas "Monosnap", id: 540348655
 mas "Numbers", id: 409203825
 mas "Pages", id: 409201541
 mas "Reeder", id: 1449412482
+mas "Spark", id: 1176895641
 mas "Tweetbot", id: 1384080005
-mas "Ulysses", id: 1225570693
 mas "Xcode", id: 497799835
+tap "heroku/brew"
+tap "homebrew/bundle"
+tap "homebrew/cask-fonts"
+tap "homebrew/cask-versions"
+tap "homebrew/cask"
+tap "homebrew/core"
+tap "homebrew/services"
+tap "thoughtbot/formulae"

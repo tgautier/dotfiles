@@ -13,15 +13,17 @@ export GIT_EDITOR="code -w"
 export GOPATH=~/Workspace/go
 PATH="${PATH}:${GOPATH}/bin"
 export GPG_TTY=$(tty)
-export HOMEBREW_BREWFILE=${HOME}/.brewfile
+export HELM_TLS_ENABLE=true
+export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile
 export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx" # In order to not install Erlang with Java
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
 export PATH
 export TERM=xterm-256color
-export WORDCHARS='*?.[]~=&;!#$%^(){}<>'
 export TILLER_NAMESPACE=tiller
-export HELM_TLS_ENABLE=true
+export WORDCHARS='*?.[]~=&;!#$%^(){}<>'
+
+export PATH="$PATH:/Users/tgautier/Workspace/playground/istio-1.4.0/bin"
 
 export HISTFILE=${HOME}/.zhistory
 export HISTSIZE=5000
@@ -134,6 +136,17 @@ kload() {
   export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id)
   export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key)
   export KOPS_STATE_STORE=s3://fewlines-co-state-store
+}
+
+plantuml() {
+  input=${1:?"input file path is required"};
+  output=${2:-"${input:r}.png"};
+  docker run \
+  --rm \
+  -i think/plantuml \
+  -tpng \
+  < "${input}" \
+  > "${output}"
 }
 
 current_tt

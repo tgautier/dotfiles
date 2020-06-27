@@ -1,0 +1,2 @@
+size=${1:-16}
+base64 /dev/urandom  | tr -d '/+oO0iIl' | tr -s '[:alnum:]' | head -c ${size}

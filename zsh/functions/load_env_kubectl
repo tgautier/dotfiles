@@ -1,0 +1,2 @@
+source <($commands[kubectl] completion zsh);
+source <($commands[helm] completion zsh);

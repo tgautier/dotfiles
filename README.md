@@ -32,7 +32,7 @@ compaudit | xargs chmod go-w
 Install `asdf`:
 
 ```sh
-git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.7.4
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.7.8
 ```
 
-⚠️ Check the latest stable version, at the time of this writing it's `0.7.4`
+⚠️ Check the latest stable version, at the time of this writing it's `0.7.8`

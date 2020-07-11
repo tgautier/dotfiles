@@ -1,5 +1,4 @@
 tap "cloudflare/cloudflare"
-tap "derailed/k9s"
 tap "heroku/brew"
 tap "homebrew/bundle"
 tap "homebrew/cask-drivers"
@@ -23,7 +22,6 @@ brew "confuse"
 brew "coreutils"
 brew "ctags"
 brew "curl"
-brew "derailed/k9s/k9s"
 brew "fontconfig"
 brew "freetype"
 brew "gdbm"
@@ -93,13 +91,12 @@ brew "zsh-completions"
 brew "zsh"
 
 cask "1password"
-cask "adobe-creative-cloud"
-cask "agenda"
+cask "adguard"
+cask "alacritty"
 cask "altair-graphql-client"
+cask "apple-hewlett-packard-printer-drivers"
 cask "chromedriver"
 cask "clickup"
-cask "dash"
-cask "discord"
 cask "docker-edge"
 cask "expressvpn"
 cask "figma"
@@ -108,22 +105,15 @@ cask "font-fira-code"
 cask "font-source-code-pro"
 cask "google-chrome"
 cask "iterm2"
-cask "ngrok"
-cask "obs"
-cask "parsec"
+cask "notion"
 cask "postman"
 cask "roon"
+cask "safari-technology-preview"
 cask "setapp"
 cask "slack"
-cask "telegram"
-cask "tidal"
-cask "ubiquiti-unifi-controller"
 cask "visual-studio-code"
 cask "vlc"
-cask "wacom-tablet"
 cask "whatsapp"
-cask "yandex-cloud-cli"
-cask "zoomus"
 
 mas "Keynote", id: 409183694
 mas "Magnet", id: 441258766
@@ -131,6 +121,5 @@ mas "Monosnap", id: 540348655
 mas "Numbers", id: 409203825
 mas "Pages", id: 409201541
 mas "Reeder", id: 1449412482
-mas "Spark", id: 1176895641
 mas "Tweetbot", id: 1384080005
 mas "Xcode", id: 497799835

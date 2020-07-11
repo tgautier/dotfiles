@@ -26,17 +26,11 @@ font:
 
 draw_bold_text_with_bright_colors: false
 
-# Colors (One Light)
 colors:
-  # Default colors
   primary:
     foreground: '#282c34'
     background: '#ffffff'
-
-  # Normal colors
   normal:
-    # NOTE: Use '#131613' for the `black` color if you'd like to see
-    # black text on the background.
     black:   '#282c34'
     red:     '#e06c75'
     green:   '#98c379'
@@ -45,8 +39,6 @@ colors:
     magenta: '#c678dd'
     cyan:    '#56b6c2'
     white:   '#abb2bf'
-
-  # Bright colors
   bright:
     black:   '#5c6370'
     red:     '#e06c75'
@@ -60,5 +52,5 @@ colors:
 key_bindings:
   - { key: Left,     mods: Alt,     chars: "\x1bb"                       }
   - { key: Right,    mods: Alt,     chars: "\x1bf"                       }
-  - { key: Left,     mods: Command, chars: "\x1bOH",   mode: AppCursor   } # Home
-  - { key: Right,    mods: Command, chars: "\x1bOF",   mode: AppCursor   } # End
+  - { key: Left,     mods: Command, chars: "\x1bOH",   mode: AppCursor   }
+  - { key: Right,    mods: Command, chars: "\x1bOF",   mode: AppCursor   }

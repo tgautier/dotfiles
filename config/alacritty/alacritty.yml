@@ -1,0 +1,64 @@
+env:
+  TERM: alacritty
+
+window:
+  dimensions:
+    columns: 180
+    lines: 35
+  padding:
+    x: 4
+    y: 4
+
+scrolling:
+  history: 10000
+  multiplier: 3
+
+font:
+  normal: 
+    family: Fira Code
+  bold: 
+    family: Fira Code
+  italic: 
+    family: Fira Code
+  bold_italic: 
+    family: Fira Code
+  size: 13
+
+draw_bold_text_with_bright_colors: false
+
+# Colors (One Light)
+colors:
+  # Default colors
+  primary:
+    foreground: '#282c34'
+    background: '#ffffff'
+
+  # Normal colors
+  normal:
+    # NOTE: Use '#131613' for the `black` color if you'd like to see
+    # black text on the background.
+    black:   '#282c34'
+    red:     '#e06c75'
+    green:   '#98c379'
+    yellow:  '#d19a66'
+    blue:    '#61afef'
+    magenta: '#c678dd'
+    cyan:    '#56b6c2'
+    white:   '#abb2bf'
+
+  # Bright colors
+  bright:
+    black:   '#5c6370'
+    red:     '#e06c75'
+    green:   '#98c379'
+    yellow:  '#d19a66'
+    blue:    '#61afef'
+    magenta: '#c678dd'
+    cyan:    '#56b6c2'
+    white:   '#ffffff'
+
+key_bindings:
+  - { key: Left,     mods: Alt,     chars: "\x1bb"                       }
+  - { key: Right,    mods: Alt,     chars: "\x1bf"                       }
+  - { key: Left,     mods: Command, chars: "\x1bOH",   mode: AppCursor   } # Home
+  - { key: Right,    mods: Command, chars: "\x1bOF",   mode: AppCursor   } # End

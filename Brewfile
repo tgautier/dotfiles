@@ -92,6 +92,7 @@ brew "zsh"
 
 cask "1password"
 cask "adguard"
+cask "adobe-creative-cloud"
 cask "alacritty"
 cask "altair-graphql-client"
 cask "apple-hewlett-packard-printer-drivers"
@@ -106,6 +107,7 @@ cask "font-source-code-pro"
 cask "google-chrome"
 cask "iterm2"
 cask "notion"
+cask "parsec"
 cask "postman"
 cask "roon"
 cask "safari-technology-preview"
@@ -114,6 +116,7 @@ cask "slack"
 cask "visual-studio-code"
 cask "vlc"
 cask "whatsapp"
+cask "yandex-cloud-cli"
 
 mas "Keynote", id: 409183694
 mas "Magnet", id: 441258766

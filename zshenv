@@ -8,7 +8,7 @@ PATH="${HOME}/.bin:${PATH}"
 FPATH="${HOME}/.zsh/functions:${FPATH}"
 
 export CDPATH="${CDPATH}:${HOME}/Workspace"
-export DISABLE_AUTO_TITLE="true"
+export DISABLE_AUTO_TITLE=true
 export DISPLAY=:1
 export EDITOR="code -w"
 export GIT_EDITOR="code -w"
@@ -18,6 +18,7 @@ export GPG_TTY=$(tty)
 export HELM_TLS_ENABLE=true
 export HELM_TLS_ENABLE=true
 export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile
+export HOMEBREW_BUNDLE_NO_LOCK=true
 export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx"
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8

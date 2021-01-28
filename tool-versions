@@ -1,7 +1,8 @@
-elixir 1.10.4-otp-23
-erlang 23.0.3
-golang 1.14.6
+elixir 1.11.2-otp-23
+erlang ref:maint
+golang 1.15.5
+helm 3.4.2
 jsonnet 0.16.0
-nodejs 14.7.0
-helm 3.2.4
-yarn 1.22.4
+nodejs 15.5.1
+ruby 2.7.2
+yarn 1.22.10

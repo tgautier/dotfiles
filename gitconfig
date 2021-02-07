@@ -68,6 +68,10 @@
 [mergetool "vimdiff3"]
 	path = nvim
 
+[pull]
+	rebase = true
+	ff = only
+
 [push]
 	default = current
 

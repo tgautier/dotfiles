@@ -1,11 +1,11 @@
 #! /usr/bin/env sh
 
 brew update \
+  && brew bundle install \
   && brew upgrade \
   && brew cleanup \
-  && brew doctor \
-  && brew bundle check \
-  && brew bundle cleanup
+  && brew bundle cleanup \
+  && brew doctor
 
 asdf update
 asdf plugin-update --all

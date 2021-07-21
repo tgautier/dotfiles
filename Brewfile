@@ -1,3 +1,5 @@
+tap "earthly/earthly"
+tap "fluxcd/tap"
 tap "heroku/brew"
 tap "homebrew/bundle"
 tap "homebrew/cask-drivers"
@@ -21,7 +23,9 @@ brew "confuse"
 brew "coreutils"
 brew "ctags"
 brew "curl"
-brew "direnv"
+brew "earthly/earthly/earthly"
+brew "eksctl"
+brew "fluxcd/tap/flux"
 brew "fontconfig"
 brew "freetype"
 brew "gdbm"
@@ -98,6 +102,7 @@ cask "1password"
 cask "adguard"
 cask "adobe-creative-cloud"
 cask "apple-hewlett-packard-printer-drivers"
+cask "canon-eos-webcam-utility"
 cask "chromedriver"
 cask "clickup"
 cask "docker"
@@ -111,6 +116,8 @@ cask "google-chrome"
 cask "hp-easy-start"
 cask "insomnia"
 cask "iterm2"
+cask "microsoft-auto-update"
+cask "microsoft-office"
 cask "mongodb-compass"
 cask "notion"
 cask "onyx"
@@ -134,7 +141,6 @@ mas "Monosnap", id: 540348655
 mas "NextDNS", id: 1464122853
 mas "Numbers", id: 409203825
 mas "Pages", id: 409201541
-mas "Reeder", id: 1449412482
 mas "Spark", id: 1176895641
 mas "Tweetbot", id: 1384080005
 mas "Xcode", id: 497799835

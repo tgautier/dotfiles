@@ -1,0 +1,21 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+pemfile=${1:?"pemfile is a required parameter"};
+
+if [ -t 0 ]; then
+  read value;
+else
+  value=$(cat /dev/stdin);
+fi
+
+echo -n ${value} \
+  | kubeseal \
+  --raw \
+  --scope cluster-wide \
+  --controller-name sealed-secrets \
+  --cert ${pemfile} \
+  --from-file=/dev/stdin

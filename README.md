@@ -36,3 +36,17 @@ git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.7.8
 ```
 
 ⚠️ Check the latest stable version, at the time of this writing it's `0.7.8`
+
+Then install asdf plugins:
+
+```sh
+cut -d' ' -f1 .tool-versions | xargs -t -L1 asdf plugin add
+```
+
+and finally:
+
+```sh
+asdf install
+```
+
+You are now good to go 🚀

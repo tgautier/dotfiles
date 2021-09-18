@@ -1,0 +1,60 @@
+#! /usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+kubectlCmd=kubectl
+
+namespace="";
+while getopts ":n:" opt; do
+  case $opt in
+    n)
+      kubectlCmd="${kubectlCmd} -n ${OPTARG}";
+      ;;
+    \?)
+      >&2 echo "invalid option: -$OPTARG"
+      exit 1
+      ;;
+    :)
+      >&2 echo "option -$OPTARG requires an argument."
+      exit 1
+      ;;
+  esac
+done
+
+shift $((OPTIND-1));
+
+objectType=${1:?"the object type is required (configmap, secrets)"};
+objectName=${2:-};
+keyName=${3:-};
+
+if [ $# -gt 3 ]; then
+  >&2 echo "invalid number of arguments";
+  exit 1;
+fi
+
+jqParams="-rj .data"
+if [ "" != "${keyName}" ]; then
+  jqParams=${jqParams}.${keyName};
+fi
+if [ "" = "${objectName}" ]; then
+  jqParams="-r .items[].metadata.name"
+fi
+
+transformCmd=cat
+case "${objectType}" in
+  configmap)
+    ;;
+  secrets)
+    if [ "" != "${keyName}" ]; then
+      transformCmd="base64 -D"
+    fi
+    ;;
+  *)
+    >&2 echo "invalid object type argument '${objectType}'. valid values: configmap, secrets"
+    exit 1
+    ;;
+esac
+
+${kubectlCmd} get "${objectType}" ${objectName} -o json | jq ${jqParams} | ${transformCmd};

@@ -102,40 +102,30 @@ brew "zsh"
 cask "1password"
 cask "adguard"
 cask "adobe-creative-cloud"
-cask "apple-hewlett-packard-printer-drivers"
 cask "canon-eos-webcam-utility"
 cask "chromedriver"
 cask "discord"
 cask "docker"
-cask "encryptme"
 cask "expressvpn"
 cask "figma"
 cask "firefox"
 cask "font-fira-code"
 cask "goland"
 cask "google-chrome"
-cask "hp-easy-start"
 cask "insomnia"
 cask "iterm2"
 cask "microsoft-auto-update"
 cask "microsoft-office"
-cask "mongodb-compass"
-cask "notion"
 cask "obsidian"
 cask "onyx"
 cask "parsec"
 cask "postman"
-cask "qobuz"
-cask "roon"
 cask "setapp"
-cask "shureplus-motiv"
 cask "slack"
-cask "telegram-desktop"
 cask "visual-studio-code"
 cask "vlc"
 cask "whatsapp"
 cask "yandex-cloud-cli"
-cask "zoom"
 
 mas "Keynote", id: 409183694
 mas "Magnet", id: 441258766
@@ -143,6 +133,7 @@ mas "Monosnap", id: 540348655
 mas "NextDNS", id: 1464122853
 mas "Numbers", id: 409203825
 mas "Pages", id: 409201541
+mas "Reeder 5", id: 1529448980
 mas "Spark", id: 1176895641
 mas "Tweetbot", id: 1384080005
 mas "Xcode", id: 497799835

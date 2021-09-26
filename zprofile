@@ -15,6 +15,7 @@ export GIT_EDITOR=vim
 export GOPATH=~/Developer/go
 PATH="${PATH}:${GOPATH}/bin"
 export HOMEBREW_BREWFILE=${HOME}/.brewfile
+export HOMEBREW_BUNDLE_NO_LOCK
 export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx" # In order to not install Erlang with Java
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8

@@ -27,3 +27,5 @@ export HELM_TLS_ENABLE=true
 export HISTFILE=${HOME}/.zhistory
 export HISTSIZE=5000
 export SAVEHIST=5000
+
+eval "$(/opt/homebrew/bin/brew shellenv)"

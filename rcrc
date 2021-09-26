@@ -1,2 +1,2 @@
 EXCLUDES="README.md"
-DOTFILES_DIRS="${HOME}/Workspace/tgautier/dotfiles ${HOME}/Workspace/tgautier/dotfiles-private"
+DOTFILES_DIRS="${HOME}/Developer/tgautier/dotfiles ${HOME}/Developer/tgautier/dotfiles-private"

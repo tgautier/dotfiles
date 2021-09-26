@@ -1,7 +1,11 @@
 fpath=(
   ~/.zsh/functions
-  /usr/local/share/zsh/site-functions
+  /opt/homebrew/completions/zsh
+  /opt/homebrew/share/zsh-completions
+  /opt/homebrew/share/zsh/site-functions
   /usr/local/share/zsh-completions
+  /usr/local/share/zsh/site-functions
+  /usr/share/zsh/site-functions
   ~/.zsh/completion
   $fpath
 )

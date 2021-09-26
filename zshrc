@@ -1,7 +1,6 @@
 export GPG_TTY=$(tty)
 
 setopt EXTENDED_HISTORY
-setopt HIST_IGNORE_SPACE
 setopt INC_APPEND_HISTORY
 setopt SHARE_HISTORY
 

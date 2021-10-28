@@ -34,7 +34,7 @@ _currentKubernetesContextName() {
 }
 
 setopt PROMPT_SUBST
-export PROMPT='%F{235}%B%c%b%f$(_currentKubernetesContextName)$(_currentEnvironmentName) %(?.%F{24}❯%f.%F{198}❯%f) '
+export PROMPT='%B%c%b%f$(_currentKubernetesContextName)$(_currentEnvironmentName) %(?.%F{24}❯%f.%F{198}❯%f) '
 
 source ${HOME}/.zsh/zaliases
 source ${HOME}/.zsh/zcompletion

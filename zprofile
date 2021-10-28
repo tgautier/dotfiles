@@ -1,5 +1,6 @@
 PATH="./bin:${PATH}"
 PATH="${HOME}/.asdf/shims:${PATH}"
+PATH="/opt/homebrew/bin:${PATH}"
 PATH="/usr/local/bin:${PATH}"
 PATH="/usr/local/sbin:${PATH}"
 PATH="${HOME}/.bin.local:${PATH}"

@@ -10,4 +10,4 @@ brew update \
 asdf update
 asdf plugin-update --all
 
-mas upgrade
+# mas upgrade

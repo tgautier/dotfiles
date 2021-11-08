@@ -1,5 +1,6 @@
 PATH="./bin:${PATH}"
 PATH="${HOME}/.asdf/shims:${PATH}"
+PATH="/opt/homebrew/bin:${PATH}"
 PATH="/usr/local/bin:${PATH}"
 PATH="/usr/local/sbin:${PATH}"
 PATH="${HOME}/.bin.local:${PATH}"
@@ -15,7 +16,7 @@ export GIT_EDITOR=vim
 export GOPATH=~/Developer/go
 PATH="${PATH}:${GOPATH}/bin"
 export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile
-export HOMEBREW_BUNDLE_NO_LOCK
+export HOMEBREW_BUNDLE_NO_LOCK=true
 export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx" # In order to not install Erlang with Java
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
@@ -28,3 +29,5 @@ export HELM_TLS_ENABLE=true
 export HISTFILE=${HOME}/.zhistory
 export HISTSIZE=5000
 export SAVEHIST=5000
+
+eval "$(/opt/homebrew/bin/brew shellenv)"

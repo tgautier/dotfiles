@@ -4,7 +4,7 @@ brew update \
   && brew bundle install \
   && brew upgrade \
   && brew cleanup \
-  && brew bundle cleanup \
+  && brew bundle cleanup --force \
   && brew doctor
 
 asdf update

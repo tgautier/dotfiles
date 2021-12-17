@@ -1,8 +1,10 @@
 PATH="./bin:${PATH}"
 PATH="${HOME}/.asdf/shims:${PATH}"
 PATH="/opt/homebrew/bin:${PATH}"
+PATH="/opt/homebrew/opt/openjdk/bin:${PATH}"
 PATH="/usr/local/bin:${PATH}"
 PATH="/usr/local/sbin:${PATH}"
+PATH="/Users/tgautier/Library/Android/sdk/tools/bin/sdkmanager:${PATH}"
 PATH="${HOME}/.bin.local:${PATH}"
 PATH="${HOME}/.bin:${PATH}"
 PATH="${HOME}/Developer/tgautier/dotfiles:${PATH}"
@@ -31,3 +33,5 @@ export HISTSIZE=5000
 export SAVEHIST=5000
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
+
+. "$HOME/.cargo/env"

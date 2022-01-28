@@ -1,9 +1,9 @@
-deno 1.16.3
+deno 1.18.1
 elixir 1.12.3-otp-24
 erlang 24.1.2
 golang 1.17.2
 helm 3.7.1
 jsonnet 0.17.0
-nodejs 17.0.1
+nodejs 17.4.0
 ruby 2.7.4
 yarn 1.22.17

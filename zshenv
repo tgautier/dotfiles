@@ -7,15 +7,15 @@ PATH="/usr/local/sbin:${PATH}"
 PATH="/Users/tgautier/Library/Android/sdk/tools/bin/sdkmanager:${PATH}"
 PATH="${HOME}/.bin.local:${PATH}"
 PATH="${HOME}/.bin:${PATH}"
-PATH="${HOME}/Developer/tgautier/dotfiles:${PATH}"
+PATH="${HOME}/Workspace/tgautier/dotfiles:${PATH}"
 
-export CDPATH="${CDPATH}:${HOME}/Developer"
+export CDPATH="${CDPATH}:${HOME}/Workspace"
 export DISABLE_AUTO_TITLE="true"
 export DISPLAY=:1
 export EDITOR=vim
 export FPATH
 export GIT_EDITOR=vim
-export GOPATH=~/Developer/go
+export GOPATH=~/Workspace/go
 PATH="${PATH}:${GOPATH}/bin"
 export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile
 export HOMEBREW_BUNDLE_NO_LOCK=true

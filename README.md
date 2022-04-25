@@ -7,13 +7,13 @@ Just a basic dotfiles repository
 Install Homebrew then run:
 
 ```sh
-brew bundle --file=~/Developer/tgautier/dotfiles/Brewfile
+brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
 ```
 
 Link dotfiles:
 
 ```sh
-rcup -d ~/Developer/tgautier/dotfiles
+rcup -d ~/Workspace/tgautier/dotfiles
 ```
 
 Change shell to use `zsh`:
@@ -32,10 +32,10 @@ compaudit | xargs chmod go-w
 Install `asdf`:
 
 ```sh
-git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.8.1
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
 ```
 
-⚠️ Check the latest stable version, at the time of this writing it's `0.8.1`
+⚠️ Check the latest stable version, at the time of this writing it's `0.9.0`
 
 Then install asdf plugins:
 

@@ -44,5 +44,3 @@ source ${HOME}/.zsh/zcompletion
 [[ -r ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 . "$HOME/.cargo/env"
-
-current_tt

@@ -1,6 +1,7 @@
 [alias]
+	ba = branch --all
 	br = branch
-	ci = commit -S
+	ci = commit
 	circleci = !open "https://circleci.com/gh/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//' | cut -f 1 -d '/')/workflows/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//' | cut -f 2 -d '/')/tree/$(git current | sed 's/#/%23/g')"
 	clean-branches = ! git branch -vv | grep "gone]" | awk '{ print $1 }' | xargs git branch -D
 	co = checkout
@@ -13,6 +14,7 @@
 	d = diff
 	dc = diff --cached
 	exec = ! exec
+	f = fetch --all --prune
 	g = grep --break --heading --line-number
 	l = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%ci) %C(bold blue)<%an>%Creset' --abbrev-commit
 	oops = commit -S --amend --no-edit

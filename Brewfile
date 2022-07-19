@@ -1,21 +1,13 @@
-# mas "Keynote", id: 409183694
-# mas "NextDNS", id: 1464122853
-# mas "Numbers", id: 409203825
-# mas "Pages", id: 409201541
-# mas "Reeder 5", id: 1529448980
-# mas "Tweetbot", id: 1384080005
-# mas "Xcode", id: 497799835
-
 tap "cloudflare/cloudflare"
 tap "earthly/earthly"
 tap "fewlines-education/tap"
 tap "fluxcd/tap"
 tap "heroku/brew"
 tap "homebrew/bundle"
-tap "homebrew/cask"
 tap "homebrew/cask-drivers"
 tap "homebrew/cask-fonts"
 tap "homebrew/cask-versions"
+tap "homebrew/cask"
 tap "homebrew/core"
 tap "homebrew/services"
 tap "mongodb/brew"
@@ -45,6 +37,7 @@ brew "fontconfig"
 brew "freetype"
 brew "gdbm"
 brew "gettext"
+brew "gh"
 brew "git"
 brew "glib"
 brew "gnupg"
@@ -136,6 +129,7 @@ cask "font-source-code-pro"
 cask "google-chrome"
 cask "insomnia"
 cask "iterm2"
+cask "linear-linear"
 cask "mongodb-compass"
 cask "notion"
 cask "obs"

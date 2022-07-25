@@ -19,9 +19,10 @@ export GOPATH=~/Workspace/go
 PATH="${PATH}:${GOPATH}/bin"
 export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile
 export HOMEBREW_BUNDLE_NO_LOCK=true
-export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx" # In order to not install Erlang with Java
+export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx"
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8
+export OP_BIOMETRIC_UNLOCK_ENABLED=true
 export PATH
 export TERM=xterm-256color
 export WORDCHARS='*?.[]~=&;!#$%^(){}<>'

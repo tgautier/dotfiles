@@ -1,6 +1,6 @@
 elixir 1.13.4-otp-24
 erlang 24.3.4.2
 golang 1.18.1
-nodejs 16.14.2
+nodejs 18.7.0
 solidity 0.8.15
 yarn 1.22.18

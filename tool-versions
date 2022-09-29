@@ -1,6 +1,7 @@
-elixir 1.13.4-otp-24
-erlang 24.3.4.2
-golang 1.18.1
-nodejs 18.7.0
-solidity 0.8.15
-yarn 1.22.18
+deno 1.25.2
+elixir 1.13.4-otp-25
+erlang 25.0.4
+golang 1.19.1
+nodejs 18.9.0
+solidity 0.8.17
+yarn 1.22.19

@@ -1,1 +1,2 @@
+#!/bin/sh
 uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '\n'

@@ -1,7 +1,7 @@
-deno 1.25.2
-elixir 1.13.4-otp-25
-erlang 25.0.4
-golang 1.19.1
-nodejs 18.9.0
-solidity 0.8.17
+deno 1.31.1
+elixir 1.14.3-otp-25
+erlang 25.3
+golang 1.20.2
+helm 3.11.2
+nodejs 18.15.0
 yarn 1.22.19

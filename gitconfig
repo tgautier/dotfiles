@@ -82,9 +82,19 @@
 	email = thomas@gautier.gg
 	name = Thomas Gautier
 	useconfigonly = true
+	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBRkKL/xhEWzA+O2DnrqTofc3gB42ixv5+P77K6zELfC
 
 [url "git@github.com:tgautier/"]
 	insteadOf = "tgautier:"
 
 [url "git@github.com:fewlinesco/"]
 	insteadOf = "fewlines:"
+
+[gpg]
+  format = ssh
+
+[gpg "ssh"]
+  program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+
+[commit]
+  gpgsign = true

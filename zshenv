@@ -28,6 +28,7 @@ export TERM=xterm-256color
 export WORDCHARS='*?.[]~=&;!#$%^(){}<>'
 export TILLER_NAMESPACE=tiller
 export HELM_TLS_ENABLE=true
+export SSH_AUTH_SOCK=~/.1password/agent.sock
 
 export HISTFILE=${HOME}/.zhistory
 export HISTSIZE=5000

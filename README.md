@@ -49,4 +49,10 @@ and finally:
 asdf install
 ```
 
+### 1Password SSH Agent
+
+```sh
+mkdir -p ~/.1password && ln -s ~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock ~/.1password/agent.sock
+```
+
 You are now good to go 🚀

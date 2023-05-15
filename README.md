@@ -32,10 +32,10 @@ compaudit | xargs chmod go-w
 Install `asdf`:
 
 ```sh
-git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.11.3
 ```
 
-⚠️ Check the latest stable version, at the time of this writing it's `0.9.0`
+⚠️ Check the latest stable version, at the time of this writing it's `0.11.3`
 
 Then install asdf plugins:
 

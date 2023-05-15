@@ -28,10 +28,11 @@ export TERM=xterm-256color
 export WORDCHARS='*?.[]~=&;!#$%^(){}<>'
 export TILLER_NAMESPACE=tiller
 export HELM_TLS_ENABLE=true
+export SSH_AUTH_SOCK=~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
 
 export HISTFILE=${HOME}/.zhistory
-export HISTSIZE=5000
-export SAVEHIST=5000
+export HISTSIZE=50000
+export SAVEHIST=50000
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
 

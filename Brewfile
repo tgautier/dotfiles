@@ -55,7 +55,6 @@ brew "htop"
 brew "iftop"
 brew "imagemagick"
 brew "iperf3"
-brew "java"
 brew "jpeg"
 brew "jpegoptim"
 brew "jq"
@@ -75,6 +74,7 @@ brew "libtool"
 brew "libxslt"
 brew "libyaml"
 brew "linkerd"
+brew "mas"
 brew "mkcert"
 brew "mongodb/brew/mongodb-community-shell"
 brew "nats-io/nats-tools/nats"
@@ -90,8 +90,8 @@ brew "pango"
 brew "pcre"
 brew "perl"
 brew "pgcli"
-brew "pinentry-mac"
 brew "pinentry"
+brew "pinentry-mac"
 brew "pixman"
 brew "pkg-config"
 brew "podman"
@@ -154,8 +154,18 @@ cask "postman"
 cask "rectangle"
 cask "reflect"
 cask "setapp"
+cask "signal"
 cask "slack"
 cask "spotify"
 cask "tailscale"
 cask "visual-studio-code"
 cask "vlc"
+
+mas "1Password for Safari", id: 1569813296
+mas "Final Cut Pro", id: 424389933
+mas "Keynote", id: 409183694
+mas "Notion Web Clipper", id: 1559269364
+mas "Numbers", id: 409203825
+mas "Pages", id: 409201541
+mas "Tailscale", id: 1475387142
+mas "Xcode", id: 497799835

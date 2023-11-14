@@ -2,18 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>AlwaysOpenWindowAtStartup</key>
-	<true/>
 	<key>CheckTestRelease</key>
 	<true/>
 	<key>Default Bookmark Guid</key>
-	<string>6C316C58-DD30-4D8A-8D22-06EA41030044</string>
+	<string>FEAFC7E4-C7A4-4CE4-B797-16358889E9DE</string>
 	<key>HapticFeedbackForEsc</key>
 	<false/>
 	<key>HotkeyMigratedFromSingleToMulti</key>
 	<true/>
-	<key>IRMemory</key>
-	<integer>4</integer>
 	<key>New Bookmarks</key>
 	<array>
 		<dict>
@@ -554,13 +550,13 @@
 			<key>Background Color</key>
 			<dict>
 				<key>Blue Component</key>
-				<real>0.8901960784313725</real>
+				<real>0.21176470588235294</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.96470588235294119</real>
+				<real>0.16862745098039217</real>
 				<key>Red Component</key>
-				<real>0.99215686274509807</real>
+				<real>0.0</real>
 			</dict>
 			<key>Background Color (Dark)</key>
 			<dict>
@@ -595,7 +591,7 @@
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.14910027384757996</real>
+				<real>0.14910030364990234</real>
 				<key>Red Component</key>
 				<real>1</real>
 			</dict>
@@ -632,13 +628,13 @@
 			<key>Bold Color</key>
 			<dict>
 				<key>Blue Component</key>
-				<real>0.45882352941176469</real>
+				<real>0.63137254901960782</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.43137254901960786</real>
+				<real>0.63137254901960782</real>
 				<key>Red Component</key>
-				<real>0.34509803921568627</real>
+				<real>0.57647058823529407</real>
 			</dict>
 			<key>Bold Color (Dark)</key>
 			<dict>
@@ -662,24 +658,32 @@
 				<key>Red Component</key>
 				<real>0.34509803921568627</real>
 			</dict>
+			<key>Brighten Bold Text (Dark)</key>
+			<true/>
+			<key>Brighten Bold Text (Light)</key>
+			<true/>
 			<key>Character Encoding</key>
 			<integer>4</integer>
 			<key>Close Sessions On End</key>
 			<true/>
 			<key>Columns</key>
-			<integer>160</integer>
+			<integer>185</integer>
 			<key>Command</key>
 			<string></string>
+			<key>Cursor Boost (Dark)</key>
+			<real>0.0</real>
+			<key>Cursor Boost (Light)</key>
+			<real>0.0</real>
 			<key>Cursor Color</key>
 			<dict>
 				<key>Blue Component</key>
-				<real>0.51372549019607838</real>
+				<real>0.58823529411764708</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.4823529411764706</real>
+				<real>0.58039215686274515</real>
 				<key>Red Component</key>
-				<real>0.396078431372549</real>
+				<real>0.51372549019607838</real>
 			</dict>
 			<key>Cursor Color (Dark)</key>
 			<dict>
@@ -745,13 +749,13 @@
 			<key>Cursor Text Color</key>
 			<dict>
 				<key>Blue Component</key>
-				<real>0.83529411764705885</real>
+				<real>0.25882352941176473</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.90980392156862744</real>
+				<real>0.21176470588235294</real>
 				<key>Red Component</key>
-				<real>0.93333333333333335</real>
+				<real>0.027450980392156862</real>
 			</dict>
 			<key>Cursor Text Color (Dark)</key>
 			<dict>
@@ -778,27 +782,29 @@
 			<key>Custom Command</key>
 			<string>No</string>
 			<key>Custom Directory</key>
-			<string>Recycle</string>
-			<key>Custom Locale</key>
-			<string>en_US.UTF-8</string>
+			<string>No</string>
 			<key>Default Bookmark</key>
 			<string>No</string>
 			<key>Description</key>
 			<string>Default</string>
 			<key>Disable Window Resizing</key>
 			<true/>
+			<key>Faint Text Alpha (Dark)</key>
+			<real>0.5</real>
+			<key>Faint Text Alpha (Light)</key>
+			<real>0.5</real>
 			<key>Flashing Bell</key>
 			<false/>
 			<key>Foreground Color</key>
 			<dict>
 				<key>Blue Component</key>
-				<real>0.51372549019607838</real>
+				<real>0.58823529411764708</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.4823529411764706</real>
+				<real>0.58039215686274515</real>
 				<key>Red Component</key>
-				<real>0.396078431372549</real>
+				<real>0.51372549019607838</real>
 			</dict>
 			<key>Foreground Color (Dark)</key>
 			<dict>
@@ -823,7 +829,7 @@
 				<real>0.396078431372549</real>
 			</dict>
 			<key>Guid</key>
-			<string>6C316C58-DD30-4D8A-8D22-06EA41030044</string>
+			<string>FEAFC7E4-C7A4-4CE4-B797-16358889E9DE</string>
 			<key>Horizontal Spacing</key>
 			<real>1</real>
 			<key>Idle Code</key>
@@ -974,6 +980,8 @@
 				<dict>
 					<key>Action</key>
 					<integer>10</integer>
+					<key>Apply Mode</key>
+					<integer>0</integer>
 					<key>Escaping</key>
 					<integer>2</integer>
 					<key>Text</key>
@@ -1006,6 +1014,8 @@
 				<dict>
 					<key>Action</key>
 					<integer>10</integer>
+					<key>Apply Mode</key>
+					<integer>0</integer>
 					<key>Escaping</key>
 					<integer>2</integer>
 					<key>Text</key>
@@ -1131,11 +1141,11 @@
 				<key>Alpha Component</key>
 				<real>1</real>
 				<key>Blue Component</key>
-				<real>0.73422712087631226</real>
+				<real>0.73422706127166748</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.35915297269821167</real>
+				<real>0.35915294289588928</real>
 				<key>Red Component</key>
 				<real>0.0</real>
 			</dict>
@@ -1165,6 +1175,10 @@
 				<key>Red Component</key>
 				<real>0.0</real>
 			</dict>
+			<key>Minimum Contrast (Dark)</key>
+			<real>0.0</real>
+			<key>Minimum Contrast (Light)</key>
+			<real>0.0</real>
 			<key>Mouse Reporting</key>
 			<true/>
 			<key>Name</key>
@@ -1182,7 +1196,7 @@
 			<key>Right Option Key Sends</key>
 			<integer>0</integer>
 			<key>Rows</key>
-			<integer>30</integer>
+			<integer>40</integer>
 			<key>Screen</key>
 			<integer>-1</integer>
 			<key>Scrollback Lines</key>
@@ -1190,13 +1204,13 @@
 			<key>Selected Text Color</key>
 			<dict>
 				<key>Blue Component</key>
-				<real>0.45882352941176469</real>
+				<real>0.63137254901960782</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.43137254901960786</real>
+				<real>0.63137254901960782</real>
 				<key>Red Component</key>
-				<real>0.34509803921568627</real>
+				<real>0.57647058823529407</real>
 			</dict>
 			<key>Selected Text Color (Dark)</key>
 			<dict>
@@ -1223,13 +1237,13 @@
 			<key>Selection Color</key>
 			<dict>
 				<key>Blue Component</key>
-				<real>0.83529411764705885</real>
+				<real>0.25882352941176473</real>
 				<key>Color Space</key>
 				<string>sRGB</string>
 				<key>Green Component</key>
-				<real>0.90980392156862744</real>
+				<real>0.21176470588235294</real>
 				<key>Red Component</key>
-				<real>0.93333333333333335</real>
+				<real>0.027450980392156862</real>
 			</dict>
 			<key>Selection Color (Dark)</key>
 			<dict>
@@ -1255,12 +1269,14 @@
 			</dict>
 			<key>Send Code When Idle</key>
 			<false/>
-			<key>Set Local Environment Vars</key>
-			<integer>2</integer>
 			<key>Shortcut</key>
 			<string></string>
 			<key>Silence Bell</key>
-			<true/>
+			<false/>
+			<key>Smart Cursor Color (Dark)</key>
+			<false/>
+			<key>Smart Cursor Color (Light)</key>
+			<false/>
 			<key>Sync Title</key>
 			<false/>
 			<key>Tags</key>
@@ -1275,12 +1291,32 @@
 			<true/>
 			<key>Use Bright Bold</key>
 			<true/>
+			<key>Use Bright Bold (Dark)</key>
+			<true/>
+			<key>Use Bright Bold (Light)</key>
+			<true/>
+			<key>Use Cursor Guide (Dark)</key>
+			<false/>
+			<key>Use Cursor Guide (Light)</key>
+			<false/>
 			<key>Use Italic Font</key>
 			<true/>
 			<key>Use Non-ASCII Font</key>
 			<false/>
+			<key>Use Selected Text Color (Dark)</key>
+			<true/>
+			<key>Use Selected Text Color (Light)</key>
+			<true/>
 			<key>Use Separate Colors for Light and Dark Mode</key>
 			<true/>
+			<key>Use Tab Color (Dark)</key>
+			<false/>
+			<key>Use Tab Color (Light)</key>
+			<false/>
+			<key>Use Underline Color (Dark)</key>
+			<false/>
+			<key>Use Underline Color (Light)</key>
+			<false/>
 			<key>Vertical Spacing</key>
 			<real>1</real>
 			<key>Visual Bell</key>
@@ -1295,53 +1331,16 @@
 	<false/>
 	<key>OpenArrangementAtStartup</key>
 	<false/>
-	<key>OpenBookmark</key>
-	<false/>
 	<key>OpenNoWindowsAtStartup</key>
 	<false/>
-	<key>PMPrintingExpandedStateForPrint2</key>
-	<false/>
-	<key>PointerActions</key>
-	<dict>
-		<key>Button,1,1,,</key>
-		<dict>
-			<key>Action</key>
-			<string>kContextMenuPointerAction</string>
-		</dict>
-		<key>Button,2,1,,</key>
-		<dict>
-			<key>Action</key>
-			<string>kPasteFromClipboardPointerAction</string>
-		</dict>
-		<key>Gesture,ThreeFingerSwipeDown,,</key>
-		<dict>
-			<key>Action</key>
-			<string>kPrevWindowPointerAction</string>
-		</dict>
-		<key>Gesture,ThreeFingerSwipeLeft,,</key>
-		<dict>
-			<key>Action</key>
-			<string>kPrevTabPointerAction</string>
-		</dict>
-		<key>Gesture,ThreeFingerSwipeRight,,</key>
-		<dict>
-			<key>Action</key>
-			<string>kNextTabPointerAction</string>
-		</dict>
-		<key>Gesture,ThreeFingerSwipeUp,,</key>
-		<dict>
-			<key>Action</key>
-			<string>kNextWindowPointerAction</string>
-		</dict>
-	</dict>
-	<key>Print In Black And White</key>
-	<true/>
 	<key>PromptOnQuit</key>
-	<false/>
-	<key>ShowFullScreenTabBar</key>
 	<false/>
 	<key>SoundForEsc</key>
 	<false/>
+	<key>StartDebugLoggingAutomatically</key>
+	<false/>
+	<key>TabStyleWithAutomaticOption</key>
+	<integer>4</integer>
 	<key>VisualIndicatorForEsc</key>
 	<false/>
 	<key>findMode_iTerm</key>

@@ -136,7 +136,7 @@ cask "setapp"
 cask "signal"
 cask "slack"
 cask "spotify"
-cask "synology-drive"
+cask "virtualbox-beta"
 cask "visual-studio-code"
 cask "vlc"
 

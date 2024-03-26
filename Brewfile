@@ -66,6 +66,7 @@ brew "libxslt"
 brew "libyaml"
 brew "linkerd"
 brew "mas"
+brew "minikube"
 brew "mkcert"
 brew "mongodb/brew/mongodb-community-shell"
 brew "nats-io/nats-tools/nats"
@@ -137,6 +138,7 @@ cask "setapp"
 cask "signal"
 cask "slack"
 cask "spotify"
+cask "tailscale"
 cask "visual-studio-code"
 cask "vlc"
 cask "whatsapp"
@@ -148,5 +150,4 @@ mas "Notion Web Clipper", id: 1559269364
 mas "Numbers", id: 409203825
 mas "Pages", id: 409201541
 mas "Reeder 5", id: 1529448980
-mas "Tailscale", id: 1475387142
 mas "Xcode", id: 497799835

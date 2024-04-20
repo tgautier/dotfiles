@@ -7,6 +7,7 @@ PATH="/usr/local/bin:${PATH}"
 PATH="/usr/local/sbin:${PATH}"
 PATH="${HOME}/.bin.local:${PATH}"
 PATH="${HOME}/.bin:${PATH}"
+PATH="${HOME}/.dapr/bin:${PATH}"
 PATH="${HOME}/Workspace/tgautier/dotfiles:${PATH}"
 
 export CDPATH="${CDPATH}:${HOME}/Workspace"

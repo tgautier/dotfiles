@@ -1,9 +1,9 @@
 deno 1.39.1
-elixir 1.15.7-otp-26
-erlang 26.2.1
-golang 1.22.1
+elixir 1.16.2-otp-26
+erlang 26.2.5
+golang 1.22.2
 helm 3.13.3
-nodejs 20.10.0
+nodejs 20.12.2
 python 3.11.8
 ruby 3.2.2
 yarn 1.22.19

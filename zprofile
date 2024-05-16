@@ -22,6 +22,7 @@ PATH="${PATH}:${GOPATH}/bin"
 export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile
 export HOMEBREW_BUNDLE_NO_LOCK=true
 export HOMEBREW_NO_ENV_HINTS=true
+export KERL_BUILD_DOCS=yes
 export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx"
 export LANG=en_US.UTF-8
 export LC_ALL=en_US.UTF-8

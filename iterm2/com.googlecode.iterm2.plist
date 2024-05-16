@@ -1276,7 +1276,7 @@
 			<key>Shortcut</key>
 			<string></string>
 			<key>Silence Bell</key>
-			<false/>
+			<true/>
 			<key>Smart Cursor Color (Dark)</key>
 			<false/>
 			<key>Smart Cursor Color (Light)</key>

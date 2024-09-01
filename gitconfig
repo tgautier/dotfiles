@@ -34,6 +34,9 @@
 	diff = true
 	ui = true
 
+[commit]
+	gpgsign = true
+
 [diff]
 	renames = copies
 	tool = vimdiff3
@@ -82,6 +85,7 @@
 	email = thomas@gautier.gg
 	name = Thomas Gautier
 	useconfigonly = true
+	signingkey = EE663676C4FECFD7
 
 [url "git@github.com:tgautier/"]
 	insteadOf = "tgautier:"

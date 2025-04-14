@@ -29,15 +29,7 @@ compaudit | xargs chown -R "$(whoami)"
 compaudit | xargs chmod go-w
 ```
 
-Install `asdf`:
-
-```sh
-git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
-```
-
-⚠️ Check the latest stable version, at the time of this writing it's `0.9.0`
-
-Then install asdf plugins:
+Install asdf plugins:
 
 ```sh
 cut -d' ' -f1 .tool-versions | xargs -t -L1 asdf plugin add

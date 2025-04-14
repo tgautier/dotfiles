@@ -1,5 +1,5 @@
 PATH="./bin:${PATH}"
-PATH="${HOME}/.asdf/shims:${PATH}"
+PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"
 PATH="/opt/homebrew/bin:${PATH}"
 PATH="/opt/homebrew/opt/openjdk/bin:${PATH}"
 PATH="/opt/homebrew/opt/sqlite/bin:${PATH}"

@@ -37,15 +37,8 @@
 [commit]
 	gpgsign = true
 
-[diff]
-	renames = copies
-	tool = vimdiff3
-
 [difftool]
 	prompt = false
-
-[difftool "vimdiff3"]
-	path = nvim
 
 [color "diff"]
 	whitespace = red
@@ -57,25 +50,15 @@
 [fetch]
 	prune = true
 
+[gpg]
+	format = ssh
+
 [gpg "ssh"]
-  program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+	program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
 
 [grep]
 	extendRegexp = true
 	lineNumber = true
-
-[include]
-	path = ~/.gitconfig.local
-
-[init]
-	templatedir = ~/.git_template
-	defaultBranch = main
-
-[merge]
-	tool = vimdiff3
-
-[mergetool "vimdiff3"]
-	path = nvim
 
 [pull]
 	rebase = true
@@ -88,10 +71,4 @@
 	email = thomas@gautier.gg
 	name = Thomas Gautier
 	useconfigonly = true
-	signingkey = EE663676C4FECFD7
-
-[url "git@github.com:tgautier/"]
-	insteadOf = "tgautier:"
-
-[url "git@github.com:fewlinesco/"]
-	insteadOf = "fewlines:"
+	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBRkKL/xhEWzA+O2DnrqTofc3gB42ixv5+P77K6zELfC

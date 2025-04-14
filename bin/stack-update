@@ -10,7 +10,6 @@ brew update \
 mas upgrade
 
 asdf install
-asdf update
-asdf plugin-update --all
+asdf plugin update --all
 
 rustup update

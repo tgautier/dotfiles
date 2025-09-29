@@ -40,7 +40,7 @@ source ${HOME}/.zsh/zaliases
 source ${HOME}/.zsh/zcompletion
 
 [[ -r ${HOME}/.zshrc.local ]] && source ${HOME}/.zshrc.local
-[[ -r ${HOME}/.asdf/asdf.sh ]] && source ${HOME}/.asdf/asdf.sh
 [[ -r ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 . "$HOME/.cargo/env"
+eval "$(/Users/tgautier/.local/bin/mise activate zsh)"

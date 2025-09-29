@@ -1,5 +1,4 @@
 PATH="./bin:${PATH}"
-PATH="${ASDF_DATA_DIR:-$HOME/.asdf}/shims:$PATH"
 PATH="/opt/homebrew/bin:${PATH}"
 PATH="/opt/homebrew/opt/openjdk/bin:${PATH}"
 PATH="/opt/homebrew/opt/sqlite/bin:${PATH}"
@@ -16,7 +15,6 @@ export DISPLAY=:1
 export EDITOR=vim
 export FPATH
 export GIT_EDITOR=vim
-export ASDF_GOLANG_MOD_VERSION_ENABLED=true
 export GOPATH=~/Workspace/go
 PATH="${PATH}:${GOPATH}/bin"
 export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile

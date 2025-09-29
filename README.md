@@ -4,7 +4,13 @@ Just a basic dotfiles repository
 
 ## Usage
 
-Install Homebrew then run:
+Install Homebrew
+
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Install packages from Brewfile:
 
 ```sh
 brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
@@ -29,16 +35,16 @@ compaudit | xargs chown -R "$(whoami)"
 compaudit | xargs chmod go-w
 ```
 
-Install asdf plugins:
+Install mise:
 
 ```sh
-cut -d' ' -f1 .tool-versions | xargs -t -L1 asdf plugin add
+curl https://mise.run | sh
 ```
 
 and finally:
 
 ```sh
-asdf install
+mise install
 ```
 
 You are now good to go 🚀

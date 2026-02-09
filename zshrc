@@ -23,13 +23,24 @@ _currentEnvironmentName() {
   fi
 }
 
-_currentKubernetesContextName() {
-  local context=$(kubectl config current-context 2> /dev/null);
+# Cache kubectl context to avoid expensive checks on every prompt render
+_kube_context_cache=""
+_kube_context_cache_time=0
 
-  if [ -z "${context}" -o "${context}" = "docker-desktop" ]; then
+_currentKubernetesContextName() {
+  local current_time=$(date +%s)
+  local cache_age=$((current_time - _kube_context_cache_time))
+
+  # Refresh cache every 30 seconds
+  if [[ $cache_age -gt 30 ]]; then
+    _kube_context_cache=$(kubectl config current-context 2> /dev/null)
+    _kube_context_cache_time=$current_time
+  fi
+
+  if [ -z "${_kube_context_cache}" -o "${_kube_context_cache}" = "docker-desktop" ]; then
     echo ""
   else
-    echo "%{%F{1}%} ${context}%{%f%} "
+    echo "%{%F{1}%} ${_kube_context_cache}%{%f%} "
   fi
 }
 
@@ -42,5 +53,5 @@ source ${HOME}/.zsh/zcompletion
 [[ -r ${HOME}/.zshrc.local ]] && source ${HOME}/.zshrc.local
 [[ -r ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
-. "$HOME/.cargo/env"
+# Initialize mise (version manager)
 eval "$(/Users/tgautier/.local/bin/mise activate zsh)"

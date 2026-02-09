@@ -1,3 +1,4 @@
+# Completion configuration (compinit is called in zprofile)
 fpath=(
   ~/.zsh/functions
   /opt/homebrew/completions/zsh
@@ -15,10 +16,7 @@ zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS}
 zstyle ':completion:*' menu select
 zstyle :compinstall filename ~/.zshrc
 
-autoload -Uz compinit
-
+# Autoload custom functions
 for f in ~/.zsh/functions/*; do
   autoload -Uz ${f##*/}
 done
-
-compinit

@@ -1,5 +1,6 @@
 tap "terror/tap"
 
+# CLI Tools & Development
 brew "act"
 brew "argocd"
 brew "autoconf"
@@ -38,7 +39,6 @@ brew "jpegoptim"
 brew "jq"
 brew "just"
 brew "k6"
-brew "kind"
 brew "kind"
 brew "kops"
 brew "kubectx"
@@ -93,8 +93,9 @@ brew "yt-dlp"
 brew "ytt"
 brew "zsh-completions"
 
-cask "1password-cli"
+# Applications
 cask "1password"
+cask "1password-cli"
 cask "adobe-creative-cloud"
 cask "antigravity"
 cask "arc"
@@ -106,8 +107,6 @@ cask "discord"
 cask "docker-desktop"
 cask "figma"
 cask "firefox"
-cask "font-fira-code"
-cask "font-source-code-pro"
 cask "google-chrome"
 cask "iterm2"
 cask "ledger-wallet"
@@ -130,6 +129,11 @@ cask "visual-studio-code"
 cask "vlc"
 cask "whatsapp"
 
+# Fonts
+cask "font-fira-code"
+cask "font-source-code-pro"
+
+# Mac App Store Applications
 mas "1Password for Safari", id: 1569813296
 mas "Keynote", id: 409183694
 mas "Notion Web Clipper", id: 1559269364

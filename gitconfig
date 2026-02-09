@@ -23,7 +23,6 @@
 	pff = push --force-with-lease --no-verify
 	pr = !open "https://github.com/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//')/compare/$(git current)?expand=1"
 	pr-create = !gitpr
-	clubhouse = !open "https://app.clubhouse.io/fewlines/story/$(git current | grep -Eo '[0-9]+' | sed 's/#//')"
 	issue = !open "https://github.com/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//')/issues/$(git current | grep -Eo '[0-9]+' | sed 's/#//')"
 	s = status --branch --short
 	serve-ro = !git daemon --reuseaddr --verbose --base-path=. --export-all --informative-errors --verbose ./.git

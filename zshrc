@@ -50,8 +50,22 @@ export PROMPT='%B%c%b%f$(_currentKubernetesContextName)$(_currentEnvironmentName
 source ${HOME}/.zsh/zaliases
 source ${HOME}/.zsh/zcompletion
 
+# WSL-specific optimizations
+if [[ $PLATFORM == "wsl" ]]; then
+  # Disable Windows PATH pollution (optional - uncomment if needed)
+  # This can significantly speed up shell startup in WSL
+  # export PATH=$(echo $PATH | tr ':' '\n' | grep -v "/mnt/" | tr '\n' ':' | sed 's/:$//')
+
+  # Set umask for better Windows interop
+  umask 022
+fi
+
 [[ -r ${HOME}/.zshrc.local ]] && source ${HOME}/.zshrc.local
 [[ -r ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && source ${HOME}/.config/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
-# Initialize mise (version manager)
-eval "$(/Users/tgautier/.local/bin/mise activate zsh)"
+# Initialize mise (version manager) if available
+if command -v mise &> /dev/null; then
+  eval "$(mise activate zsh)"
+elif [[ -x "${HOME}/.local/bin/mise" ]]; then
+  eval "$($HOME/.local/bin/mise activate zsh)"
+fi

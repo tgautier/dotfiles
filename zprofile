@@ -8,6 +8,7 @@ PATH="${HOME}/.bin.local:${PATH}"
 PATH="${HOME}/.bin:${PATH}"
 PATH="${HOME}/.dapr/bin:${PATH}"
 PATH="${HOME}/Workspace/tgautier/dotfiles:${PATH}"
+PATH="/Users/tgautier/.antigravity/antigravity/bin:$PATH"
 
 export CDPATH="${CDPATH}:${HOME}/Workspace"
 export DISABLE_AUTO_TITLE="true"
@@ -37,5 +38,8 @@ export HISTSIZE=50000
 export SAVEHIST=50000
 
 eval "$(/opt/homebrew/bin/brew shellenv)"
+fpath=(/Users/tgautier/.docker/completions $fpath)
+autoload -Uz compinit
+compinit
 
 . "$HOME/.cargo/env"

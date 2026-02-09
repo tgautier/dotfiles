@@ -3,7 +3,7 @@
 brew update \
   && brew bundle install \
   && brew upgrade \
-  && brew cleanup \
+  && brew cleanup --prune=all \
   && brew bundle cleanup --force \
   && brew doctor
 

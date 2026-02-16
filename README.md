@@ -42,17 +42,30 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
    sudo apt update && sudo apt upgrade -y
    ```
 
-2. **Install essential tools:**
+2. **Configure locales:**
    ```sh
-   sudo apt install -y zsh git curl build-essential
+   sudo apt install -y locales
+   sudo locale-gen en_US.UTF-8
+   sudo update-locale LANG=en_US.UTF-8
    ```
 
-3. **Install Homebrew (optional but recommended):**
+3. **Install essential tools:**
+   ```sh
+   sudo apt install -y coreutils zsh git curl build-essential
+   ```
+
+4. **Install Homebrew (optional but recommended):**
    ```sh
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
 
-4. **Install packages:**
+   Then add Homebrew to your PATH:
+   ```sh
+   echo 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >> ~/.bashrc
+   eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+   ```
+
+5. **Install packages:**
    ```sh
    # If using Homebrew:
    brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
@@ -61,7 +74,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
    sudo apt install -y gh jq htop httpie docker.io
    ```
 
-5. **Link dotfiles:**
+6. **Link dotfiles:**
    ```sh
    # Install rcm if using Homebrew:
    brew install rcm
@@ -73,18 +86,20 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
    rcup -d ~/Workspace/tgautier/dotfiles
    ```
 
-6. **Change shell to zsh:**
+7. **Change shell to zsh:**
    ```sh
    chsh -s $(which zsh)
    ```
 
-7. **Install mise:**
+   Log out and log back in for the shell change to take effect.
+
+8. **Install mise:**
    ```sh
    curl https://mise.run | sh
    mise install
    ```
 
-8. **(WSL only) Install 1Password for SSH:**
+9. **(WSL only) Install 1Password for SSH:**
    Follow: https://developer.1password.com/docs/ssh/get-started#step-3-turn-on-the-1password-ssh-agent
 
 ## Platform Detection
@@ -102,6 +117,30 @@ Platform-specific configurations are handled automatically in:
 - `zshrc` - WSL-specific optimizations
 
 ## Troubleshooting
+
+### Linux/WSL: Locale errors
+
+If you see `setlocale: LC_ALL: cannot change locale` errors:
+```sh
+sudo apt install -y locales
+sudo locale-gen en_US.UTF-8
+sudo update-locale LANG=en_US.UTF-8
+# Then log out and log back in
+```
+
+### Linux/WSL: Command not found (readlink, dirname, tty, date)
+
+Install coreutils package:
+```sh
+sudo apt install -y coreutils
+```
+
+### Linux/WSL: Homebrew not found after installation
+
+Add Homebrew to your current shell session:
+```sh
+eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+```
 
 ### Completion warnings
 

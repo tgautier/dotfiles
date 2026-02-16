@@ -70,10 +70,14 @@ elif [[ $PLATFORM == "linux" ]] || [[ $PLATFORM == "wsl" ]]; then
   [[ -d "/home/linuxbrew/.linuxbrew/bin" ]] && path+="/home/linuxbrew/.linuxbrew/bin"
 fi
 
-# Common paths
+# Common paths (including standard system paths)
 path+=(
   /usr/local/bin
   /usr/local/sbin
+  /usr/bin
+  /usr/sbin
+  /bin
+  /sbin
 )
 
 # Tool-specific paths (check if they exist)
@@ -81,8 +85,5 @@ path+=(
 [[ -d "${HOME}/Workspace/tgautier/dotfiles" ]] && path+="${HOME}/Workspace/tgautier/dotfiles"
 [[ -d "${HOME}/.antigravity/antigravity/bin" ]] && path+="${HOME}/.antigravity/antigravity/bin"
 [[ -d "${GOPATH}/bin" ]] && path+="${GOPATH}/bin"
-
-# Append existing PATH
-path+=$path
 
 export PATH

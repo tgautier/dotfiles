@@ -53,7 +53,7 @@
 	format = ssh
 
 [gpg "ssh"]
-	program = "/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+	program = op-ssh-sign
 
 [grep]
 	extendRegexp = true
@@ -71,3 +71,9 @@
 	name = Thomas Gautier
 	useconfigonly = true
 	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBRkKL/xhEWzA+O2DnrqTofc3gB42ixv5+P77K6zELfC
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential

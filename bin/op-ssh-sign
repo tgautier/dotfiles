@@ -1,0 +1,14 @@
+#!/bin/sh
+# Cross-platform wrapper for 1Password SSH signing
+case "$(uname -s)" in
+    Darwin)
+        exec /Applications/1Password.app/Contents/MacOS/op-ssh-sign "$@"
+        ;;
+    Linux)
+        for f in "/mnt/c/Program Files/WindowsApps"/Agilebits.1Password_*/op-ssh-sign-wsl; do
+            [ -x "$f" ] && exec "$f" "$@"
+        done
+        echo "op-ssh-sign-wsl not found" >&2
+        exit 1
+        ;;
+esac

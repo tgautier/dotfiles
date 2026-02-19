@@ -74,9 +74,9 @@ fi
 if [[ $PLATFORM == "wsl" ]]; then
   local wsl_paths=(
     "/mnt/c/Users/thoma/AppData/Local/Programs/Microsoft VS Code/bin"  # code
-    "/mnt/c/Windows/System32"                                           # clip.exe, cmd.exe, wsl.exe
-    "/mnt/c/Windows"                                                    # explorer.exe
-    "/mnt/c/Program Files/PowerShell/7"                                 # pwsh.exe
+    "/mnt/c/Windows/System32"                                          # clip.exe, cmd.exe, wsl.exe
+    "/mnt/c/Windows"                                                   # explorer.exe
+    "/mnt/c/Program Files/PowerShell/7"                                # pwsh.exe
   )
   for p in $wsl_paths; do
     [[ -d "$p" ]] && path+="$p"

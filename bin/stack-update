@@ -7,7 +7,7 @@ brew update \
   && brew bundle cleanup --force \
   && brew doctor
 
-mas upgrade
+command -v mas > /dev/null && mas upgrade
 
 mise install
 

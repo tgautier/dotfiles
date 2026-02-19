@@ -72,15 +72,14 @@ fi
 
 # WSL: Add Windows interop paths
 if [[ $PLATFORM == "wsl" ]]; then
-  local wsl_paths=(
-    "/mnt/c/Users/thoma/AppData/Local/Programs/Microsoft VS Code/bin"  # code
-    "/mnt/c/Windows/System32"                                          # clip.exe, cmd.exe, wsl.exe
-    "/mnt/c/Windows"                                                   # explorer.exe
-    "/mnt/c/Program Files/PowerShell/7"                                # pwsh.exe
-  )
-  for p in $wsl_paths; do
-    [[ -d "$p" ]] && path+="$p"
-  done
+  # VS Code (detect Windows user dynamically)
+  _vscode=(/mnt/c/Users/*/AppData/Local/Programs/Microsoft\ VS\ Code/bin(NY1))
+  (( ${#_vscode} )) && path+="$_vscode[1]"
+  # Windows system utilities (clip.exe, explorer.exe, cmd.exe, pwsh.exe)
+  [[ -d "/mnt/c/Windows/System32" ]] && path+="/mnt/c/Windows/System32"
+  [[ -d "/mnt/c/Windows" ]] && path+="/mnt/c/Windows"
+  [[ -d "/mnt/c/Program Files/PowerShell/7" ]] && path+="/mnt/c/Program Files/PowerShell/7"
+  unset _vscode
 fi
 
 # Common paths (including standard system paths)

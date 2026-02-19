@@ -51,7 +51,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
 
 3. **Install essential tools:**
    ```sh
-   sudo apt install -y coreutils zsh git curl build-essential
+   sudo apt install -y coreutils zsh git curl build-essential libffi-dev libyaml-dev zlib1g-dev
    ```
 
 4. **Install Homebrew (optional but recommended):**

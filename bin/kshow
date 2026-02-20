@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 
 set -o errexit
 set -o nounset
@@ -43,12 +43,19 @@ if [ "" = "${objectName}" ]; then
 fi
 
 transformCmd=cat
+decodeBase64Cmd() {
+  if base64 --decode </dev/null >/dev/null 2>&1; then
+    base64 --decode
+  else
+    base64 -D
+  fi
+}
 case "${objectType}" in
   configmap)
     ;;
   secrets)
     if [ "" != "${keyName}" ]; then
-      transformCmd="base64 -D"
+      transformCmd=decodeBase64Cmd
     fi
     ;;
   *)

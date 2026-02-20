@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env zsh
 input=${1:?"input file path is required"};
 output=${2:-"${input:r}.png"};
 

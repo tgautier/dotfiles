@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env sh
 # Cross-platform wrapper for 1Password SSH signing
 case "$(uname -s)" in
     Darwin)

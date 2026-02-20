@@ -5,5 +5,10 @@ alias kns=kubens
 alias kxec=kubectl exec -it
 alias la='ls -lah'
 alias ll='ls -lh'
-alias ls='ls -G'
-alias ts='/Applications/Tailscale.localized/Tailscale.app/Contents/MacOS/Tailscale'
+
+if [[ "${PLATFORM}" == "macos" ]]; then
+  alias ls='ls -G'
+  alias ts='/Applications/Tailscale.localized/Tailscale.app/Contents/MacOS/Tailscale'
+else
+  alias ls='ls --color=auto'
+fi

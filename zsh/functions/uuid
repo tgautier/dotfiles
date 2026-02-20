@@ -1,2 +1,2 @@
-#!/bin/sh
+#!/usr/bin/env zsh
 uuidgen | tr '[:upper:]' '[:lower:]' | tr -d '\n'

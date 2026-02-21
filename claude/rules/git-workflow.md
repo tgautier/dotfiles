@@ -13,9 +13,16 @@
 
 ## Automated PR reviews (Codex / Copilot)
 
-- After fixing review feedback, resolve the corresponding review threads via GraphQL before pushing:
+- For each bot review comment, decide whether to accept or reject:
+  - **Accept**: fix the issue, then resolve the thread via GraphQL
+  - **Reject**: reply to the thread explaining why, leave it unresolved
+- Resolve accepted threads via GraphQL before pushing:
   ```
   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
+  ```
+- Reply to rejected threads via the REST API:
+  ```
+  gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies -f body='Reason for not accepting'
   ```
 - To list unresolved thread IDs:
   ```

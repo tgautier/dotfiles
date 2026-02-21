@@ -99,8 +99,10 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
 
 4. If Codex left review comments or requested changes:
    - Read each comment carefully
-   - Fix the issues locally
-   - Resolve the addressed review threads via GraphQL:
+   - For each comment, decide whether to accept or reject:
+     - **Accept**: fix the issue locally, then resolve the thread via GraphQL
+     - **Reject**: reply to the thread explaining why, then leave it unresolved
+   - Resolve accepted threads via GraphQL:
      ```
      # List unresolved Codex threads
      gh api graphql -f query='query { repository(owner: "{owner}", name: "{repo}") { pullRequest(number: {pr_number}) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { author { login } } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | select(.comments.nodes[0].author.login == "chatgpt-codex-connector[bot]") | .id'
@@ -138,8 +140,10 @@ Request and wait for the GitHub Copilot code review:
 
 4. If Copilot left inline comments with suggestions:
    - Read each comment carefully
-   - Fix the issues locally
-   - Resolve the addressed review threads via GraphQL:
+   - For each comment, decide whether to accept or reject:
+     - **Accept**: fix the issue locally, then resolve the thread via GraphQL
+     - **Reject**: reply to the thread explaining why, then leave it unresolved
+   - Resolve accepted threads via GraphQL:
      ```
      # List unresolved Copilot threads
      gh api graphql -f query='query { repository(owner: "{owner}", name: "{repo}") { pullRequest(number: {pr_number}) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { author { login } } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]") | .id'

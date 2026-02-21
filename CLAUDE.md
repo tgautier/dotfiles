@@ -22,17 +22,21 @@ brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
 ## Architecture
 
 ### Platform Detection
+
 `zshenv` detects the platform (`macos`, `wsl`, `linux`) into `$PLATFORM`. Platform-specific logic is spread across `zshenv`, `zprofile`, `zsh/zcompletion`, and `zshrc`. Always guard platform-specific code with `$PLATFORM` checks.
 
 ### Shell Configuration Load Order
+
 `zshenv` → `zprofile` → `zshrc` → `zsh/zaliases` + `zsh/zcompletion`
 
 Custom functions live in `zsh/functions/` and are autoloaded. Scripts in `bin/` are added to PATH automatically.
 
 ### Performance
+
 Shell startup is optimized with caching (kubectl context, environment vars). Avoid adding slow operations to shell init files.
 
 ### Git Configuration
+
 - SSH key signing via 1Password (`op-ssh-sign`)
 - `gh` credential helper for GitHub HTTPS
 - Rebase-based pulls with fast-forward only
@@ -40,6 +44,7 @@ Shell startup is optimized with caching (kubectl context, environment vars). Avo
 ## Commit Conventions
 
 Per `claude/rules/commits.md`:
+
 - Conventional commit format: `type(scope): description`
 - Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `perf`
 - First line under 72 characters

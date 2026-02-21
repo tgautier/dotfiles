@@ -15,19 +15,25 @@
 
 - For each bot review comment, decide whether to accept or reject:
   - **Accept**: fix the issue, then resolve the thread via GraphQL
-  - **Reject**: reply to the thread explaining why, leave it unresolved
+  - **Reject**: reply to the thread explaining why, then resolve it
 - Resolve accepted threads via GraphQL before pushing:
-  ```
+
+  ```sh
   gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
   ```
+
 - Reply to rejected threads via the REST API:
-  ```
+
+  ```sh
   gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies -f body='Reason for not accepting'
   ```
+
 - To list unresolved thread IDs:
-  ```
+
+  ```sh
   gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { body author { login } } } } } } } }'
   ```
+
 - Only resolve threads from bot reviewers (`chatgpt-codex-connector[bot]`, `copilot-pull-request-reviewer[bot]`) — never resolve human reviewer threads
 
 ## Merging

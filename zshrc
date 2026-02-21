@@ -1,4 +1,5 @@
-export GPG_TTY=$(tty)
+GPG_TTY=$(tty)
+export GPG_TTY
 
 setopt EXTENDED_HISTORY
 setopt INC_APPEND_HISTORY
@@ -28,7 +29,8 @@ _kube_context_cache=""
 _kube_context_cache_time=0
 
 _currentKubernetesContextName() {
-  local current_time=$(date +%s)
+  local current_time
+  current_time=$(date +%s)
   local cache_age=$((current_time - _kube_context_cache_time))
 
   # Refresh cache every 30 seconds
@@ -37,7 +39,7 @@ _currentKubernetesContextName() {
     _kube_context_cache_time=$current_time
   fi
 
-  if [ -z "${_kube_context_cache}" -o "${_kube_context_cache}" = "docker-desktop" ]; then
+  if [ -z "${_kube_context_cache}" ] || [ "${_kube_context_cache}" = "docker-desktop" ]; then
     echo ""
   else
     echo "%{%F{1}%} ${_kube_context_cache}%{%f%} "

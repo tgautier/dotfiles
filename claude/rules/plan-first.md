@@ -28,9 +28,17 @@ Before writing any code, determine how to verify it works:
 
 Run verification **after every edit**, not batched at the end. If a test fails, fix it before moving on.
 
+## Failing tests are blockers
+
+- **Never dismiss a test failure** — "pre-existing", "unrelated", or "infrastructure issue" are not valid reasons to skip investigation
+- If a test fails during verification, **stop and fix it** before continuing with the original task
+- If the fix is genuinely out of scope, explain the root cause to the user and let them decide — don't silently move on
+- Run **all** verification commands in the plan (`just check`, `just test`, `just test-e2e`), not just the ones you expect to pass
+
 ## Anti-patterns
 
 - Writing code before reading the files you'll change
 - Making speculative fixes without understanding root cause
 - Batching all verification to the end
 - Skipping plan mode to "save time" — it costs more time when changes need rework
+- Dismissing failing tests as "pre-existing" or "unrelated" without investigating

@@ -50,6 +50,13 @@
 
 ## Automated PR reviews (Copilot)
 
+- Before requesting a review, record the latest Copilot review ID to distinguish old from new:
+
+  ```sh
+  LAST_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | .id // 0')
+  ```
+
 - Request the review via API:
 
   ```sh
@@ -58,19 +65,25 @@
 
   - If this fails (e.g. Copilot not enabled), report "Copilot review skipped (not available)" and continue
 
-- Poll for a new review every 15 seconds, up to 5 minutes:
+- Poll for a **new** review every 15 seconds, up to 5 minutes — compare against the saved ID:
 
   ```sh
-  gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | {state: .state, body: .body}'
+  gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | select(.id != '"$LAST_REVIEW_ID"') | {id: .id, state: .state, body: .body}'
   ```
 
-  - If no review appears after 5 minutes, inform the user and continue
+  - If the output is empty, the new review hasn't arrived yet — keep polling
+  - If no new review appears after 5 minutes, inform the user and continue
 
-- Read inline comments from Copilot:
+- Read inline comments **from the new review only** (filter by `pull_request_review_id`):
 
   ```sh
-  gh api repos/{owner}/{repo}/pulls/{pr_number}/comments --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]") | {path: .path, line: .line, body: .body}'
+  gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
+    --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]" and .pull_request_review_id == NEW_REVIEW_ID) | {id: .id, path: .path, line: .line, body: .body}'
   ```
+
+  - Use the review ID from the poll step above as `NEW_REVIEW_ID`
+  - This prevents re-processing comments from previous review rounds
 
 - For each bot review comment, decide whether to accept or reject:
   - **Accept**: fix the issue, then resolve the thread via GraphQL
@@ -94,8 +107,19 @@
   ```
 
 - Only resolve threads from bot reviewers (`copilot-pull-request-reviewer[bot]`) — never resolve human reviewer threads
-- After fixing accepted comments: commit, push, re-request review (repeat the cycle)
+
+### Review-fix cycle
+
+After processing all comments from a Copilot review:
+
+1. Resolve all accepted/rejected threads (GraphQL mutations + REST replies)
+2. Commit the fixes
+3. Push (the standard push workflow applies — this triggers steps 1-3 from the Pushing section, including `gh pr edit` and a new Copilot review request)
+4. Poll for the new Copilot review and process any new comments
+5. Repeat from step 1 until the review comes back clean (no new comments)
+
 - 3-round cap: if the reviewer keeps finding issues after 3 rounds, inform the user and let them decide
+- Never skip re-requesting the review — every push that fixes review comments **must** trigger a fresh Copilot review
 
 ## Merging
 

@@ -1,14 +1,16 @@
 # Dotfiles
 
-Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
+Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
+[rcm](https://github.com/thoughtbot/rcm).
 
 ## Features
 
-- 🚀 **Optimized shell startup** with intelligent caching
-- 🔄 **Cross-platform support** for macOS and Linux/WSL
-- 🎯 **Platform detection** with automatic path configuration
-- 📦 **Homebrew integration** with platform-specific Brewfiles
-- ⚡ **Performance optimizations** for faster shell experience
+- Cross-platform support for macOS, Linux, and WSL2
+- Platform detection (`$PLATFORM`) with automatic path configuration
+- Homebrew integration with platform-specific Brewfiles
+- Runtime version management via [mise](https://mise.jdx.dev/)
+- Optimized shell startup with intelligent caching
+- CI with [just](https://just.systems/) + GitHub Actions
 
 ## Quick Start
 
@@ -29,7 +31,11 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
 3. **Link dotfiles:**
 
    ```sh
+   # First-time setup (rcrc not yet symlinked):
    rcup -d ~/Workspace/tgautier/dotfiles
+
+   # Subsequent updates:
+   rcup
    ```
 
 4. **Install mise:**
@@ -94,7 +100,11 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
    sudo add-apt-repository ppa:martin-frost/thoughtbot-rcm
    sudo apt install rcm
 
+   # First-time setup (rcrc not yet symlinked):
    rcup -d ~/Workspace/tgautier/dotfiles
+
+   # Subsequent updates:
+   rcup
    ```
 
 7. **Change shell to zsh:**
@@ -115,6 +125,28 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu.
 9. **(WSL only) Install 1Password for SSH:**
    Follow: <https://developer.1password.com/docs/ssh/get-started#step-3-turn-on-the-1password-ssh-agent>
 
+## Structure
+
+```text
+zshenv                  # Platform detection, environment variables, PATH
+zprofile                # Homebrew init, compinit
+zshrc                   # Prompt, keybindings, mise activation, sources aliases/completions
+zsh/
+  zaliases              # Shell aliases
+  zcompletion           # Completion paths, autoloads functions
+  functions/            # Autoloaded zsh functions
+bin/                    # Scripts added to PATH
+config/
+  mise/config.toml      # Pinned tool versions (node, python, ruby, go, etc.)
+  alacritty/alacritty.yml
+gitconfig               # SSH signing via 1Password, rebase-based pulls
+rcrc                    # rcm config (DOTFILES_DIRS, EXCLUDES)
+Brewfile                # macOS Homebrew packages
+Brewfile.linux          # Linux Homebrew packages
+justfile                # Local CI tasks (lint-shell, lint-json-yaml, etc.)
+.github/workflows/ci.yml
+```
+
 ## Platform Detection
 
 The dotfiles automatically detect your platform and configure accordingly:
@@ -129,6 +161,30 @@ Platform-specific configurations are handled automatically in:
 - `zprofile` - Homebrew initialization
 - `zsh/zcompletion` - Completion paths
 - `zshrc` - WSL-specific optimizations
+
+## CI / Linting
+
+Run all checks locally with [just](https://just.systems/):
+
+```sh
+just ci
+```
+
+Individual targets:
+
+| Target                 | Description                                          |
+| ---------------------- | ---------------------------------------------------- |
+| `just lint-shell`      | ShellCheck on `bin/*` and zsh files                  |
+| `just lint-json-yaml`  | Validate `claude/settings.json` and `alacritty.yml`  |
+| `just lint-markdown`   | markdownlint-cli2                                    |
+| `just lint-brewfile`   | Ruby syntax check on Brewfiles                       |
+| `just lint-mise`       | Validate mise config                                 |
+
+Enable the pre-commit hook:
+
+```sh
+just setup
+```
 
 ## Troubleshooting
 
@@ -183,5 +239,3 @@ Check if required tools are installed:
 ```sh
 which brew mise git zsh
 ```
-
-You are now good to go 🚀

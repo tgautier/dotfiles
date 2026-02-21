@@ -100,6 +100,13 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
 4. If Codex left review comments or requested changes:
    - Read each comment carefully
    - Fix the issues locally
+   - Resolve the addressed review threads via GraphQL:
+     ```
+     # List unresolved Codex threads
+     gh api graphql -f query='query { repository(owner: "{owner}", name: "{repo}") { pullRequest(number: {pr_number}) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { author { login } } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | select(.comments.nodes[0].author.login == "chatgpt-codex-connector[bot]") | .id'
+     # Resolve each thread
+     gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
+     ```
    - Commit with a descriptive message (e.g. `fix(scope): address Codex review feedback`)
    - Push (go back to step 4 for sync/push)
    - Wait for the new Codex review (repeat this step)
@@ -132,6 +139,13 @@ Request and wait for the GitHub Copilot code review:
 4. If Copilot left inline comments with suggestions:
    - Read each comment carefully
    - Fix the issues locally
+   - Resolve the addressed review threads via GraphQL:
+     ```
+     # List unresolved Copilot threads
+     gh api graphql -f query='query { repository(owner: "{owner}", name: "{repo}") { pullRequest(number: {pr_number}) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { author { login } } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]") | .id'
+     # Resolve each thread
+     gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
+     ```
    - Commit with a descriptive message (e.g. `fix(scope): address Copilot review feedback`)
    - Push (go back to step 4 for sync/push)
    - Request a new Copilot review (repeat this step)

@@ -74,15 +74,20 @@
 
   - If the output is empty, the new review hasn't arrived yet — keep polling
   - If no new review appears after 5 minutes, inform the user and continue
+  - Extract the new review ID for use in the next step:
+
+    ```sh
+    NEW_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+      --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | select(.id != '"$LAST_REVIEW_ID"') | .id')
+    ```
 
 - Read inline comments **from the new review only** (filter by `pull_request_review_id`):
 
   ```sh
   gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
-    --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]" and .pull_request_review_id == NEW_REVIEW_ID) | {id: .id, path: .path, line: .line, body: .body}'
+    --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]" and .pull_request_review_id == '"$NEW_REVIEW_ID"') | {id: .id, path: .path, line: .line, body: .body}'
   ```
 
-  - Use the review ID from the poll step above as `NEW_REVIEW_ID`
   - This prevents re-processing comments from previous review rounds
 
 - For each bot review comment, decide whether to accept or reject:

@@ -90,7 +90,8 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
     '.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
       | select(.comments.nodes | length > 0)
-      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")
+      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]" or .comments.nodes[0].author.login == "copilot-pull-request-reviewer")
+      | select(.comments.nodes[0].pullRequestReview != null)
       | select(.comments.nodes[0].pullRequestReview.databaseId == ($newReviewId | tonumber))
       | {threadId: .id, body: .comments.nodes[0].body}'
   ```
@@ -127,7 +128,7 @@ After processing all comments from a Copilot review:
 
 1. Resolve all accepted/rejected threads (GraphQL mutations + REST replies)
 2. Commit the fixes
-3. Push (the standard push workflow applies — this triggers steps 1-2 from the Pushing section, including `gh pr edit` and a new Copilot review request)
+3. Push (the standard push workflow applies — including updating the PR description with `gh pr edit` and requesting a new Copilot review)
 4. Poll for the new Copilot review and process any new comments
 5. Repeat from step 1 until the review comes back clean (no new comments)
 

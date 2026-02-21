@@ -18,7 +18,7 @@ lint-shell:
 # Validate JSON and YAML config files
 lint-json-yaml:
     jq empty claude/settings.json
-    python3 -c "import yaml; yaml.safe_load(open('config/alacritty/alacritty.yml'))"
+    yq '.' config/alacritty/alacritty.yml > /dev/null
 
 # Lint markdown files
 lint-markdown:

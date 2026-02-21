@@ -1,9 +1,0 @@
-deno 2.6.3
-elixir 1.19.4-otp-28
-erlang 28.3
-golang 1.25.5
-helm 4.0.4
-nodejs 25.2.1
-python 3.14.2
-ruby 3.4.8
-yarn 4.12.0

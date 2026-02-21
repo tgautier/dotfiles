@@ -21,8 +21,7 @@
   - If push fails because the remote branch was deleted: re-push with `-u` to recreate it
 - After every push to a branch with an open PR:
   1. Update the PR description (`gh pr edit`) — title, summary, and test plan must reflect ALL commits on the branch vs main
-  2. Request a Copilot review: `gh api --method POST repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'`
-  3. Poll for the review (up to 5 minutes), then process any comments before continuing
+  2. Poll for the Copilot review (auto-triggered by GitHub on push, up to 5 minutes), then process any comments before continuing
 
 ## Pull requests
 
@@ -50,45 +49,41 @@
 
 ## Automated PR reviews (Copilot)
 
-- Before requesting a review, record the latest Copilot review ID to distinguish old from new:
+GitHub automatically triggers a Copilot review when you push to a PR — **do not** manually request one via the API, as that creates a duplicate review and confuses ID-based polling.
+
+- Before pushing, record the latest Copilot review ID to distinguish old from new:
 
   ```sh
   LAST_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | .id // 0')
+    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last // empty | .id // 0')
   ```
 
-- Request the review via API:
+- After pushing, poll for a **new** review every 15 seconds, up to 5 minutes — compare against the saved ID:
 
   ```sh
-  gh api --method POST repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+  NEW_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last // empty | select(.id != '"$LAST_REVIEW_ID"') | .id')
   ```
 
-  - If this fails (e.g. Copilot not enabled), report "Copilot review skipped (not available)" and continue
-
-- Poll for a **new** review every 15 seconds, up to 5 minutes — compare against the saved ID:
-
-  ```sh
-  gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | select(.id != '"$LAST_REVIEW_ID"') | {id: .id, state: .state, body: .body}'
-  ```
-
-  - If the output is empty, the new review hasn't arrived yet — keep polling
+  - If `NEW_REVIEW_ID` is empty, the new review hasn't arrived yet — keep polling
   - If no new review appears after 5 minutes, inform the user and continue
-  - Extract the new review ID for use in the next step:
 
-    ```sh
-    NEW_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-      --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | select(.id != '"$LAST_REVIEW_ID"') | .id')
-    ```
-
-- Read inline comments **from the new review only** (filter by `pull_request_review_id`):
+- Read inline comments **from the new review only** — use GraphQL to reliably get review threads (the REST comments endpoint may not return comments on outdated diff lines):
 
   ```sh
-  gh api repos/{owner}/{repo}/pulls/{pr_number}/comments \
-    --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]" and .pull_request_review_id == '"$NEW_REVIEW_ID"') | {id: .id, path: .path, line: .line, body: .body}'
+  gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
+    pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes {
+      id isResolved comments(first: 5) { nodes { body author { login }
+        pullRequestReview { databaseId } } } } } } } }' \
+    --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+      | select(.isResolved == false)
+      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer")
+      | select(.comments.nodes[0].pullRequestReview.databaseId == '"$NEW_REVIEW_ID"')
+      | {threadId: .id, body: .comments.nodes[0].body}'
   ```
 
-  - This prevents re-processing comments from previous review rounds
+  - This filters to unresolved threads from the specific new review only
+  - Prevents re-processing comments from previous review rounds
 
 - For each bot review comment, decide whether to accept or reject:
   - **Accept**: fix the issue, then resolve the thread via GraphQL

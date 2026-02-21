@@ -30,6 +30,13 @@
   ```
 - Only resolve threads from bot reviewers (`chatgpt-codex-connector[bot]`, `copilot-pull-request-reviewer[bot]`) — never resolve human reviewer threads
 
+## Merging
+
+- Before merging, verify all todo list tasks are completed — never merge with pending or in-progress items
+- PR reviews (Codex, Copilot, or any reviewer) may add new tasks — treat accepted review comments as todo items that must be resolved before merging
+- Check that CI checks pass before merging: `gh pr checks`
+- Confirm the PR is still `OPEN` immediately before merging
+
 ## Principles
 
 - Prevent problems, don't recover from them — design workflows so errors can't happen rather than adding complex recovery logic

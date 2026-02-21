@@ -10,7 +10,10 @@
 ## Pushing
 
 - `--force-with-lease` is the safety net for remote divergence — don't add redundant pulls before it
-- After every push to a branch with an open PR, update the PR description (`gh pr edit`) — summary must reflect ALL commits on the branch, test plan must reflect current state
+- After every push to a branch with an open PR:
+  1. Update the PR description (`gh pr edit`) — summary must reflect ALL commits on the branch, test plan must reflect current state
+  2. Request a Copilot review: `gh api --method POST repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'`
+  3. Poll for the review (up to 5 minutes), then process any comments before continuing
 
 ## Automated PR reviews (Copilot)
 
@@ -39,6 +42,16 @@
 
 ## Merging
 
+- **Never merge with unresolved review threads** — every thread from every reviewer (bot or human) must be resolved before merging:
+  - Accepted: fix applied and thread resolved via GraphQL
+  - Rejected: reply posted explaining why, then thread resolved
+- Verify zero unresolved threads before merging:
+
+  ```sh
+  gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved } } } } }' --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length'
+  ```
+
+  If the count is not `0`, stop and resolve remaining threads first
 - Before merging, verify all todo list tasks are completed — never merge with pending or in-progress items
 - PR reviews (Copilot or any reviewer) may add new tasks — treat accepted review comments as todo items that must be resolved before merging
 - Check that CI checks pass before merging: `gh pr checks`

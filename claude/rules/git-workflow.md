@@ -83,7 +83,7 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
 
   ```sh
   gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
-    pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes {
+    pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes {
       id isResolved comments(first: 5) { nodes { body author { login }
         pullRequestReview { databaseId } } } } } } } }' \
     | jq --arg newReviewId "$NEW_REVIEW_ID" \

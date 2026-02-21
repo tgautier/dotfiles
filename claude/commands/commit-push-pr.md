@@ -17,7 +17,15 @@ Run these in parallel:
 - `git branch --show-current` (current branch)
 - `git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "no-upstream"` (tracking info)
 
-## 2. Stage and commit
+## 2. Create feature branch if needed
+
+- If the current branch is `main` or `master`, create a new feature branch before committing
+- Derive the branch name from the changes (e.g. `feat/add-libpq`, `fix/shell-startup`)
+- Use the format: `type/short-description` (lowercase, hyphens, no spaces)
+- Checkout the new branch: `git checkout -b <branch-name>`
+- If already on a feature branch, skip this step
+
+## 3. Stage and commit
 
 - Stage all relevant changed files (avoid secrets, .env, credentials)
 - Write a conventional commit message: `type(scope): description`
@@ -25,12 +33,12 @@ Run these in parallel:
 - Keep first line under 72 characters
 - Use a HEREDOC for the commit message
 
-## 3. Push
+## 4. Push
 
 - Push to the remote, using `-u` if no upstream is set
-- If the branch is `main` or `master`, STOP and warn the user
+- Never push directly to `main` or `master`
 
-## 4. Create or update PR
+## 5. Create or update PR
 
 - Check if a PR already exists for this branch: `gh pr view --json number,url 2>/dev/null`
 - If a PR exists: report its URL, do NOT create a new one

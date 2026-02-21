@@ -1,6 +1,6 @@
 ---
 allowed-tools: Bash, Read, Glob, Grep
-description: Commit all changes, push, and create/update a PR if needed
+description: Commit, push, create/update PR, and optionally merge
 user-invocable: true
 ---
 
@@ -27,22 +27,25 @@ Run these in parallel:
 
 ## 3. Stage and commit
 
+- If there are no changes to commit, skip to step 4
 - Stage all relevant changed files (avoid secrets, .env, credentials)
 - Write a conventional commit message: `type(scope): description`
 - Do NOT include `Co-Authored-By` or mention Claude/AI
 - Keep first line under 72 characters
 - Use a HEREDOC for the commit message
 
-## 4. Push
+## 4. Rebase and push
 
-- Push to the remote, using `-u` if no upstream is set
+- Fetch latest: `git fetch origin main`
+- If the branch has diverged from `origin/main` (e.g. after a previous squash merge), rebase: `git rebase origin/main`
+- Push to the remote, using `-u` if no upstream is set; use `--force-with-lease` if rebase rewrote history
 - Never push directly to `main` or `master`
 
 ## 5. Create or update PR
 
-- Check if a PR already exists for this branch: `gh pr view --json number,url 2>/dev/null`
-- If a PR exists: report its URL, do NOT create a new one
-- If no PR exists: create one with `gh pr create` using this format:
+- Check if an **open** PR exists: `gh pr view --json number,url,state 2>/dev/null`
+- If a PR exists and `state` is `OPEN`: report its URL, do NOT create a new one
+- If no open PR exists: create one with `gh pr create` using this format:
 
 ```
 gh pr create --title "short title" --body "$(cat <<'EOF'
@@ -66,3 +69,7 @@ EOF
 
 - Always use squash merge: `gh pr merge <number> --squash`
 - Never use `--merge` or `--rebase` strategies
+- After merge completes:
+  1. Switch back to main: `git checkout main`
+  2. Pull latest: `git pull`
+  3. Delete the local feature branch: `git branch -d <branch-name>`

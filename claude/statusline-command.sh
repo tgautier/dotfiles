@@ -75,14 +75,14 @@ if [ -n "$branch" ]; then
   printf "${sep}${GREEN}🌿 ${branch}${RESET}"
 fi
 
-# Model segment
-if [ -n "$short_model" ]; then
-  printf "${sep}${CYAN}🧠 ${short_model}${RESET}"
-fi
-
 # Context segment
 if [ -n "$ctx_str" ]; then
   printf "${sep}${YELLOW}📊 ${ctx_str}${RESET}"
+fi
+
+# Model segment
+if [ -n "$short_model" ]; then
+  printf "${sep}${CYAN}🧠 ${short_model}${RESET}"
 fi
 
 # Version segment (subtle)

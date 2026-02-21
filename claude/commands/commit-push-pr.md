@@ -17,28 +17,35 @@ Run these in parallel:
 - `git branch --show-current` (current branch)
 - `git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "no-upstream"` (tracking info)
 
-## 2. Create feature branch if needed
+## 2. Clean up stale branch or create new one
 
+- If on a feature branch, check if its PR was already merged/closed: `gh pr view --json state 2>/dev/null`
+  - If `state` is `MERGED` or `CLOSED`: warn the user if there are uncommitted changes, then switch to main, pull, delete the stale branch, and create a fresh feature branch from main
 - If the current branch is `main` or `master`, create a new feature branch before committing
 - Derive the branch name from the changes (e.g. `feat/add-libpq`, `fix/shell-startup`)
 - Use the format: `type/short-description` (lowercase, hyphens, no spaces)
 - Checkout the new branch: `git checkout -b <branch-name>`
-- If already on a feature branch, skip this step
+- If already on a feature branch with no merged/closed PR, skip this step
 
 ## 3. Stage and commit
 
-- If there are no changes to commit, skip to step 4
+- If there are no changes to commit and nothing unpushed, inform the user and stop
+- If there are no changes to commit but there are unpushed commits, skip to step 4
 - Stage all relevant changed files (avoid secrets, .env, credentials)
 - Write a conventional commit message: `type(scope): description`
 - Do NOT include `Co-Authored-By` or mention Claude/AI
 - Keep first line under 72 characters
 - Use a HEREDOC for the commit message
 
-## 4. Rebase and push
+## 4. Sync, rebase, and push
 
-- Fetch latest: `git fetch origin main`
-- If the branch has diverged from `origin/main` (e.g. after a previous squash merge), rebase: `git rebase origin/main`
-- Push to the remote, using `-u` if no upstream is set; use `--force-with-lease` if rebase rewrote history
+- Fetch latest: `git fetch origin`
+- Check if branch needs rebasing onto main: `git merge-base --is-ancestor origin/main HEAD` (exit 0 = clean)
+- If rebase is needed: `git rebase origin/main`
+  - If rebase hits conflicts: abort, inform the user of the conflicting files, and stop
+- Push with `--force-with-lease`, adding `-u` if no upstream is set
+  - If `--force-with-lease` rejects the push (remote has unknown commits): stop and inform the user
+  - If push fails because the remote branch was deleted: re-push with `-u` to recreate it
 - Never push directly to `main` or `master`
 
 ## 5. Create or update PR
@@ -69,6 +76,7 @@ EOF
 
 - Always use squash merge: `gh pr merge <number> --squash`
 - Never use `--merge` or `--rebase` strategies
+- If merge fails due to failing checks: inform the user and stop
 - After merge completes:
   1. Switch back to main: `git checkout main`
   2. Pull latest: `git pull`

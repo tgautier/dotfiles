@@ -19,7 +19,7 @@
   ```
 - To list unresolved thread IDs:
   ```
-  gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: PR) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { body author { login } } } } } } } }'
+  gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { body author { login } } } } } } } }'
   ```
 - Only resolve threads from bot reviewers (`chatgpt-codex-connector[bot]`, `copilot-pull-request-reviewer[bot]`) — never resolve human reviewer threads
 

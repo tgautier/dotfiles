@@ -150,7 +150,7 @@ Request and wait for the GitHub Copilot code review:
    - Push (go back to step 4 for sync/push)
    - Request a new Copilot review (repeat this step)
 
-5. If Copilot review has no inline comments: report "Copilot review passed" and continue
+5. If Copilot review has no inline comments and the review body contains no actionable feedback: report "Copilot review passed" and continue. If the body contains actionable suggestions but no inline comments, treat them as feedback to address.
 
 ### 6c. Handle combined review feedback
 

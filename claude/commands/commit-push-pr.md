@@ -123,9 +123,9 @@ Request and wait for the GitHub Copilot code review:
    ```
    - If this fails (e.g. Copilot not enabled for the repo), report "Copilot review skipped (not available)" and continue
 
-2. Poll for the Copilot review:
+2. Note the current Copilot review count before polling, then poll for a new review:
    ```
-   gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]") | {state: .state, body: .body}'
+   gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | {state: .state, body: .body}'
    ```
    - Poll every 15 seconds, up to 5 minutes
    - If no review appears after 5 minutes, inform the user and continue

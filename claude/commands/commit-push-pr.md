@@ -70,9 +70,11 @@ EOF
 - The summary should cover ALL commits in the branch, not just the latest
 - Return the PR URL when done
 
-## 6. Wait for Codex review
+## 6. Wait for Codex and Copilot reviews
 
-After creating or pushing to a PR, always wait for the OpenAI Codex review:
+After creating or pushing to a PR, wait for both the OpenAI Codex review and the GitHub Copilot review.
+
+### 6a. Wait for Codex review
 
 1. First, check for a usage-limit comment from Codex:
    ```
@@ -103,6 +105,43 @@ After creating or pushing to a PR, always wait for the OpenAI Codex review:
    - Wait for the new Codex review (repeat this step)
 
 5. If Codex gave 👍 with no comments: report "Codex review passed" and continue
+
+### 6b. Wait for Copilot review
+
+Request and wait for the GitHub Copilot code review:
+
+1. Request the review via API:
+   ```
+   gh api --method POST repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+   ```
+   - If this fails (e.g. Copilot not enabled for the repo), report "Copilot review skipped (not available)" and continue
+
+2. Poll for the Copilot review:
+   ```
+   gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]") | {state: .state, body: .body}'
+   ```
+   - Poll every 15 seconds, up to 5 minutes
+   - If no review appears after 5 minutes, inform the user and continue
+   - Copilot always leaves a "COMMENTED" review (never "APPROVED" or "CHANGES_REQUESTED")
+
+3. Check for inline review comments from Copilot:
+   ```
+   gh api repos/{owner}/{repo}/pulls/{pr_number}/comments --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]") | {path: .path, line: .line, body: .body}'
+   ```
+
+4. If Copilot left inline comments with suggestions:
+   - Read each comment carefully
+   - Fix the issues locally
+   - Commit with a descriptive message (e.g. `fix(scope): address Copilot review feedback`)
+   - Push (go back to step 4 for sync/push)
+   - Request a new Copilot review (repeat this step)
+
+5. If Copilot review has no inline comments: report "Copilot review passed" and continue
+
+### 6c. Handle combined review feedback
+
+- If both Codex and Copilot left feedback, address all comments in a single commit when possible
+- If either reviewer keeps finding issues after 3 rounds, inform the user and let them decide whether to continue iterating
 
 ## 7. Merge (only if user explicitly asks to merge)
 

@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-json-yaml lint-markdown lint-brewfile
+ci: lint-shell lint-json-yaml lint-markdown lint-brewfile lint-mise
 
 # Enable the pre-commit hook for this repo
 setup:
@@ -18,7 +18,7 @@ lint-shell:
 # Validate JSON and YAML config files
 lint-json-yaml:
     jq empty claude/settings.json
-    python3 -c "import yaml; yaml.safe_load(open('config/alacritty/alacritty.yml'))"
+    yq '.' config/alacritty/alacritty.yml > /dev/null
 
 # Lint markdown files
 lint-markdown:
@@ -28,3 +28,7 @@ lint-markdown:
 lint-brewfile:
     ruby -c Brewfile
     ruby -c Brewfile.linux
+
+# Validate mise config
+lint-mise:
+    mise config ls

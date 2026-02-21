@@ -9,6 +9,6 @@ brew update \
 
 command -v mas > /dev/null && mas upgrade
 
-mise install
+mise upgrade --bump
 
 rustup update

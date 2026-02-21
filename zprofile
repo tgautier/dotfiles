@@ -10,9 +10,13 @@ fi
 # Add Docker completions to fpath (if available)
 [[ -d "${HOME}/.docker/completions" ]] && fpath=(${HOME}/.docker/completions $fpath)
 
-# Initialize completions
+# Initialize completions (cached daily via zcompdump)
 autoload -Uz compinit
-compinit
+if [[ -f ~/.zcompdump && $(date +'%j') == $(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null || stat -c '%Y' ~/.zcompdump 2>/dev/null | xargs -I{} date -d @{} +'%j' 2>/dev/null) ]]; then
+  compinit -C
+else
+  compinit
+fi
 
 # Initialize Rust/Cargo environment (if available)
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"

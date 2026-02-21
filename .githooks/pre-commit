@@ -3,5 +3,5 @@ set -euo pipefail
 
 # Only run if just and the justfile are available
 if command -v just &>/dev/null && [ -f justfile ]; then
-  just ci
+  mise x -- just ci
 fi

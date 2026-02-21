@@ -52,7 +52,7 @@ Run these in parallel:
 ## 5. Create or update PR
 
 - Check if an **open** PR exists: `gh pr view --json number,url,state 2>/dev/null`
-- If a PR exists and `state` is `OPEN`: report its URL, do NOT create a new one
+- If a PR exists and `state` is `OPEN`: update its title, summary, and test plan to reflect ALL commits on the branch (use `gh pr edit`), then report its URL
 - If no open PR exists: create one with `gh pr create` using this format:
 
 ```sh
@@ -69,6 +69,8 @@ EOF
 
 - The PR title should be short (under 70 chars) and reflect all commits on the branch vs main
 - The summary should cover ALL commits in the branch, not just the latest
+- The test plan should reflect the current state (check off completed items, add new items for new commits)
+- **Every push must be followed by a PR description update** — after addressing review feedback, always run `gh pr edit` to keep the summary and test plan in sync with the branch
 - Return the PR URL when done
 
 ## 6. Wait for Codex and Copilot reviews

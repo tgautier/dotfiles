@@ -10,6 +10,7 @@
 ## Pushing
 
 - `--force-with-lease` is the safety net for remote divergence — don't add redundant pulls before it
+- After every push to a branch with an open PR, update the PR description (`gh pr edit`) — summary must reflect ALL commits on the branch, test plan must reflect current state
 
 ## Automated PR reviews (Codex / Copilot)
 

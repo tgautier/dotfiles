@@ -101,7 +101,7 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
    - Read each comment carefully
    - For each comment, decide whether to accept or reject:
      - **Accept**: fix the issue locally, then resolve the thread via GraphQL
-     - **Reject**: reply to the thread explaining why, then leave it unresolved
+     - **Reject**: reply to the thread explaining why, leave it unresolved
    - Resolve accepted threads via GraphQL:
      ```
      # List unresolved Codex threads
@@ -110,7 +110,7 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
      gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
      ```
    - Commit with a descriptive message (e.g. `fix(scope): address Codex review feedback`)
-   - Push (go back to step 4 for sync/push)
+   - Push (go back to section 4, "Sync, rebase, and push")
    - Wait for the new Codex review (repeat steps 1–3 of 6a)
 
 5. If Codex gave 👍 with no comments: report "Codex review passed" and continue
@@ -142,7 +142,7 @@ Request and wait for the GitHub Copilot code review:
    - Read each comment carefully
    - For each comment, decide whether to accept or reject:
      - **Accept**: fix the issue locally, then resolve the thread via GraphQL
-     - **Reject**: reply to the thread explaining why, then leave it unresolved
+     - **Reject**: reply to the thread explaining why, leave it unresolved
    - Resolve accepted threads via GraphQL:
      ```
      # List unresolved Copilot threads
@@ -151,10 +151,12 @@ Request and wait for the GitHub Copilot code review:
      gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
      ```
    - Commit with a descriptive message (e.g. `fix(scope): address Copilot review feedback`)
-   - Push (go back to step 4 for sync/push)
+   - Push (go back to section 4, "Sync, rebase, and push")
    - Request a new Copilot review (repeat steps 1–3 of 6b)
 
-5. If Copilot review has no inline comments and the review body contains no actionable feedback: report "Copilot review passed" and continue. If the body contains actionable suggestions but no inline comments, treat them as feedback to address.
+5. If the Copilot review has no inline comments:
+   - If the review body contains no actionable feedback, report "Copilot review passed" and continue
+   - If the review body contains actionable suggestions, treat them as feedback to address (as in step 4)
 
 ### 6c. Handle combined review feedback
 

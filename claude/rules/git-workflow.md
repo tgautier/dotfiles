@@ -55,7 +55,7 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
 
   ```sh
   LAST_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last // empty | .id // 0')
+    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | .id // 0')
   ```
 
 - After pushing, request a Copilot review:
@@ -68,11 +68,12 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
   - If this fails (e.g. Copilot not enabled or already requested), continue — an auto-triggered review may still arrive
   - If a review was auto-triggered by the push, the manual request is harmless (GitHub deduplicates)
 
-- Poll for a **new** review every 15 seconds, up to 5 minutes — compare against the saved ID:
+- Poll for a **new** review every 15 seconds, up to 5 minutes — use `--arg` for safe type handling:
 
   ```sh
   NEW_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last // empty | select(.id != '"$LAST_REVIEW_ID"') | .id')
+    --jq --arg lastId "$LAST_REVIEW_ID" \
+    '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | select(.id != ($lastId | tonumber)) | .id')
   ```
 
   - If `NEW_REVIEW_ID` is empty, the new review hasn't arrived yet — keep polling
@@ -85,10 +86,12 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
     pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes {
       id isResolved comments(first: 5) { nodes { body author { login }
         pullRequestReview { databaseId } } } } } } } }' \
-    --jq '.data.repository.pullRequest.reviewThreads.nodes[]
+    --jq --arg newReviewId "$NEW_REVIEW_ID" \
+    '.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
-      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer")
-      | select(.comments.nodes[0].pullRequestReview.databaseId == '"$NEW_REVIEW_ID"')
+      | select(.comments.nodes | length > 0)
+      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]")
+      | select(.comments.nodes[0].pullRequestReview.databaseId == ($newReviewId | tonumber))
       | {threadId: .id, body: .comments.nodes[0].body}'
   ```
 
@@ -124,7 +127,7 @@ After processing all comments from a Copilot review:
 
 1. Resolve all accepted/rejected threads (GraphQL mutations + REST replies)
 2. Commit the fixes
-3. Push (the standard push workflow applies — this triggers steps 1-3 from the Pushing section, including `gh pr edit` and a new Copilot review request)
+3. Push (the standard push workflow applies — this triggers steps 1-2 from the Pushing section, including `gh pr edit` and a new Copilot review request)
 4. Poll for the new Copilot review and process any new comments
 5. Repeat from step 1 until the review comes back clean (no new comments)
 

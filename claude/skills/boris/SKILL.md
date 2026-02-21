@@ -117,7 +117,7 @@ Create skills and commit them to git. Reuse across every project.
 Use slash commands for workflows you do many times a day. Commands are checked into git under `.claude/commands/` and shared with the team.
 
 ```
-> /commit-push-pr
+> /my-custom-command
 ```
 
 **Power feature:** Slash commands can include inline Bash to pre-compute info (like git status) for quick execution without extra model calls.

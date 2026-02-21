@@ -61,3 +61,8 @@ EOF
 - The PR title should be short (under 70 chars) and reflect all commits on the branch vs main
 - The summary should cover ALL commits in the branch, not just the latest
 - Return the PR URL when done
+
+## 6. Merge (only if user explicitly asks to merge)
+
+- Always use squash merge: `gh pr merge <number> --squash`
+- Never use `--merge` or `--rebase` strategies

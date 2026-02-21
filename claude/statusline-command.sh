@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code status line — beautiful one-liner with nerd font icons
+# Claude Code status line — beautiful one-liner with unicode emoji
 # Input: JSON from stdin
 
 input=$(cat)
@@ -20,7 +20,7 @@ fi
 # --- Directory: replace $HOME with ~ ---
 if [ -n "$cwd" ]; then
   home="$HOME"
-  dir="${cwd/#$home/\~}"
+  dir="${cwd/#$home/~}"
 else
   dir="?"
 fi
@@ -47,15 +47,11 @@ else
   ctx_str=""
 fi
 
-# --- Model + Version (combined) ---
-if [ -n "$short_model" ] && [ -n "$version" ] && [ "$version" != "null" ]; then
-  model_ver_str="${short_model} v${version}"
-elif [ -n "$short_model" ]; then
-  model_ver_str="${short_model}"
-elif [ -n "$version" ] && [ "$version" != "null" ]; then
-  model_ver_str="v${version}"
+# --- Version ---
+if [ -n "$version" ] && [ "$version" != "null" ]; then
+  ver_str="v${version}"
 else
-  model_ver_str=""
+  ver_str=""
 fi
 
 # --- Assemble one-liner ---
@@ -72,26 +68,26 @@ MAGENTA='\033[35m'
 sep="${DIM} ｜ ${RESET}"
 
 # Directory segment
-printf "${BOLD}${BLUE} ${dir}${RESET}"
+printf "${BOLD}${BLUE}📂 ${dir}${RESET}"
 
 # Branch segment
 if [ -n "$branch" ]; then
-  printf "${sep}${GREEN} ${branch}${RESET}"
+  printf "${sep}${GREEN}🌿 ${branch}${RESET}"
 fi
 
 # Model segment
 if [ -n "$short_model" ]; then
-  printf "${sep}${CYAN}󰧑 ${short_model}${RESET}"
+  printf "${sep}${CYAN}🧠 ${short_model}${RESET}"
 fi
 
 # Context segment
 if [ -n "$ctx_str" ]; then
-  printf "${sep}${YELLOW}󰾆 ${ctx_str}${RESET}"
+  printf "${sep}${YELLOW}📊 ${ctx_str}${RESET}"
 fi
 
-# Model + Version segment (subtle)
-if [ -n "$model_ver_str" ]; then
-  printf "${sep}${DIM}${model_ver_str}${RESET}"
+# Version segment (subtle)
+if [ -n "$ver_str" ]; then
+  printf "${sep}${DIM}💻 ${ver_str}${RESET}"
 fi
 
 printf "\n"

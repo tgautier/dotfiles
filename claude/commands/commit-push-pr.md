@@ -62,8 +62,6 @@ gh pr create --title "short title" --body "$(cat <<'EOF'
 ## Test plan
 - [ ] Tests pass locally
 - [ ] CI passes
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
 ```

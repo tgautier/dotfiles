@@ -21,7 +21,7 @@
   - If push fails because the remote branch was deleted: re-push with `-u` to recreate it
 - After every push to a branch with an open PR:
   1. Update the PR description (`gh pr edit`) — title, summary, and test plan must reflect ALL commits on the branch vs main
-  2. Poll for the Copilot review (auto-triggered by GitHub on push, up to 5 minutes), then process any comments before continuing
+  2. Request a Copilot review and poll for it (up to 5 minutes), then process any comments before continuing
 
 ## Pull requests
 
@@ -49,7 +49,7 @@
 
 ## Automated PR reviews (Copilot)
 
-GitHub automatically triggers a Copilot review when you push to a PR — **do not** manually request one via the API, as that creates a duplicate review and confuses ID-based polling.
+GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent pushes typically require a manual re-request.
 
 - Before pushing, record the latest Copilot review ID to distinguish old from new:
 
@@ -58,7 +58,17 @@ GitHub automatically triggers a Copilot review when you push to a PR — **do no
     --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last // empty | .id // 0')
   ```
 
-- After pushing, poll for a **new** review every 15 seconds, up to 5 minutes — compare against the saved ID:
+- After pushing, request a Copilot review:
+
+  ```sh
+  gh api --method POST repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers \
+    -f 'reviewers[]=copilot-pull-request-reviewer[bot]' 2>/dev/null || true
+  ```
+
+  - If this fails (e.g. Copilot not enabled or already requested), continue — an auto-triggered review may still arrive
+  - If a review was auto-triggered by the push, the manual request is harmless (GitHub deduplicates)
+
+- Poll for a **new** review every 15 seconds, up to 5 minutes — compare against the saved ID:
 
   ```sh
   NEW_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \

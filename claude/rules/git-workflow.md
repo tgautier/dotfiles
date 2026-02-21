@@ -2,6 +2,7 @@
 
 ## Squash merge
 
+- Delete the remote branch after merge: `git push origin --delete <branch>` (skip if already deleted by GitHub)
 - Use `git branch -D` (not `-d`) after squash merge — squash creates new commit hashes, so git never considers the branch "fully merged"
 - Check PR `state` is `OPEN` before acting on it — `gh pr view` returns merged/closed PRs too
 - Detect stale branches early — PRs can be merged outside your control (GitHub UI, standalone `gh`); check before committing on top

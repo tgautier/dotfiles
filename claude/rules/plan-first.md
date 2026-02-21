@@ -21,6 +21,7 @@ Always start with a plan before writing code.
 ## Verification-first (TDD)
 
 Before writing any code, determine how to verify it works:
+
 - Existing test suite (`just api-test`, `just test`)
 - New test you'll write first
 - Shell command or curl

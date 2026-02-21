@@ -11,6 +11,7 @@ Follow these steps in order:
 ## 1. Assess current state
 
 Run these in parallel:
+
 - `git status` (no -uall flag)
 - `git diff HEAD --stat` (all changes vs last commit)
 - `git log --oneline -5` (recent commit style)
@@ -54,7 +55,7 @@ Run these in parallel:
 - If a PR exists and `state` is `OPEN`: report its URL, do NOT create a new one
 - If no open PR exists: create one with `gh pr create` using this format:
 
-```
+```sh
 gh pr create --title "short title" --body "$(cat <<'EOF'
 ## Summary
 <1-3 bullet points>
@@ -77,22 +78,27 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
 ### 6a. Wait for Codex review
 
 1. First, check for a usage-limit comment from Codex:
-   ```
+
+   ```sh
    gh api repos/{owner}/{repo}/issues/{pr_number}/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'
    ```
+
    - If the comment contains "usage limits", report "Codex review skipped (usage limit reached)" and continue to the next step — do not poll
 
 2. Poll for the Codex reaction on the PR (from `chatgpt-codex-connector[bot]`):
-   ```
+
+   ```sh
    gh api repos/{owner}/{repo}/issues/{pr_number}/reactions --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .content'
    ```
+
    - Poll every 15 seconds, up to 5 minutes
    - `eyes` (👀) means review is in progress — keep waiting
    - `+1` (👍) means review passed with no issues
    - If no reaction appears after 5 minutes, inform the user and continue
 
 3. Check for review comments from Codex:
-   ```
+
+   ```sh
    gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
    gh api repos/{owner}/{repo}/pulls/{pr_number}/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
    ```
@@ -103,12 +109,14 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
      - **Accept**: fix the issue locally, then resolve the thread via GraphQL
      - **Reject**: reply to the thread explaining why, leave it unresolved
    - Resolve accepted threads via GraphQL:
-     ```
+
+     ```sh
      # List unresolved Codex threads
      gh api graphql -f query='query { repository(owner: "{owner}", name: "{repo}") { pullRequest(number: {pr_number}) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { author { login } } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | select(.comments.nodes[0].author.login == "chatgpt-codex-connector[bot]") | .id'
      # Resolve each thread
      gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
      ```
+
    - Commit with a descriptive message (e.g. `fix(scope): address Codex review feedback`)
    - Push (go back to section 4, "Sync, rebase, and push")
    - Wait for the new Codex review (repeat steps 1–3 of 6a)
@@ -120,21 +128,26 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
 Request and wait for the GitHub Copilot code review:
 
 1. Request the review via API:
-   ```
+
+   ```sh
    gh api --method POST repos/{owner}/{repo}/pulls/{pr_number}/requested_reviewers -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
    ```
+
    - If this fails (e.g. Copilot not enabled for the repo), report "Copilot review skipped (not available)" and continue
 
 2. Note the current Copilot review count before polling, then poll for a new review:
-   ```
+
+   ```sh
    gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | {state: .state, body: .body}'
    ```
+
    - Poll every 15 seconds, up to 5 minutes
    - If no review appears after 5 minutes, inform the user and continue
    - Copilot always leaves a "COMMENTED" review (never "APPROVED" or "CHANGES_REQUESTED")
 
 3. Check for inline review comments from Copilot:
-   ```
+
+   ```sh
    gh api repos/{owner}/{repo}/pulls/{pr_number}/comments --jq '.[] | select(.user.login == "copilot-pull-request-reviewer[bot]") | {path: .path, line: .line, body: .body}'
    ```
 
@@ -144,12 +157,14 @@ Request and wait for the GitHub Copilot code review:
      - **Accept**: fix the issue locally, then resolve the thread via GraphQL
      - **Reject**: reply to the thread explaining why, leave it unresolved
    - Resolve accepted threads via GraphQL:
-     ```
+
+     ```sh
      # List unresolved Copilot threads
      gh api graphql -f query='query { repository(owner: "{owner}", name: "{repo}") { pullRequest(number: {pr_number}) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { author { login } } } } } } } }' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false) | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]") | .id'
      # Resolve each thread
      gh api graphql -f query='mutation { resolveReviewThread(input: {threadId: "THREAD_ID"}) { thread { isResolved } } }'
      ```
+
    - Commit with a descriptive message (e.g. `fix(scope): address Copilot review feedback`)
    - Push (go back to section 4, "Sync, rebase, and push")
    - Request a new Copilot review (repeat steps 1–3 of 6b)

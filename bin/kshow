@@ -6,7 +6,6 @@ set -o pipefail
 
 kubectlCmd=kubectl
 
-namespace="";
 while getopts ":n:" opt; do
   case $opt in
     n)
@@ -42,7 +41,7 @@ if [ "" = "${objectName}" ]; then
   jqParams="-r .items[].metadata.name"
 fi
 
-transformCmd=cat
+transformCmd="cat"
 decodeBase64Cmd() {
   if base64 --decode </dev/null >/dev/null 2>&1; then
     base64 --decode

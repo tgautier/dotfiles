@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          curl -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+          sudo apt-get install -y shellcheck
+          npm install -g markdownlint-cli2
+
+      - name: Run all checks
+        run: just ci

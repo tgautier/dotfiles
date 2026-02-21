@@ -39,7 +39,7 @@ case $PLATFORM in
     ;;
   wsl)
     # WSL-specific: Use Windows host for X11
-    export DISPLAY=$(cat /etc/resolv.conf | grep nameserver | awk '{print $2}'):0
+    export DISPLAY=$(grep nameserver /etc/resolv.conf | awk '{print $2}'):0
     export SSH_AUTH_SOCK=~/.1password/agent.sock
     export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile.linux
     ;;

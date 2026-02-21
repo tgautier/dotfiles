@@ -9,14 +9,20 @@ Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** 
 ## Key Commands
 
 ```sh
-# Link/update dotfiles after changes
-rcup -d ~/Workspace/tgautier/dotfiles
+# Link/update dotfiles after changes (uses DOTFILES_DIRS from rcrc)
+rcup
 
 # Install macOS packages
 brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
 
 # Install Linux packages
 brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
+
+# Run all linters locally (same as CI)
+just ci
+
+# Enable pre-commit hook
+just setup
 ```
 
 ## Architecture
@@ -31,9 +37,21 @@ brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
 
 Custom functions live in `zsh/functions/` and are autoloaded. Scripts in `bin/` are added to PATH automatically.
 
+### Tool Version Management (mise)
+
+Runtime versions are managed by **mise** via `config/mise/config.toml` (symlinked to `~/.config/mise/config.toml`). Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn.
+
 ### Performance
 
 Shell startup is optimized with caching (kubectl context, environment vars). Avoid adding slow operations to shell init files.
+
+### CI / Linting
+
+The `justfile` defines local CI targets mirroring the GitHub Actions workflow:
+
+- `just ci` — runs all checks (shell, JSON/YAML, markdown, Brewfile, mise)
+- `just lint-shell` — shellcheck on `bin/*` and zsh files
+- `just setup` — enables `.githooks/pre-commit`
 
 ### Git Configuration
 

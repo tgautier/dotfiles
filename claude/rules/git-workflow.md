@@ -12,7 +12,7 @@
 - `--force-with-lease` is the safety net for remote divergence — don't add redundant pulls before it
 - After every push to a branch with an open PR, update the PR description (`gh pr edit`) — summary must reflect ALL commits on the branch, test plan must reflect current state
 
-## Automated PR reviews (Codex / Copilot)
+## Automated PR reviews (Copilot)
 
 - For each bot review comment, decide whether to accept or reject:
   - **Accept**: fix the issue, then resolve the thread via GraphQL
@@ -35,12 +35,12 @@
   gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { body author { login } } } } } } } }'
   ```
 
-- Only resolve threads from bot reviewers (`chatgpt-codex-connector[bot]`, `copilot-pull-request-reviewer[bot]`) — never resolve human reviewer threads
+- Only resolve threads from bot reviewers (`copilot-pull-request-reviewer[bot]`) — never resolve human reviewer threads
 
 ## Merging
 
 - Before merging, verify all todo list tasks are completed — never merge with pending or in-progress items
-- PR reviews (Codex, Copilot, or any reviewer) may add new tasks — treat accepted review comments as todo items that must be resolved before merging
+- PR reviews (Copilot or any reviewer) may add new tasks — treat accepted review comments as todo items that must be resolved before merging
 - Check that CI checks pass before merging: `gh pr checks`
 - Confirm the PR is still `OPEN` immediately before merging
 

@@ -74,7 +74,13 @@ EOF
 
 After creating or pushing to a PR, always wait for the OpenAI Codex review:
 
-1. Poll for the Codex reaction on the PR (from `chatgpt-codex-connector[bot]`):
+1. First, check for a usage-limit comment from Codex:
+   ```
+   gh api repos/{owner}/{repo}/issues/{pr_number}/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .body'
+   ```
+   - If the comment contains "usage limits", report "Codex review skipped (usage limit reached)" and continue to the next step — do not poll
+
+2. Poll for the Codex reaction on the PR (from `chatgpt-codex-connector[bot]`):
    ```
    gh api repos/{owner}/{repo}/issues/{pr_number}/reactions --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]") | .content'
    ```
@@ -83,20 +89,20 @@ After creating or pushing to a PR, always wait for the OpenAI Codex review:
    - `+1` (👍) means review passed with no issues
    - If no reaction appears after 5 minutes, inform the user and continue
 
-2. Check for review comments from Codex:
+3. Check for review comments from Codex:
    ```
    gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
    gh api repos/{owner}/{repo}/pulls/{pr_number}/comments --jq '.[] | select(.user.login == "chatgpt-codex-connector[bot]")'
    ```
 
-3. If Codex left review comments or requested changes:
+4. If Codex left review comments or requested changes:
    - Read each comment carefully
    - Fix the issues locally
    - Commit with a descriptive message (e.g. `fix(scope): address Codex review feedback`)
    - Push (go back to step 4 for sync/push)
    - Wait for the new Codex review (repeat this step)
 
-4. If Codex gave 👍 with no comments: report "Codex review passed" and continue
+5. If Codex gave 👍 with no comments: report "Codex review passed" and continue
 
 ## 7. Merge (only if user explicitly asks to merge)
 

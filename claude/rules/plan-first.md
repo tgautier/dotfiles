@@ -16,6 +16,7 @@ Always start with a plan before writing code.
 3. **Use plan mode** (`shift+tab`) for anything non-trivial
 4. **List files to change** and the order of changes
 5. **Get user approval** before writing code
+6. **Scope explicitly** — for refactoring tasks, list what's in scope AND what you're deliberately skipping, with rationale for each
 
 ## Verification-first (TDD)
 

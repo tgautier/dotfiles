@@ -72,7 +72,7 @@ EOF
 
 ## 6. Wait for Codex and Copilot reviews
 
-After creating or pushing to a PR, wait for both the OpenAI Codex review and the GitHub Copilot review.
+After creating or pushing to a PR, wait for both the OpenAI Codex review and the GitHub Copilot review. Run these sequentially: complete 6a (Codex) first, then 6b (Copilot).
 
 ### 6a. Wait for Codex review
 
@@ -109,7 +109,7 @@ After creating or pushing to a PR, wait for both the OpenAI Codex review and the
      ```
    - Commit with a descriptive message (e.g. `fix(scope): address Codex review feedback`)
    - Push (go back to step 4 for sync/push)
-   - Wait for the new Codex review (repeat this step)
+   - Wait for the new Codex review (repeat steps 1–3 of 6a)
 
 5. If Codex gave 👍 with no comments: report "Codex review passed" and continue
 
@@ -148,7 +148,7 @@ Request and wait for the GitHub Copilot code review:
      ```
    - Commit with a descriptive message (e.g. `fix(scope): address Copilot review feedback`)
    - Push (go back to step 4 for sync/push)
-   - Request a new Copilot review (repeat this step)
+   - Request a new Copilot review (repeat steps 1–3 of 6b)
 
 5. If Copilot review has no inline comments and the review body contains no actionable feedback: report "Copilot review passed" and continue. If the body contains actionable suggestions but no inline comments, treat them as feedback to address.
 

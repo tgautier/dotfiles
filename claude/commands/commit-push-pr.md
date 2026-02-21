@@ -12,7 +12,7 @@ Follow these steps in order:
 
 Run these in parallel:
 - `git status` (no -uall flag)
-- `git diff --stat` (staged + unstaged summary)
+- `git diff HEAD --stat` (all changes vs last commit)
 - `git log --oneline -5` (recent commit style)
 - `git branch --show-current` (current branch)
 - `git rev-parse --abbrev-ref @{upstream} 2>/dev/null || echo "no-upstream"` (tracking info)

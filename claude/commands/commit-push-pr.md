@@ -80,4 +80,4 @@ EOF
 - After merge completes:
   1. Switch back to main: `git checkout main`
   2. Pull latest: `git pull`
-  3. Delete the local feature branch: `git branch -d <branch-name>`
+  3. Delete the local feature branch: `git branch -D <branch-name>` (squash merge requires `-D` since commit hashes differ)

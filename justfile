@@ -5,6 +5,10 @@ zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2179,SC2206,
 # Run all CI checks
 ci: lint-shell lint-json-yaml lint-markdown lint-brewfile
 
+# Enable the pre-commit hook for this repo
+setup:
+    git config --local core.hooksPath .githooks
+
 # Lint shell scripts with ShellCheck
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/stack-update bin/kshow bin/kseal

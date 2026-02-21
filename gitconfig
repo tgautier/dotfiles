@@ -44,7 +44,6 @@
 
 [core]
 	excludesfile = ~/.gitignore
-	hooksPath = ~/.git_hooks
 	pager = less -F -X
 
 [fetch]

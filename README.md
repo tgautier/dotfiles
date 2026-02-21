@@ -31,6 +31,10 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
 3. **Link dotfiles:**
 
    ```sh
+   # First-time setup (rcrc not yet symlinked):
+   rcup -d ~/Workspace/tgautier/dotfiles
+
+   # Subsequent updates:
    rcup
    ```
 
@@ -96,6 +100,10 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    sudo add-apt-repository ppa:martin-frost/thoughtbot-rcm
    sudo apt install rcm
 
+   # First-time setup (rcrc not yet symlinked):
+   rcup -d ~/Workspace/tgautier/dotfiles
+
+   # Subsequent updates:
    rcup
    ```
 

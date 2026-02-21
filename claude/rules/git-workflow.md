@@ -55,7 +55,7 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
 
   ```sh
   LAST_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-    --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | .id // 0')
+    --jq '[.[] | select(.user.login | test("^copilot-pull-request-reviewer"))] | sort_by(.submitted_at) | last | .id // 0')
   ```
 
 - After pushing, request a Copilot review:
@@ -68,12 +68,12 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
   - If this fails (e.g. Copilot not enabled or already requested), continue — an auto-triggered review may still arrive
   - If a review was auto-triggered by the push, the manual request is harmless (GitHub deduplicates)
 
-- Poll for a **new** review every 15 seconds, up to 5 minutes — use `--arg` for safe type handling:
+- Poll for a **new** review every 15 seconds, up to 5 minutes — pipe to `jq` for safe variable passing (`--arg` is a `jq` flag, not a `gh api` flag):
 
   ```sh
   NEW_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-    --jq --arg lastId "$LAST_REVIEW_ID" \
-    '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | sort_by(.submitted_at) | last | select(.id != ($lastId | tonumber)) | .id')
+    | jq --arg lastId "$LAST_REVIEW_ID" \
+    '[.[] | select(.user.login | test("^copilot-pull-request-reviewer"))] | sort_by(.submitted_at) | last | select(.id != ($lastId | tonumber)) | .id')
   ```
 
   - If `NEW_REVIEW_ID` is empty, the new review hasn't arrived yet — keep polling
@@ -86,11 +86,11 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
     pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes {
       id isResolved comments(first: 5) { nodes { body author { login }
         pullRequestReview { databaseId } } } } } } } }' \
-    --jq --arg newReviewId "$NEW_REVIEW_ID" \
+    | jq --arg newReviewId "$NEW_REVIEW_ID" \
     '.data.repository.pullRequest.reviewThreads.nodes[]
       | select(.isResolved == false)
       | select(.comments.nodes | length > 0)
-      | select(.comments.nodes[0].author.login == "copilot-pull-request-reviewer[bot]" or .comments.nodes[0].author.login == "copilot-pull-request-reviewer")
+      | select(.comments.nodes[0].author.login | test("^copilot-pull-request-reviewer"))
       | select(.comments.nodes[0].pullRequestReview != null)
       | select(.comments.nodes[0].pullRequestReview.databaseId == ($newReviewId | tonumber))
       | {threadId: .id, body: .comments.nodes[0].body}'
@@ -120,7 +120,7 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
   gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved comments(first: 1) { nodes { body author { login } } } } } } } }'
   ```
 
-- Only resolve threads from bot reviewers (`copilot-pull-request-reviewer[bot]`) — never resolve human reviewer threads
+- Only resolve threads from Copilot bot reviewers (`copilot-pull-request-reviewer[bot]` or `copilot-pull-request-reviewer`) — never resolve human reviewer threads
 
 ### Review-fix cycle
 

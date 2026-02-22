@@ -61,7 +61,7 @@ The `justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 ## Commit Conventions
 
-Per `claude/rules/commits.md`:
+Per `claude/rules/git-workflow.md` (commit conventions section):
 
 - Conventional commit format: `type(scope): description`
 - Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `perf`
@@ -69,3 +69,7 @@ Per `claude/rules/commits.md`:
 - Never include `Co-Authored-By` lines mentioning Claude or any AI
 - Never mention Claude, AI, or LLM in commit messages
 - Only commit when explicitly asked
+
+## GitHub Integration
+
+GitHub PR workflows (creating, reviewing, merging) use the GitHub MCP Server (`github`, configured in `~/.claude.json` user scope). The `/github` skill (`claude/skills/github/SKILL.md`) provides the full workflow instructions. The always-on `claude/rules/git-workflow.md` handles local git safety only.

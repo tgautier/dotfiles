@@ -601,6 +601,9 @@ Use the Prettier plugin (`prettier-plugin-tailwindcss`) for automatic class sort
 
 ## 11. Security
 
+> For comprehensive browser security (CSRF defense layers, CSP strict policies, cookie hardening,
+> session management, OAuth 2.1), see the **Web Security skill** (`/web-security`).
+
 ### XSS prevention
 
 React auto-escapes values in JSX curly braces. The risk vectors are:

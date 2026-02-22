@@ -220,6 +220,9 @@ Network failures during non-idempotent operations (POST, sometimes PATCH) create
 
 ## 10. Security — Authentication, Authorization & Audit
 
+> For browser-facing security (CSRF, XSS, CSP, cookie hardening, session management),
+> see the **Web Security skill** (`/web-security`).
+
 ### Authentication (AuthN) — Who are you?
 
 - Bearer tokens in `Authorization: Bearer <token>` header — **never in URL query parameters** (logged in access logs, cached by proxies, visible in browser history)
@@ -261,6 +264,9 @@ Network failures during non-idempotent operations (POST, sometimes PATCH) create
 ---
 
 ## 11. Security — Transport & Headers
+
+> For detailed security header values, CSP policies, and CORS hardening,
+> see the **Web Security skill** (`/web-security`).
 
 - **HTTPS only** — redirect HTTP to HTTPS, set HSTS (`Strict-Transport-Security: max-age=63072000; includeSubDomains`)
 - **Security headers:** `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Content-Security-Policy`

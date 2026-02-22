@@ -72,4 +72,4 @@ Per `claude/rules/git-workflow.md` (commit conventions section):
 
 ## GitHub Integration
 
-GitHub PR workflows (creating, reviewing, merging) use the GitHub MCP Server (`github` in `claude/settings.json`). The `/github` skill (`claude/skills/github/SKILL.md`) provides the full workflow instructions. The always-on `claude/rules/git-workflow.md` handles local git safety only.
+GitHub PR workflows (creating, reviewing, merging) use the GitHub MCP Server (`github`, configured in `~/.claude.json` user scope). The `/github` skill (`claude/skills/github/SKILL.md`) provides the full workflow instructions. The always-on `claude/rules/git-workflow.md` handles local git safety only.

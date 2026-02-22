@@ -17,7 +17,7 @@ user-invocable: true
 
 Cross-cutting browser-facing security guidance for production web applications. This skill deepens topics that span API design, frontend, and backend — CSRF, XSS, CSP, cookies, sessions, auth, JWT, OAuth 2.1, CORS, headers, SSRF, input validation, and supply chain security.
 
-Based on OWASP cheat sheets (2024), Google BeyondCorp, Stripe security patterns, Cloudflare production configs, Mozilla Web Security Guidelines, Auth0/Okta best practices, and OAuth 2.1 / RFC 9700 (January 2025).
+Based on OWASP cheat sheets (2024), Google BeyondCorp, Stripe security patterns, Cloudflare production configs, Mozilla Web Security Guidelines, Auth0/Okta best practices, the OAuth 2.1 draft (as of January 2025), and the OAuth 2.0 Security BCP (RFC 9700, January 2025).
 
 > **Scope boundary:** This skill covers *what* to enforce and *why*. For implementation:
 > - Rust/Axum middleware and Tower layers → **Rust skill** (`/rust` §9, §12)
@@ -171,11 +171,11 @@ APIs serve no HTML — lock everything down. Cloudflare recommends different hea
 
 ### Rollout strategy (all sources agree)
 
-1. Deploy `Content-Security-Policy-Report-Only` with report-uri
+1. Deploy `Content-Security-Policy-Report-Only` with `report-to` / `Reporting-Endpoints` (optionally add legacy `report-uri` for older browsers)
 2. Monitor violations for 1-2 weeks
 3. Fix legitimate violations (inline scripts → nonced, `eval()` → alternatives)
 4. Switch to enforcing `Content-Security-Policy`
-5. Keep report-uri active for ongoing monitoring
+5. Keep `report-to` reporting active for ongoing monitoring
 
 ---
 
@@ -355,9 +355,11 @@ All authentication failure responses must be **identical** in:
 
 ---
 
-## 9. OAuth 2.1 & RFC 9700
+## 9. OAuth 2.1 (draft) & OAuth 2.0 Security BCP (RFC 9700)
 
-### What OAuth 2.1 (RFC 9700, January 2025) changes
+### What OAuth 2.1 (draft) changes
+
+OAuth 2.1 is a draft that consolidates secure OAuth 2.0 patterns. RFC 9700 is a separate document, *OAuth 2.0 Security Best Current Practice*, which provides guidance for existing OAuth 2.0 deployments rather than defining OAuth 2.1 itself.
 
 **Removed:**
 - Implicit grant (was `response_type=token`) — tokens in URL fragments are insecure
@@ -518,7 +520,7 @@ All authentication failure responses must be **identical** in:
 
 | Tool | Language | Run in CI |
 |------|----------|-----------|
-| `yarn npm audit` | JavaScript/TypeScript | Every PR |
+| `npm audit` / `yarn audit` | JavaScript/TypeScript | Every PR |
 | `cargo audit` | Rust | Every PR |
 | `cargo deny` | Rust (license + advisory) | Every PR |
 

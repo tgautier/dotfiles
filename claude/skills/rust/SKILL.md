@@ -949,7 +949,7 @@ Response shape:
 
 ### ETags and conditional requests
 
-Implement via `TypedHeader<IfNoneMatch>` extractor and `ETag` response header. Use `updatedAt` timestamp or content hash as ETag basis.
+Implement via `TypedHeader<IfNoneMatch>` extractor and `ETag` response header. Use a stable per-resource version such as an `updated_at` timestamp (Rust/DB field) or content hash as the ETag basis; if your public JSON uses camelCase (for example `updatedAt`), map it from `updated_at` via `serde` attributes or a consistent naming strategy.
 
 ### API versioning
 
@@ -972,7 +972,7 @@ let breaker = CircuitBreaker::builder()
 
 ### Retry with exponential backoff
 
-Use `backon` crate:
+Use `backon` crate. Only retry idempotent operations and transient failures (timeouts, 5xx), never validation/4xx errors; see API Design skill §15 for detailed retryability rules.
 
 ```rust
 use backon::{ExponentialBuilder, Retryable};

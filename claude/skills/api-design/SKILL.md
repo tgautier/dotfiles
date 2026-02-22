@@ -339,7 +339,8 @@ DX is what separates a good API from a great one. **Time to first successful API
 
 ### Consistency
 
-- camelCase for JSON fields, kebab-case for URL paths, plural nouns for collections
+- camelCase for JSON fields in this skill's examples; language-specific skills may use different field naming styles in code (for example, Rust `snake_case` structs) while configuring their serializers to emit camelCase JSON
+- kebab-case for URL paths, plural nouns for collections
 - Same envelope for all list endpoints (`{ items, total, limit, offset }`)
 - Same error shape from every endpoint (RFC 9457)
 - Same auth pattern on every endpoint
@@ -390,7 +391,7 @@ Liveness must **never** check dependencies. If Postgres is down, the process is 
 
 ### Client retry guidance
 
-- Only retry on 429 (rate limited) and 503 (unavailable) — both include `Retry-After`
+- Only retry on 429 (rate limited) and 503 (unavailable) — honor `Retry-After` when present; if absent, fall back to your exponential backoff policy
 - Never retry on 4xx (client errors) — the request is wrong, retrying won't help
 - Exponential backoff with jitter — prevents thundering herd
 - Stripe: `Should-Retry` header makes retry decisions explicit

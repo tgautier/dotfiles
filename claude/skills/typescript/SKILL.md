@@ -635,7 +635,12 @@ Avoid `'unsafe-inline'` for scripts — use nonces or hashes.
 
 ### CSRF protection
 
-Use `SameSite=Strict` cookies (see API Design skill section 10 for auth patterns).
+For cookie-authenticated, state-changing requests:
+- Require an unguessable anti-CSRF token tied to the user/session and validate it on every non-idempotent request (e.g., send via a custom header or request body).
+- Use `SameSite=Lax` or `SameSite=Strict` cookies as an additional hardening layer, not as your only CSRF defense.
+- You may rely on `SameSite` alone only for requests that are not authenticated via cookies (e.g., pure bearer-token APIs) or are strictly read-only.
+
+See API Design skill section 10 for more detailed auth and CSRF patterns.
 
 ---
 
@@ -816,7 +821,7 @@ type ApiResult<T> =
 
 ### Retry with exponential backoff
 
-Retry only on 429 and 503 (see API Design skill section 15). Respect `Retry-After` headers. TanStack Query provides this built-in via the `retry` option.
+Retry only on 429 and 503 (see API Design skill section 15). Respect `Retry-After` headers. TanStack Query's default `retry` option retries all failures — customize it to only retry 429/503 and honor `Retry-After`.
 
 ---
 

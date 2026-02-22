@@ -301,6 +301,8 @@ pub amount: BigDecimal,
 
 ## 6. Domain Types & Newtype Pattern
 
+> For when to use newtypes vs plain types, aggregate boundaries, and value object identification, see the **Domain Design skill** (`/domain-design` §3-4).
+
 Use the Rust type system to **make invalid states unrepresentable**.
 
 ### Newtypes with `nutype`

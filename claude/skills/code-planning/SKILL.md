@@ -66,6 +66,7 @@ Compare approaches against these dimensions:
 Defer domain-specific decisions to the relevant skill:
 
 - API contract decisions → **API Design skill** (`/api-design`)
+- Domain modeling (aggregates, bounded contexts, data modeling) → **Domain Design skill** (`/domain-design`)
 - Rust implementation patterns → **Rust skill** (`/rust`)
 - TypeScript/React patterns → **TypeScript skill** (`/typescript`)
 - Security posture → **Web Security skill** (`/web-security`)

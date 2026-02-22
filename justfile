@@ -37,7 +37,7 @@ lint-mise:
 update: update-brew update-mas update-mise update-rust
 
 # Platform-specific Brewfile
-brewfile := if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
+brewfile := justfile_directory() / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
 
 # Update Homebrew packages and clean up
 update-brew:
@@ -61,3 +61,49 @@ update-mise:
 # Update Rust toolchain
 update-rust:
     rustup update
+
+# Remove stale symlinks in $HOME that point into dotfiles dirs
+cleanup-symlinks:
+    #!/usr/bin/env zsh
+    # Derive nested dirs from the dotfiles repos themselves
+    dotfiles_repos=("$HOME/Workspace/tgautier/dotfiles" "$HOME/Workspace/tgautier/dotfiles-private")
+    nested=()
+    for repo in "${dotfiles_repos[@]}"; do
+        [[ -d "$repo" ]] || continue
+        for d in "$repo"/*(N/); do
+            name=${d:t}
+            # Skip repo-only dirs that rcm doesn't symlink
+            [[ "$name" == .* || "$name" == README* || "$name" == CLAUDE* ]] && continue
+            candidate="$HOME/.$name"
+            [[ -d "$candidate" ]] && nested+=("$candidate")
+        done
+    done
+    stale=()
+    # Top-level dotfiles (non-recursive)
+    for f in $HOME/.[!.]*(N@); do
+        [[ -e "$f" ]] && continue
+        target=$(readlink "$f")
+        [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
+    done
+    # Nested dirs (recursive)
+    for dir in "${nested[@]}"; do
+        [[ -d "$dir" ]] || continue
+        for f in "$dir"/**/*(N@); do
+            [[ -e "$f" ]] && continue
+            target=$(readlink "$f")
+            [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
+        done
+    done
+    if (( ${#stale} == 0 )); then
+        echo "No stale symlinks found."
+        exit 0
+    fi
+    echo "Stale symlinks:"
+    printf '  %s\n' "${stale[@]}"
+    echo ""
+    read -q "reply?Remove ${#stale} stale symlink(s)? [y/N] " || { echo ""; exit 0; }
+    echo ""
+    for entry in "${stale[@]}"; do
+        link="${entry%% ->*}"
+        rm "$link" && echo "Removed: $link"
+    done

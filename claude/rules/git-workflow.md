@@ -73,8 +73,10 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
   ```sh
   NEW_REVIEW_ID=$(gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
     | jq --arg lastId "$LAST_REVIEW_ID" \
-    '[.[] | select(.user.login | test("^copilot-pull-request-reviewer"))] | sort_by(.submitted_at) | last | select(.id != ($lastId | tonumber)) | .id')
+    '[.[] | select(.user.login | test("^copilot-pull-request-reviewer"))] | sort_by(.submitted_at) | last | select((.id == ($lastId | tonumber)) | not) | .id')
   ```
+
+  - **Important:** Never use `!=` in jq filters — zsh history expansion corrupts `!` even inside single quotes when the Bash tool or shell wrappers re-parse the command. Use `== ... | not` instead.
 
   - If `NEW_REVIEW_ID` is empty, the new review hasn't arrived yet — keep polling
   - If no new review appears after 5 minutes, inform the user and continue
@@ -91,7 +93,7 @@ GitHub may auto-trigger a Copilot review on the first push to a PR. Subsequent p
       | select(.isResolved == false)
       | select(.comments.nodes | length > 0)
       | select(.comments.nodes[0].author.login | test("^copilot-pull-request-reviewer"))
-      | select(.comments.nodes[0].pullRequestReview != null)
+      | select((.comments.nodes[0].pullRequestReview == null) | not)
       | select(.comments.nodes[0].pullRequestReview.databaseId == ($newReviewId | tonumber))
       | {threadId: .id, body: .comments.nodes[0].body}'
   ```
@@ -151,6 +153,7 @@ After processing all comments from a Copilot review:
   If the count is not `0`, stop and resolve remaining threads first
 - Before merging, verify all todo list tasks are completed — never merge with pending or in-progress items
 - PR reviews (Copilot or any reviewer) may add new tasks — treat accepted review comments as todo items that must be resolved before merging
+- **Never merge with unchecked test plan items** — every item in the PR's test plan must be checked off before merging. If an item cannot be completed, remove it with an explanation or ask the user
 - Check that CI checks pass before merging: `gh pr checks`
 - Confirm the PR is still `OPEN` immediately before merging
 - If merge fails due to failing checks: inform the user and stop

@@ -15,7 +15,7 @@
 
 ## Sensitive files
 
-- Never commit `.env`, `.env.*`, `credentials.json`, `*.pem`, `*.key`, or similar files
+- Outside `dotfiles-private`, never commit `.env`, `.env.*`, `credentials.json`, `*.pem`, `*.key`, or similar files
 - If a `.gitignore` is missing entries for sensitive files, suggest adding them before committing
 - Never remove secret-related entries from `.gitignore`
 

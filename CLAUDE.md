@@ -21,6 +21,9 @@ brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
 # Run all linters locally (same as CI)
 just ci
 
+# Update everything (brew, mas, mise, rust)
+just update
+
 # Enable pre-commit hook
 just setup
 ```

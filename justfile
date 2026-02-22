@@ -11,7 +11,7 @@ setup:
 
 # Lint shell scripts with ShellCheck
 lint-shell:
-    shellcheck --severity=warning bin/op-ssh-sign bin/stack-update bin/kshow bin/kseal
+    shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
     shellcheck --severity=warning claude/statusline-command.sh
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 
@@ -32,3 +32,32 @@ lint-brewfile:
 # Validate mise config
 lint-mise:
     mise config ls
+
+# Update everything (brew, mac app store, mise, rust)
+update: update-brew update-mas update-mise update-rust
+
+# Platform-specific Brewfile
+brewfile := if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
+
+# Update Homebrew packages and clean up
+update-brew:
+    brew update
+    brew bundle install --file={{brewfile}}
+    brew upgrade
+    brew cleanup --prune=all
+    brew bundle cleanup --force --file={{brewfile}}
+    brew doctor
+
+# Update Mac App Store apps (skipped if mas not installed)
+update-mas:
+    command -v mas > /dev/null || exit 0
+    mas upgrade
+
+# Show outdated mise tools and upgrade them
+update-mise:
+    mise outdated
+    mise upgrade --bump
+
+# Update Rust toolchain
+update-rust:
+    rustup update

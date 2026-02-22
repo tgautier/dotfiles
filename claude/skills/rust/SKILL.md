@@ -13,6 +13,8 @@ user-invocable: true
 
 # Rust Industrial-Grade Development
 
+Implements the API Design skill conventions using Axum + Diesel + utoipa. See that skill for HTTP semantics, error format, status codes, pagination contracts, security patterns, and DX principles.
+
 Comprehensive Rust guidance for building production-quality Axum + Diesel APIs. Based on industry best practices from Cloudflare, Discord, AWS, and the broader Rust ecosystem.
 
 ---
@@ -44,7 +46,6 @@ Every handler is a public async function returning `Result<T, ApiError>`.
     responses(
         (status = 200, description = "Success", body = PaginatedResponse<Resource>),
         (status = 400, description = "Validation error", body = ProblemDetail),
-        (status = 500, description = "Internal error", body = ProblemDetail),
     ),
     tag = "resources"
 )]
@@ -88,7 +89,7 @@ where S: Send + Sync {
 
 ### Rejection handling
 
-Override Axum's default rejection responses (which return plain text) with a custom handler to return consistent JSON error bodies matching your RFC 7807 format.
+Override Axum's default rejection responses (which return plain text) with a custom handler to return consistent JSON error bodies matching your RFC 9457 format.
 
 ---
 
@@ -127,9 +128,9 @@ pub enum ApiError {
 
 Always preserve the error chain via `#[source]` or `#[from]`. Log errors **only when handled** (in `IntoResponse`), never during propagation — this prevents duplicate log entries.
 
-### RFC 7807 Problem Details
+### RFC 9457 Problem Details
 
-Return structured JSON error responses following RFC 9457 (formerly 7807):
+Implement RFC 9457 Problem Details (see API Design skill section 5 for the contract). Rust implementation:
 
 ```rust
 impl IntoResponse for ApiError {
@@ -516,6 +517,8 @@ Diesel migrations are the database schema source of truth.
 
 ## 9. Tower Middleware & Server Hardening
 
+See API Design skill sections 11 and 15 for the security and resilience rationale. This section covers Rust/Axum implementation.
+
 ### Middleware stack order
 
 Layer outermost to innermost:
@@ -545,23 +548,17 @@ let app = Router::new()
 
 ### Request body limits
 
-Always set a maximum request body size. Without this, a malicious client can OOM your server:
-
 ```rust
 .layer(RequestBodyLimitLayer::new(1024 * 1024))  // 1 MB for JSON APIs
 ```
 
 ### Request timeouts
 
-Prevent slow clients from holding connections indefinitely:
-
 ```rust
 .layer(TimeoutLayer::new(Duration::from_secs(30)))
 ```
 
 ### Response compression
-
-Essentially free — reduces JSON response bandwidth 60-80%:
 
 ```rust
 .layer(CompressionLayer::new())  // gzip, br, deflate, zstd
@@ -594,11 +591,7 @@ use axum::http::HeaderValue;
 ))
 ```
 
-Also set `Strict-Transport-Security` for HTTPS deployments.
-
 ### Rate limiting
-
-Use `tower_governor` (GCRA algorithm — no burst counting artifacts):
 
 ```rust
 let governor = GovernorConfigBuilder::default()
@@ -912,9 +905,9 @@ Cloudflare and Discord both report measurable memory reduction and more predicta
 
 ## 14. API Design Patterns
 
-### Idempotency keys
+See API Design skill for contract definitions (idempotency, pagination, ETags, versioning). This section covers Rust implementation.
 
-For POST endpoints, accept an `Idempotency-Key` header to make retries safe:
+### Idempotency keys
 
 ```rust
 pub async fn create_resource(
@@ -933,8 +926,6 @@ pub async fn create_resource(
 
 ### Cursor-based pagination
 
-Offset pagination breaks under concurrent inserts and is slow for deep pages. Prefer cursor-based for user-facing lists:
-
 ```rust
 #[derive(Deserialize, IntoParams)]
 pub struct CursorParams {
@@ -947,10 +938,10 @@ pub struct CursorParams {
 // Return items[0..limit] and next_cursor = items[limit-1].id
 ```
 
-Response shape:
+Response shape (see API Design skill for contract):
 ```json
 {
-  "items": [...],
+  "data": [...],
   "next_cursor": "550e8400-e29b-41d4-a716-446655440000",
   "has_more": true
 }
@@ -958,22 +949,21 @@ Response shape:
 
 ### ETags and conditional requests
 
-Return `ETag` on GET responses. Honor `If-None-Match` to return 304 Not Modified. Reduces bandwidth for unchanged data.
+Implement via `TypedHeader<IfNoneMatch>` extractor and `ETag` response header. Use a stable per-resource version such as the `updated_at` timestamp or content hash as the ETag basis.
 
 ### API versioning
 
-Include the major version in the URL path (`/v1/resources`). Only bump for breaking changes. When deprecating a version, add `Sunset` and `Deprecation` response headers.
+Use nested `Router` for version grouping: `Router::new().nest("/v1", v1_routes).nest("/v2", v2_routes)`. Add `Sunset` and `Deprecation` headers via middleware on deprecated routers.
 
 ---
 
 ## 15. Resilience Patterns
 
+See API Design skill section 15 for resilience concepts. Rust crate recommendations and implementation patterns:
+
 ### Circuit breaker
 
-When calling external services, prevent cascade failures:
-
 ```rust
-// States: Closed (normal) -> Open (failing, reject fast) -> Half-Open (test)
 let breaker = CircuitBreaker::builder()
     .failure_policy(consecutive_failures(5))
     .success_policy(ConsecutiveSuccesses::new(3))
@@ -982,7 +972,7 @@ let breaker = CircuitBreaker::builder()
 
 ### Retry with exponential backoff
 
-For transient failures (network blips, temporary DB unavailability):
+Use `backon` crate. Only retry idempotent operations and transient failures (timeouts, 5xx), never validation/4xx errors; see API Design skill §15 for detailed retryability rules.
 
 ```rust
 use backon::{ExponentialBuilder, Retryable};
@@ -992,20 +982,14 @@ let result = || async { fetch_external_data().await }
     .await;
 ```
 
-Never retry on validation errors or 4xx responses — only on 5xx/timeouts.
-
 ### Bulkhead (concurrency limiting)
-
-Prevent one slow subsystem from consuming all capacity:
 
 ```rust
 use tower::limit::ConcurrencyLimitLayer;
-app.layer(ConcurrencyLimitLayer::new(100))  // max 100 concurrent requests
+app.layer(ConcurrencyLimitLayer::new(100))
 ```
 
 ### Fallback responses
-
-When a dependency is unavailable, return degraded but useful data:
 
 ```rust
 match fetch_live_data(&state).await {

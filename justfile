@@ -51,9 +51,9 @@ update-brew:
     brew bundle cleanup --force --file={{brewfile}}
     -brew doctor
 
-# Update Mac App Store apps (macOS only)
+# Update Mac App Store apps (no-op on non-macOS)
 update-mas:
-    {{ if os() == "macos" { "mas upgrade" } else { "true" } }}
+    {{ if os() == "macos" { "if command -v mas >/dev/null 2>&1; then mas upgrade; fi" } else { "true" } }}
 
 # Show outdated mise tools and upgrade them
 update-mise:

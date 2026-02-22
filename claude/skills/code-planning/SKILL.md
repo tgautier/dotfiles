@@ -217,7 +217,7 @@ The chosen path. Why alternatives were rejected (brief).
 |-------------|-------------|-----|
 | Plans without verification steps | No way to prove correctness | Every task gets a verification command |
 | Monolithic tasks ("implement the feature") | Can't track progress, can't parallelize | Decompose into atomic tasks |
-| Missing dependency ordering | Frontend before API exists, tests before code | Order: data model → handlers → frontend → tests |
+| Missing dependency ordering | Frontend before API exists, tests before code | Order: data model → handlers → frontend, with tests alongside each layer |
 | Scope without exclusions | Everything is implicitly in scope | State what's out and why |
 | Novelty over boring technology | Unproven approaches carry hidden risk | Justify why proven approaches won't work |
 | Ignoring project-local rules | Plan violates codebase conventions | Read `.claude/rules/*.md` and match existing patterns |

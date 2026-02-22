@@ -36,8 +36,11 @@ lint-mise:
 # Update everything (brew, mac app store, mise, rust)
 update: update-brew update-mas update-mise update-rust
 
+# Resolve through symlink so this works when just finds ~/.justfile
+dotfiles_dir := canonicalize(justfile_directory())
+
 # Platform-specific Brewfile
-brewfile := justfile_directory() / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
+brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
 
 # Update Homebrew packages and clean up
 update-brew:
@@ -48,10 +51,9 @@ update-brew:
     brew bundle cleanup --force --file={{brewfile}}
     -brew doctor
 
-# Update Mac App Store apps (skipped if mas not installed)
+# Update Mac App Store apps (no-op on non-macOS)
 update-mas:
-    command -v mas > /dev/null || exit 0
-    mas upgrade
+    {{ if os() == "macos" { "if command -v mas >/dev/null 2>&1; then mas upgrade; fi" } else { "true" } }}
 
 # Show outdated mise tools and upgrade them
 update-mise:

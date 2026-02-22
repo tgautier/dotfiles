@@ -105,8 +105,10 @@ After requesting a review, **always** wait for both CI and the Copilot review to
 
 ### Accept or reject each comment
 
-- **Accept**: fix the issue, then resolve the thread
-- **Reject**: reply explaining why, then resolve the thread
+Present each comment to the user with your recommendation (accept or reject, with rationale). Wait for user confirmation before acting — never accept or reject a comment autonomously.
+
+- **Accept** (user confirmed): fix the issue, then resolve the thread
+- **Reject** (user confirmed): reply explaining why, then resolve the thread
 
 ### Resolve threads
 

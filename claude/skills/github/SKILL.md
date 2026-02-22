@@ -69,12 +69,23 @@ After each push:
 
 ### Wait for CI and Copilot review
 
-After requesting a review, wait for both CI and the Copilot review to complete:
+After requesting a review, **always** wait for both CI and the Copilot review to complete before proceeding. Never skip this step.
 
-1. Run `gh pr checks <number> --repo <owner/repo> --watch` — blocks until all check runs finish (CI and Copilot review are both check runs)
-2. Then read review comments below
+1. **CI**: run `gh pr checks <number> --repo <owner/repo> --watch` to block until all check runs finish. The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs — do not use it for CI status.
+2. **Copilot review**: poll using **MCP** `pull_request_read` with `get_reviews`, checking for a review authored by `copilot-pull-request-reviewer[bot]`. Poll every 30 seconds, up to 10 attempts (5 minutes). **Fallback** (if MCP is unavailable):
 
-The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs — do not use it for CI status.
+   ```sh
+   for i in $(seq 1 10); do
+     review_state=$(gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
+       pullRequest(number: PR_NUMBER) { reviews(last: 1) { nodes { author { login } state } } } } }' \
+       --jq '.data.repository.pullRequest.reviews.nodes[] | select(.author.login == "copilot-pull-request-reviewer[bot]") | .state' 2>/dev/null)
+     if [ -n "$review_state" ]; then break; fi
+     sleep 30
+   done
+   ```
+
+3. If the review has not appeared after 5 minutes, inform the user and ask whether to continue without it
+4. Once the review appears, read review comments below
 
 ### Read review comments
 

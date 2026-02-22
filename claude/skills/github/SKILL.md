@@ -67,6 +67,15 @@ After each push:
 
 - If the request fails (Copilot not enabled, already requested), continue — an auto-triggered review may still arrive
 
+### Wait for CI and Copilot review
+
+After requesting a review, wait for both CI and the Copilot review to complete:
+
+1. Run `gh pr checks <number> --repo <owner/repo> --watch` — blocks until all check runs finish (CI and Copilot review are both check runs)
+2. Then read review comments below
+
+The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs — do not use it for CI status.
+
 ### Read review comments
 
 - **MCP**: `get_pull_request_reviews` then `get_pull_request_comments` to get review threads
@@ -165,7 +174,7 @@ Before merging, verify all gates pass:
    If the count is not `0`, stop and resolve remaining threads first
 
 2. **All test plan items checked** — never merge with unchecked items. If an item cannot be completed, remove it with an explanation or ask the user
-3. **CI passes** — **MCP**: `get_pull_request` with `get_status`; **Fallback**: `gh pr checks`
+3. **CI passes** — use `gh pr checks <number> --repo <owner/repo> --watch` to block until all checks complete. The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs, so it will miss CI results
 4. **PR still OPEN** — confirm immediately before merging
 5. **All todo list tasks completed** — never merge with pending or in-progress items
 

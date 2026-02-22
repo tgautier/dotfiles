@@ -52,9 +52,8 @@ update-brew:
     -brew doctor
 
 # Update Mac App Store apps (macOS only)
-[macos]
 update-mas:
-    mas upgrade
+    {{ if os() == "macos" { "mas upgrade" } else { "true" } }}
 
 # Show outdated mise tools and upgrade them
 update-mise:

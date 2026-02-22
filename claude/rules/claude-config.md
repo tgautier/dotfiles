@@ -5,7 +5,7 @@ Two-tier model for organizing Claude instructions.
 ## Tiers
 
 | Tier | Location | Loaded | Purpose |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | **Rules** | `.claude/rules/` (project), `claude/rules/` (global) | Auto — always, or when `paths:` match | Constraints, invariants, conventions that must hold |
 | **Skills** | `claude/skills/<name>/SKILL.md` (global) | On-demand via `/name` | Reusable methodology, checklists, design patterns |
 
@@ -39,7 +39,7 @@ paths:
 ## Evolution triggers
 
 | Signal | Action |
-|---|---|
+| --- | --- |
 | Rule > 80 lines | Split into focused rules, or extract methodology into a skill |
 | Rule referenced only from one skill | Merge into that skill |
 | Skill invoked on every task | Promote the core constraint to a rule |

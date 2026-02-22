@@ -2,6 +2,8 @@
 
 Always start with a plan before writing code.
 
+> **Scope boundary:** This rule governs planning *process* — when to plan, the annotation cycle, verification-first workflow. For plan *quality* methodology (trade-off evaluation, task decomposition, scope management, risk identification) → **Code Planning skill** (`/code-planning`).
+
 ## When to plan
 
 - Multi-file changes

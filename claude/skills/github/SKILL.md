@@ -74,12 +74,13 @@ After each push:
 
   ```sh
   gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
-    pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes {
+    pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes {
       id isResolved comments(first: 5) { nodes { body author { login }
         pullRequestReview { databaseId } } } } } } } }'
   ```
 
 - Filter to unresolved threads from Copilot reviewers only (`copilot-pull-request-reviewer[bot]` or `copilot-pull-request-reviewer`)
+- Track the most recent Copilot review ID (max `pullRequestReview.databaseId`); only skip threads from earlier rounds if they have already been accepted and fixed, or replied to with an explanation
 - Never process human reviewer threads automatically
 
 ### Accept or reject each comment
@@ -89,7 +90,7 @@ After each push:
 
 ### Resolve threads
 
-- **MCP**: `submit_pending_pull_request_review` or use GraphQL fallback
+- No dedicated MCP method for resolving individual threads; use the GraphQL fallback
 - **GraphQL fallback**:
 
   ```sh
@@ -146,8 +147,8 @@ Categorize each finding: `blocker` | `important` | `nit` | `suggestion` | `quest
 Two-stage process:
 
 1. Generate review locally — show the user all findings before posting
-2. After user approval, post via **MCP**: `create_pull_request_review` with `event` (`APPROVE`, `REQUEST_CHANGES`, `COMMENT`)
-3. Add inline comments via `add_comment_to_pending_review` before submitting
+2. Add inline comments via `add_comment_to_pending_review` to a pending review
+3. After user approval, submit via **MCP**: `create_pull_request_review` with `event` (`APPROVE`, `REQUEST_CHANGES`, `COMMENT`)
 
 ## Merge Gates
 
@@ -157,7 +158,7 @@ Before merging, verify all gates pass:
 
    ```sh
    gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
-     pullRequest(number: PR_NUMBER) { reviewThreads(first: 100) { nodes { id isResolved } } } } }' \
+     pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved } } } } }' \
      --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length'
    ```
 

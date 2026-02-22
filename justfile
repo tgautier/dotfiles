@@ -37,7 +37,7 @@ lint-mise:
 update: update-brew update-mas update-mise update-rust
 
 # Resolve through symlink so this works when just finds ~/.justfile
-dotfiles_dir := canonicalize(justfile_directory())
+dotfiles_dir := parent_directory(canonicalize(justfile()))
 
 # Platform-specific Brewfile
 brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }

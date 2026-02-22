@@ -46,7 +46,7 @@ update-brew:
     brew upgrade
     brew cleanup --prune=all
     brew bundle cleanup --force --file={{brewfile}}
-    brew doctor
+    -brew doctor
 
 # Update Mac App Store apps (skipped if mas not installed)
 update-mas:

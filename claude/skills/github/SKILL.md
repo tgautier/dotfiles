@@ -78,7 +78,7 @@ After requesting a review, **always** wait for both CI and the Copilot review to
    for i in $(seq 1 10); do
      review_state=$(gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
        pullRequest(number: <PR_NUMBER>) { reviews(last: 1) { nodes { author { login } state } } } } }' \
-       --jq '.data.repository.pullRequest.reviews.nodes[] | select(.author.login == "copilot-pull-request-reviewer[bot]") | .state' 2>/dev/null)
+       --jq '.data.repository.pullRequest.reviews.nodes[] | select(.author.login == "copilot-pull-request-reviewer[bot]" or .author.login == "copilot-pull-request-reviewer") | .state' 2>/dev/null)
      if [ -n "$review_state" ]; then break; fi
      sleep 30
    done

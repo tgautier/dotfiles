@@ -640,7 +640,7 @@ For cookie-authenticated, state-changing requests:
 - Use `SameSite=Lax` or `SameSite=Strict` cookies as an additional hardening layer, not as your only CSRF defense.
 - You may rely on `SameSite` alone only for requests that are not authenticated via cookies (e.g., pure bearer-token APIs) or are strictly read-only.
 
-See API Design skill section 10 for more detailed auth and CSRF patterns.
+See API Design skill section 10 for auth patterns.
 
 ---
 

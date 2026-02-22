@@ -105,10 +105,17 @@ After requesting a review, **always** wait for both CI and the Copilot review to
 
 ### Accept or reject each comment
 
-Present each comment to the user with your recommendation (accept or reject, with rationale). Wait for user confirmation before acting — never accept or reject a comment autonomously.
+Process comments **one at a time** — present a single comment, wait for the user's decision, act on it, then move to the next. Never batch multiple comments into one message.
 
-- **Accept** (user confirmed): fix the issue, then resolve the thread
-- **Reject** (user confirmed): reply explaining why, then resolve the thread
+For each comment:
+
+1. Show the comment body and file/line
+2. State your recommendation (accept or reject) with a brief rationale
+3. **Stop and wait** for the user to confirm or override
+4. Act on the decision:
+   - **Accept**: fix the issue, then resolve the thread
+   - **Reject**: reply explaining why, then resolve the thread
+5. Move to the next comment
 
 ### Resolve threads
 

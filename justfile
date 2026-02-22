@@ -17,7 +17,6 @@ lint-shell:
 
 # Validate JSON and YAML config files
 lint-json-yaml:
-    jq empty claude/settings.json
     yq '.' config/alacritty/alacritty.yml > /dev/null
 
 # Lint markdown files

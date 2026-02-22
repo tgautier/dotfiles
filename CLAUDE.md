@@ -73,6 +73,12 @@ Per `claude/rules/git-workflow.md` (commit conventions section):
 - Never mention Claude, AI, or LLM in commit messages
 - Only commit when explicitly asked
 
+## Worktrees
+
+Always use git worktrees for new tasks. This keeps the main working tree clean and allows parallel work without stashing or switching branches.
+
+When spawning subagents via the Task tool, always set `isolation: "worktree"` so each agent works on an isolated copy of the repository. This prevents agents from interfering with each other or with the main working tree.
+
 ## GitHub Integration
 
 GitHub PR workflows (creating, reviewing, merging) use the GitHub MCP Server (`github`, configured in `~/.claude.json` user scope). The `/github` skill (`claude/skills/github/SKILL.md`) provides the full workflow instructions. The always-on `claude/rules/git-workflow.md` handles local git safety only.

@@ -37,6 +37,12 @@
 - Always squash merge — never use merge or rebase strategies
 - Post-merge cleanup is handled by the `/github` skill
 
+## Worktree isolation
+
+- Always use git worktrees for new tasks — never work directly in the main working tree
+- When spawning subagents via the Task tool, always set `isolation: "worktree"` so each agent gets its own copy of the repository
+- Custom agents in `.claude/agents/` should include `isolation: worktree` in their frontmatter
+
 ## Principles
 
 - Prevent problems, don't recover from them — design workflows so errors can't happen rather than adding complex recovery logic

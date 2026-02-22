@@ -520,7 +520,7 @@ OAuth 2.1 is a draft that consolidates secure OAuth 2.0 patterns. RFC 9700 is a 
 
 | Tool | Language | Run in CI |
 |------|----------|-----------|
-| `npm audit` / `yarn audit` | JavaScript/TypeScript | Every PR |
+| `yarn audit` | JavaScript/TypeScript | Every PR |
 | `cargo audit` | Rust | Every PR |
 | `cargo deny` | Rust (license + advisory) | Every PR |
 

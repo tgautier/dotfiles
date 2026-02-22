@@ -11,10 +11,11 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
 - Runtime version management via [mise](https://mise.jdx.dev/)
 - Optimized shell startup with intelligent caching
 - CI with [just](https://just.systems/) + GitHub Actions
+- One-command system updates via `just update`
 
 ## Quick Start
 
-### macOS
+### macOS (clean machine)
 
 1. **Install Homebrew:**
 
@@ -22,30 +23,63 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
    ```
 
-2. **Install packages from Brewfile:**
+2. **Clone this repo** (HTTPS — no SSH keys yet on a clean machine):
+
+   ```sh
+   mkdir -p ~/Workspace/tgautier
+   git clone https://github.com/tgautier/dotfiles.git ~/Workspace/tgautier/dotfiles
+   ```
+
+3. **Install packages from Brewfile** (includes rcm, just, rustup, 1Password, and everything else):
 
    ```sh
    brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
    ```
 
-3. **Link dotfiles:**
+4. **Link dotfiles** (rcm was installed in step 3):
 
    ```sh
-   # First-time setup (rcrc not yet symlinked):
    rcup -d ~/Workspace/tgautier/dotfiles
-
-   # Subsequent updates:
-   rcup
    ```
 
-4. **Install mise:**
+5. **Set up 1Password SSH agent:**
+   Open 1Password, sign in, and enable the SSH agent under
+   Settings > Developer > SSH Agent.
+
+6. **Switch git remote to SSH** (now that 1Password SSH is configured):
+
+   ```sh
+   git -C ~/Workspace/tgautier/dotfiles remote set-url origin git@github.com:tgautier/dotfiles.git
+   ```
+
+7. **Install mise:**
 
    ```sh
    curl https://mise.run | sh
    mise install
    ```
 
-### Linux / WSL2 Ubuntu
+8. **Update everything:**
+
+   ```sh
+   just update
+   ```
+
+### Windows + WSL2 Ubuntu
+
+#### Windows side (do this first)
+
+1. **Install WSL2 and Ubuntu** from the Microsoft Store or via PowerShell:
+
+   ```powershell
+   wsl --install -d Ubuntu
+   ```
+
+2. **Install 1Password for Windows** and enable the SSH agent:
+   Settings > Developer > SSH Agent. This provides `op-ssh-sign-wsl`
+   which the dotfiles use for git commit signing inside WSL.
+
+#### WSL side
 
 1. **Update system packages:**
 
@@ -67,7 +101,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    sudo apt install -y coreutils zsh git curl build-essential libffi-dev libyaml-dev zlib1g-dev
    ```
 
-4. **Install Homebrew (optional but recommended):**
+4. **Install Homebrew:**
 
    ```sh
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
@@ -80,34 +114,26 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
    ```
 
-5. **Install packages:**
+5. **Clone this repo** (HTTPS — no SSH keys yet on a clean machine):
 
    ```sh
-   # If using Homebrew:
+   mkdir -p ~/Workspace/tgautier
+   git clone https://github.com/tgautier/dotfiles.git ~/Workspace/tgautier/dotfiles
+   ```
+
+6. **Install packages from Brewfile** (includes rcm, just, rustup, and other tools):
+
+   ```sh
    brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
-
-   # Or install tools via apt:
-   sudo apt install -y gh jq htop httpie docker.io
    ```
 
-6. **Link dotfiles:**
+7. **Link dotfiles** (rcm was installed in step 6):
 
    ```sh
-   # Install rcm if using Homebrew:
-   brew install rcm
-
-   # Or via apt:
-   sudo add-apt-repository ppa:martin-frost/thoughtbot-rcm
-   sudo apt install rcm
-
-   # First-time setup (rcrc not yet symlinked):
    rcup -d ~/Workspace/tgautier/dotfiles
-
-   # Subsequent updates:
-   rcup
    ```
 
-7. **Change shell to zsh:**
+8. **Change shell to zsh:**
 
    ```sh
    chsh -s $(which zsh)
@@ -115,15 +141,42 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
 
    Log out and log back in for the shell change to take effect.
 
-8. **Install mise:**
+9. **Switch git remote to SSH** (1Password SSH agent was set up on the Windows side):
 
    ```sh
-   curl https://mise.run | sh
-   mise install
+   git -C ~/Workspace/tgautier/dotfiles remote set-url origin git@github.com:tgautier/dotfiles.git
    ```
 
-9. **(WSL only) Install 1Password for SSH:**
-   Follow: <https://developer.1password.com/docs/ssh/get-started#step-3-turn-on-the-1password-ssh-agent>
+10. **Install mise:**
+
+    ```sh
+    curl https://mise.run | sh
+    mise install
+    ```
+
+11. **Update everything:**
+
+    ```sh
+    just update
+    ```
+
+## Day-to-Day Updates
+
+Keep everything up to date with a single command:
+
+```sh
+just update
+```
+
+Or run individual update steps:
+
+| Recipe             | Description                                       |
+| ------------------ | ------------------------------------------------- |
+| `just update`      | Run all update steps below                        |
+| `just update-brew` | Update Homebrew packages and clean up             |
+| `just update-mas`  | Update Mac App Store apps (skipped if no `mas`)   |
+| `just update-mise` | Show outdated mise tools and upgrade them         |
+| `just update-rust` | Update Rust toolchain                             |
 
 ## Structure
 
@@ -143,7 +196,7 @@ gitconfig               # SSH signing via 1Password, rebase-based pulls
 rcrc                    # rcm config (DOTFILES_DIRS, EXCLUDES)
 Brewfile                # macOS Homebrew packages
 Brewfile.linux          # Linux Homebrew packages
-justfile                # Local CI tasks (lint-shell, lint-json-yaml, etc.)
+justfile                # CI and update recipes
 .github/workflows/ci.yml
 ```
 

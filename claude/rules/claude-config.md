@@ -28,7 +28,7 @@ paths:
 
 - Use path scoping when a rule is relevant only to specific directories
 - Omit `paths:` when the rule applies globally (e.g., CQRS, testing, config)
-- After directory restructuring, run `just check-rule-scopes` to verify all globs still resolve
+- After directory restructuring, run `just claude-check-rule-scopes` (if the project defines it) to verify all globs still resolve
 
 ## Size and scope discipline
 
@@ -67,7 +67,7 @@ When modifying Claude config:
 
 - [ ] Each rule file covers exactly one concern
 - [ ] Path-scoped rules have valid `paths:` frontmatter
-- [ ] `just check-rule-scopes` passes (no orphaned globs)
+- [ ] `just claude-check-rule-scopes` passes, if the project defines it (no orphaned globs)
 - [ ] No duplicate content across rules and skills
-- [ ] `CLAUDE.md` rules table reflects current `.claude/rules/` contents
+- [ ] If the repo defines project-local rules in `.claude/rules/`, any rules table in `CLAUDE.md` reflects their current contents
 - [ ] Cross-references point to existing files

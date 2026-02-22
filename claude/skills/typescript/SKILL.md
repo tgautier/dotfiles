@@ -11,7 +11,7 @@ date: 2026-02-21
 user-invocable: true
 ---
 
-# TypeScript & React Industrial-Grade Development
+# TypeScript & React Development
 
 For API contract conventions (error formats, pagination, status codes, auth patterns), see the API Design skill.
 

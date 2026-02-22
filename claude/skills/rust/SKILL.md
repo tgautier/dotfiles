@@ -11,7 +11,7 @@ date: 2026-02-21
 user-invocable: true
 ---
 
-# Rust Industrial-Grade Development
+# Rust Development
 
 Implements the API Design skill conventions using Axum + Diesel + utoipa. See that skill for HTTP semantics, error format, status codes, pagination contracts, security patterns, and DX principles.
 
@@ -633,6 +633,10 @@ async fn shutdown_signal() {
 
 ## 10. Observability
 
+> For language-agnostic observability methodology (naming conventions, sampling strategies,
+> cardinality discipline, health check contracts, anti-patterns), see the **Observability skill** (`/observability`).
+> This section covers Rust-specific implementation patterns only.
+
 ### Handler instrumentation
 
 `#[tracing::instrument]` is mandatory on every public handler (see section 2).
@@ -645,7 +649,7 @@ let results = {
 };
 ```
 
-### Structured logging
+### Structured logging with `tracing`
 
 Always use typed fields, never string interpolation:
 
@@ -657,23 +661,15 @@ tracing::info!(resource.id = %id, resource.name = %name, "Resource created");
 tracing::info!("Resource {} created with name {}", id, name);
 ```
 
-**Never log sensitive data** — passwords, tokens, PII, full request bodies.
+**Never log sensitive data** — see `claude/rules/secrets.md` § Logging for the full list.
 
 Log errors **only when handled** (in `IntoResponse`), never during propagation. This prevents duplicate log entries.
 
-### Health checks — three endpoints
-
-| Endpoint | Purpose | What it checks |
-|---|---|---|
-| `GET /health` | **Liveness** — process alive? | Always returns 200 (no dependencies) |
-| `GET /ready` | **Readiness** — can serve traffic? | DB pool connectivity |
-| `GET /metrics` | **Prometheus scrape** | All registered metrics |
-
-The liveness probe must **never** check external dependencies. If Postgres is down, the process is still alive — the orchestrator should stop routing traffic (readiness), not restart the process.
+### Health check implementation
 
 ```rust
 pub async fn health() -> StatusCode {
-    StatusCode::OK  // no dependency checks
+    StatusCode::OK  // no dependency checks — liveness only
 }
 
 pub async fn ready(State(state): State<AppState>) -> StatusCode {
@@ -684,27 +680,12 @@ pub async fn ready(State(state): State<AppState>) -> StatusCode {
 }
 ```
 
-### Metric naming (Prometheus)
-
-Follow the pattern `<namespace>_<subsystem>_<name>_<unit>`:
-
-```
-myapp_http_requests_total              // counter
-myapp_http_request_duration_seconds    // histogram
-myapp_db_connections_active            // gauge
-myapp_db_query_duration_seconds        // histogram
-```
-
-### Trace sampling
-
-For production, sample rather than recording 100% of traces:
+### Trace sampling in Rust
 
 ```rust
 use opentelemetry_sdk::trace::Sampler;
 Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(0.1)))  // 10%
 ```
-
-Avoid high-cardinality span fields (e.g., user IDs as span names) — they cause cardinality explosion in trace backends.
 
 ---
 
@@ -809,6 +790,8 @@ async fn test_list_resources_returns_200() {
 ---
 
 ## 12. Security & Dependency Hygiene
+
+> For cross-cutting web security principles (OWASP, input validation, supply chain strategy), see the **Web Security skill** (`/web-security`).
 
 ### `cargo-deny`
 

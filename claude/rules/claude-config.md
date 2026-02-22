@@ -51,15 +51,17 @@ paths:
 
 - Rules: `kebab-case.md` — descriptive noun or noun-phrase (`domain-invariants`, `generated-code`)
 - Skills: `kebab-case/SKILL.md` — verb-phrase or domain name (`code-planning`, `api-design`)
-- No prefixes, no numbering — filesystem order doesn't matter
+- Path-scoped rules use a layer prefix (`domain-`, `frontend-`, `rust-`, `db-`) to signal scope from the filename. Global rules have no prefix. No numbering — filesystem order doesn't matter
 
 ## Cross-reference format
 
 Reference other config files with relative paths from the project root:
 
-- Rules → `.claude/rules/testing.md` (project-local) or `claude/rules/git-workflow.md` (global)
+- Rules → `.claude/rules/test-isolation.md` (project-local) or `claude/rules/git-conventions.md` (global)
 - Skills → `/skill-name` (invoke syntax)
 - Project docs → `CLAUDE.md`
+
+**Global skills and rules must never reference project-local files** (`.claude/rules/`, project source paths). Global config is reusable across projects — project-specific bridging belongs in each project's `CLAUDE.md`. Use generic language like "check the project's `CLAUDE.md`" instead.
 
 ## Hygiene checklist
 
@@ -71,3 +73,4 @@ When modifying Claude config:
 - [ ] No duplicate content across rules and skills
 - [ ] If the repo defines project-local rules in `.claude/rules/`, any rules table in `CLAUDE.md` reflects their current contents
 - [ ] Cross-references point to existing files
+- [ ] Global skills/rules don't reference project-local files (`.claude/rules/`, project source paths)

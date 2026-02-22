@@ -16,7 +16,7 @@ user-invocable: true
 Methodology for structuring high-quality implementation plans. This skill governs *how to plan well* — evaluating trade-offs, decomposing work, managing scope, and identifying risks. A good plan eliminates ambiguity before code is written.
 
 > **Scope boundary:** This skill covers plan *quality* — what makes a plan good. For related concerns:
-> - Planning *process*, execution discipline, and verification → **workflow rule** (`claude/rules/workflow.md`)
+> - Planning *process*, execution discipline, and verification → **task lifecycle rule** (`claude/rules/task-lifecycle.md`)
 > - Source evaluation for research that informs plans → **Code Research skill** (`/code-research`)
 > - Domain-specific decisions are delegated to the relevant skill (see Trade-off Evaluation below)
 
@@ -224,3 +224,17 @@ The chosen path. Why alternatives were rejected (brief).
 | Planning without reading code first | Plan based on assumptions, not reality | Research first (workflow rule) |
 | Batching all tests to the end | Errors compound, root cause is obscured | Verify after each task |
 | Horizontal decomposition | "All models, then all handlers" prevents incremental verification | Use vertical slices |
+
+---
+
+## 9. Annotation Cycle
+
+For non-trivial changes, iterate on the plan before implementation:
+
+1. Claude generates a plan (as a markdown file, in addition to plan mode)
+2. You add inline notes directly in the plan — corrections, rejections, domain knowledge
+3. Claude addresses all notes and updates the plan. **No code yet.**
+4. Repeat this cycle 1–6 times until the plan is right
+5. Only then: "implement it all"
+
+Guard phrase: include "don't implement yet" when refining the plan to prevent premature code generation.

@@ -52,15 +52,15 @@ APIs are user interfaces for developers. Design for the developer who has never 
 | GET | Yes | Yes | No | Retrieve resource(s) |
 | POST | No | No | Yes | Create resource, trigger action |
 | PUT | No | Yes | Yes | Full replace |
-| PATCH | No | No | Yes | Partial update (JSON Merge Patch RFC 7396) |
+| PATCH | No | Depends | Yes | Partial update (JSON Merge Patch RFC 7396) |
 | DELETE | No | Yes | No | Remove resource |
 
 **Method choice rules:**
 - GET must never have side effects — no creating, no deleting, no state changes
 - PUT replaces the entire resource — omitted fields reset to defaults
-- PATCH updates only provided fields — use JSON Merge Patch (RFC 7396): send only changed fields, omitted fields stay unchanged
+- PATCH updates only provided fields — use JSON Merge Patch (RFC 7396): send only changed fields, omitted fields stay unchanged. Idempotency depends on patch semantics: patches representing desired final state are idempotent; operational patches (e.g., "increment balance by 10") are not
 - DELETE is idempotent — deleting an already-deleted resource returns 204, not 404
-- POST is the only non-idempotent method — use `Idempotency-Key` header to make it safe for retries
+- Non-idempotent operations (commonly POST, sometimes PATCH) are not safe to retry — use an `Idempotency-Key` header to make retries safe
 
 ---
 
@@ -78,8 +78,8 @@ APIs are user interfaces for developers. Design for the developer who has never 
 | 401 | Unauthorized | No credentials or expired token — **MUST include `WWW-Authenticate` header** |
 | 403 | Forbidden | Valid credentials, insufficient permissions. Use 404 instead if resource existence is sensitive (Google, Microsoft) |
 | 404 | Not Found | Resource doesn't exist, or 403 disguised to prevent resource enumeration |
-| 409 | Conflict | Duplicate resource, state conflict, optimistic locking failure (`If-Match` ETag mismatch at the application level) |
-| 412 | Precondition Failed | `If-Match` / `If-None-Match` header condition not met (HTTP-level conditional request failure) |
+| 409 | Conflict | Duplicate resource, state conflict, optimistic locking failure not expressed via HTTP conditional headers |
+| 412 | Precondition Failed | `If-Match` / `If-None-Match` precondition not met — use this (not 409) when `If-*` headers are present |
 | 422 | Unprocessable Entity | Valid syntax but semantic/business rule violation (e.g., insufficient balance, invalid date range) |
 | 429 | Too Many Requests | Rate limited — **MUST include `Retry-After` header** |
 | 503 | Service Unavailable | Dependency down, maintenance — **SHOULD include `Retry-After` header** |
@@ -210,7 +210,7 @@ Inspired by Stripe: include `doc_url` linking to error documentation, and consid
 
 ## 9. Idempotency
 
-POST is the only non-idempotent standard method. Network failures during POST create "did it work?" ambiguity.
+Network failures during non-idempotent operations (POST, sometimes PATCH) create "did it work?" ambiguity. Use idempotency keys to make retries safe.
 
 **`Idempotency-Key` header** (Stripe pattern):
 - Client generates a UUID, sends via `Idempotency-Key` header

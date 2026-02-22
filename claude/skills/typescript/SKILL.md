@@ -13,6 +13,8 @@ user-invocable: true
 
 # TypeScript & React Industrial-Grade Development
 
+For API contract conventions (error formats, pagination, status codes, auth patterns), see the API Design skill.
+
 Comprehensive guidance for building production-quality TypeScript and React applications. Based on industry best practices from the React team, Matt Pocock, Kent C. Dodds, TkDodo, and companies running React at scale.
 
 ---
@@ -633,7 +635,7 @@ Avoid `'unsafe-inline'` for scripts — use nonces or hashes.
 
 ### CSRF protection
 
-For cookie-based auth, use `SameSite=Strict` cookies and CSRF tokens on state-changing requests.
+Use `SameSite=Strict` cookies (see API Design skill section 10 for auth patterns).
 
 ---
 
@@ -814,7 +816,7 @@ type ApiResult<T> =
 
 ### Retry with exponential backoff
 
-Respect `Retry-After` headers. Retry only on transient failures (429, 503, network errors), never on 4xx client errors. TanStack Query provides this built-in via the `retry` option.
+Retry only on 429 and 503 (see API Design skill section 15). Respect `Retry-After` headers. TanStack Query provides this built-in via the `retry` option.
 
 ---
 

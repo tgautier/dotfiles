@@ -32,10 +32,10 @@ Before planning, deeply read all code that will be affected or that the changes 
 
 For non-trivial changes, iterate on the plan before implementation:
 
-1. Claude generates a plan (as a markdown file, not just plan mode)
+1. Claude generates a plan (as a markdown file, in addition to plan mode)
 2. You add inline notes directly in the plan — corrections, rejections, domain knowledge
 3. Claude addresses all notes and updates the plan. **No code yet.**
-4. Repeat 1–6 rounds until the plan is right
+4. Repeat this cycle 1–6 times until the plan is right
 5. Only then: "implement it all"
 
 Guard phrase: include "don't implement yet" when refining the plan to prevent premature code generation.

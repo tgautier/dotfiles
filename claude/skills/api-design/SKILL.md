@@ -41,7 +41,7 @@ APIs are user interfaces for developers. Design for the developer who has never 
 - Custom methods when CRUD doesn't fit: use `:action` suffix (Google AIP-136) — `/api/assets/{id}:archive`
 - Query parameters for filtering, sorting, field selection — never in the URL path
 - Resource IDs: UUIDs over sequential integers (OWASP BOLA mitigation — prevents enumeration)
-- Standard fields on every resource (Google AIP-148): `id`, `createdAt`, `updatedAt`. Consider `metadata` (Stripe) — arbitrary key-value pairs for developer use
+- Standard fields on every resource (Google AIP-148): `id`, `created_at`, `updated_at`. Consider `metadata` (Stripe) — arbitrary key-value pairs for developer use
 
 ---
 
@@ -118,8 +118,8 @@ Validation errors — return field-level detail so developers fix all issues in 
   "status": 422,
   "detail": "2 fields failed validation",
   "errors": [
-    { "field": "currency", "message": "Must be a 3-letter uppercase ISO 4217 code", "rejectedValue": "us" },
-    { "field": "value", "message": "Must be positive", "rejectedValue": "-10" }
+    { "field": "currency", "message": "Must be a 3-letter uppercase ISO 4217 code", "rejected_value": "us" },
+    { "field": "value", "message": "Must be positive", "rejected_value": "-10" }
   ]
 }
 ```
@@ -151,25 +151,44 @@ Inspired by Stripe: include `doc_url` linking to error documentation, and consid
 - Cons: no random page access, no "page 3 of 10"
 - Use for: infinite scroll, feeds, large datasets, public APIs
 
-### Response shape (both)
+### Response shapes
+
+Pick one strategy per endpoint — never mix offset and cursor fields in the same response (Twilio's hybrid is a cautionary tale).
+
+**Cursor-based** (preferred — Stripe, Google, Slack pattern):
 
 ```json
 {
-  "items": [...],
-  "total": 42,
-  "limit": 25,
-  "offset": 0,
-  "hasMore": true,
-  "nextCursor": "eyJpZCI6Ii4uLiJ9"
+  "data": [...],
+  "has_more": true,
+  "next_cursor": "eyJpZCI6MTIzfQ=="
 }
 ```
 
+- `has_more`: boolean — unambiguous signal, avoids client inferring end-of-list from `len(data) < limit`
+- `next_cursor`: opaque string, `null` when `has_more` is `false`. Never expose internal IDs or timestamps as the cursor format
+- Request params: `cursor` (opaque), `limit` (integer with default and max)
+
+**Offset-based** (only when random page access is a hard requirement):
+
+```json
+{
+  "data": [...],
+  "page": 1,
+  "page_size": 25,
+  "total": 1042
+}
+```
+
+- Request params: `page` (integer, 1-indexed), `page_size` (integer)
+
 ### Rules
 
-- Deterministic sort order — always include a unique tiebreaker column (e.g., `createdAt DESC, id DESC`)
+- Deterministic sort order — always include a unique tiebreaker column (e.g., `created_at DESC, id DESC`)
 - Server-enforced limits — clamp to `[1, 100]`, don't reject. If client requests 500, silently coerce to 100 (Google)
-- Consider omitting `total` for performance (Zalando) — counting requires a full table scan. Use `hasMore` instead
-- Never return pagination metadata without items (no empty `{ total: 0 }` without `items: []`)
+- Omit `total` from cursor responses — expensive to compute at scale, often stale. Offer as a separate endpoint or opt-in field if needed (Zalando)
+- Never return pagination metadata without items (no empty `{ total: 0 }` without `data: []`)
+- Cursors must be opaque strings — clients must not parse or construct them
 
 ---
 
@@ -177,7 +196,7 @@ Inspired by Stripe: include `doc_url` linking to error documentation, and consid
 
 **Filtering:** `?status=active&type=STOCK` for simple equality. For complex queries, consider a structured syntax (Google AIP-160 or OData-style operators: `?filter=value gt 1000`).
 
-**Sorting:** `?sort=createdAt:desc,name:asc` — explicit, composable, same syntax across all list endpoints.
+**Sorting:** `?sort=created_at:desc,name:asc` — explicit, composable, same syntax across all list endpoints.
 
 **Field selection:** `?fields=id,name,value` — reduces payload. More sophisticated: `?expand=account` to inline related resources (Stripe pattern — default returns IDs, expand returns full objects).
 
@@ -254,7 +273,7 @@ Network failures during non-idempotent operations (POST, sometimes PATCH) create
 
 ### Audit — What did you do?
 
-- Log every state-changing operation: `{ actor, action, resource, resourceId, timestamp, requestId, sourceIp, result }`
+- Log every state-changing operation: `{ actor, action, resource, resource_id, timestamp, request_id, source_ip, result }`
 - Include `X-Request-ID` in audit entries for end-to-end correlation
 - Never log credentials, tokens, or PII in audit logs
 - Immutable, append-only audit trail — never delete or modify entries
@@ -291,9 +310,9 @@ Network failures during non-idempotent operations (POST, sometimes PATCH) create
 
 ### ETags for optimistic concurrency
 
-- Client sends `If-Match: <etag>` on PUT/PATCH/DELETE — server returns 409 Conflict if the resource changed since the client last read it
+- Client sends `If-Match: <etag>` on PUT/PATCH/DELETE — server returns 412 Precondition Failed if the resource changed since the client last read it
 - Prevents lost updates in multi-user scenarios
-- `updatedAt` timestamp can serve as the ETag basis for simple cases
+- `updated_at` timestamp can serve as the ETag basis for simple cases
 
 ### Cache-Control directives
 
@@ -339,7 +358,7 @@ DX is what separates a good API from a great one. **Time to first successful API
 
 ### Consistency
 
-- camelCase for JSON fields in this skill's examples; language-specific skills may use different field naming styles in code (for example, Rust `snake_case` structs) while configuring their serializers to emit camelCase JSON
+- snake_case for all JSON fields — matches Stripe, GitHub, Zalando, Cloudflare conventions. Rust emits snake_case natively; other languages configure their serializers accordingly
 - kebab-case for URL paths, plural nouns for collections
 - Same envelope for all list endpoints (`{ items, total, limit, offset }`)
 - Same error shape from every endpoint (RFC 9457)

@@ -938,10 +938,10 @@ pub struct CursorParams {
 // Return items[0..limit] and next_cursor = items[limit-1].id
 ```
 
-Response shape:
+Response shape (see API Design skill for contract):
 ```json
 {
-  "items": [...],
+  "data": [...],
   "next_cursor": "550e8400-e29b-41d4-a716-446655440000",
   "has_more": true
 }
@@ -949,7 +949,7 @@ Response shape:
 
 ### ETags and conditional requests
 
-Implement via `TypedHeader<IfNoneMatch>` extractor and `ETag` response header. Use a stable per-resource version such as an `updated_at` timestamp (Rust/DB field) or content hash as the ETag basis; if your public JSON uses camelCase (for example `updatedAt`), map it from `updated_at` via `serde` attributes or a consistent naming strategy.
+Implement via `TypedHeader<IfNoneMatch>` extractor and `ETag` response header. Use a stable per-resource version such as the `updated_at` timestamp or content hash as the ETag basis.
 
 ### API versioning
 

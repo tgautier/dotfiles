@@ -1,4 +1,4 @@
-# Security
+# Secrets
 
 ## Secrets in code
 
@@ -12,6 +12,13 @@
 - Never echo, log, or print environment variables that may contain secrets
 - Never pass secrets as command-line arguments (visible in `ps` output) — use environment variables or stdin
 - Never include secrets in URLs, query strings, or commit messages
+
+## Logging
+
+- Never log passwords, tokens, API keys, or secrets
+- Never log full request/response bodies
+- Never log PII (email addresses, names in non-debug contexts)
+- Never log database connection strings
 
 ## Sensitive files
 

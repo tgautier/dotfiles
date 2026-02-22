@@ -1,8 +1,8 @@
-# Workflow
+# Task Lifecycle
 
 How Claude approaches tasks, from intake to completion. Organized by the task lifecycle: assess → research → plan → implement → verify → done.
 
-> **Scope boundary:** This rule governs *process* — when to plan, how to work, verification discipline. For plan *quality* methodology (trade-off evaluation, task decomposition, scope management, risk identification) → **Code Planning skill** (`/code-planning`).
+> **Scope boundary:** This rule governs *process* — when to plan, how to work, verification discipline. For plan *quality* methodology (trade-off evaluation, task decomposition, scope management, risk identification, annotation cycles) → **Code Planning skill** (`/code-planning`).
 
 ## Project grounding
 
@@ -10,7 +10,7 @@ At the start of any task, read the project's `CLAUDE.md`. It contains:
 
 - Which verification commands to run and when
 - Critical constraints specific to this codebase
-- Pointers to reference docs (`.claude/docs/`) for the domain you're working in
+- Pointers to rules (`.claude/rules/`) — path-scoped rules auto-load for matching files
 
 ## Assess
 
@@ -27,35 +27,23 @@ Before starting, identify how you'll verify the work: existing test suite, new t
 Before planning, deeply read all code that will be affected:
 
 1. Read the files you'll change AND the files that call/import them
-2. Write findings to a persistent file (`research.md`) — not just chat summaries
-3. Document: existing patterns, conventions, gotchas, and integration points
-4. The research artifact survives context compression and informs the plan
+2. Document findings: existing patterns, conventions, gotchas, and integration points
 
 Use subagents for research to keep the main context window clean. Offload exploration and parallel analysis — don't pollute the main conversation with hundreds of lines of search results.
 
 ## Plan
 
-1. **Use plan mode** (`shift+tab`) for anything non-trivial — for complex multi-step work, also write the plan to a persistent file (`plan.md`) that survives context compression
+1. **Use plan mode** (`shift+tab`) for anything non-trivial
 2. **Include a task checklist** — mark tasks complete during implementation to track progress
 3. **List files to change** and the order of changes
 4. **Scope explicitly** — for refactoring tasks, list what's in scope AND what you're deliberately skipping, with rationale for each
 5. **Get user approval** before writing code
 
-### Annotation cycle
-
-For non-trivial changes, iterate on the plan before implementation:
-
-1. Claude generates a plan (as a markdown file, in addition to plan mode)
-2. You add inline notes directly in the plan — corrections, rejections, domain knowledge
-3. Claude addresses all notes and updates the plan. **No code yet.**
-4. Repeat this cycle 1–6 times until the plan is right
-5. Only then: "implement it all"
-
-Guard phrase: include "don't implement yet" when refining the plan to prevent premature code generation.
+For iterating on plans before implementation, see the annotation cycle in `/code-planning`.
 
 ## Implement
 
-- Mark each task complete in the plan document as you go — never stop mid-implementation with tasks unchecked
+- Mark each task complete as you go — never stop mid-implementation with tasks unchecked
 - Run verification (typecheck, lint, tests) **after every edit**, not batched at the end. If a test fails, fix it before moving on
 - Do not add unnecessary comments, jsdocs, or type annotations to code you didn't change
 - Keep corrections terse — single-sentence when context already exists. Reference existing code for consistency: "match the pattern in X"
@@ -106,8 +94,5 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 
 - Writing code before reading the files you'll change
 - Making speculative fixes without understanding root cause
-- Batching all verification to the end
-- Skipping plan mode to "save time" — it costs more time when changes need rework
 - Dismissing failing tests as "pre-existing" or "unrelated" without investigating
 - Incrementally patching a bad approach instead of reverting and re-planning
-- Asking the user for hand-holding on a bug when the error message is right there

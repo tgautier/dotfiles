@@ -21,7 +21,7 @@ Language-agnostic guidance for modeling business domains. Covers the *what* of d
 
 Based on Eric Evans (*Domain-Driven Design*), Vaughn Vernon (*Implementing Domain-Driven Design*, *Domain-Driven Design Distilled*), Martin Fowler (*Patterns of Enterprise Application Architecture*, refactoring.guru), and Microsoft Azure Architecture Center.
 
-> **Project-specific:** Check `.claude/rules/domain-models.md` for this project's concrete aggregate definitions, field mappings, and validation rules. Check `.claude/rules/domain-invariants.md` for financial correctness constraints.
+> **Project-specific:** Check the project's `CLAUDE.md` for domain-specific rules covering aggregate definitions, field mappings, validation rules, and financial correctness constraints.
 
 ---
 
@@ -318,7 +318,7 @@ When a feature requires changes across layers:
 
 Each layer should be independently deployable — the backend should handle both old and new schema during transition.
 
-> **Implementation:** For Diesel migration workflow, see **Rust skill** (`/rust` §8). For project-specific migration steps, see `.claude/rules/schema-workflow.md`.
+> **Implementation:** For Diesel migration workflow, see **Rust skill** (`/rust` §8). For project-specific migration steps, check the project's `CLAUDE.md`.
 
 ---
 
@@ -419,7 +419,7 @@ Before implementing a new domain model or modifying an existing one:
 - [ ] **Deterministic pagination** — do paginated queries include a unique tiebreaker column?
 - [ ] **Schema evolution** — can this migration be rolled back? Does it follow expand-migrate-contract?
 - [ ] **Event design** — if this change triggers side effects, are they modeled as domain events?
-- [ ] **Project rules** — have you checked `.claude/rules/domain-models.md` and `.claude/rules/domain-invariants.md` for project-specific constraints?
+- [ ] **Project rules** — have you checked the project's `CLAUDE.md` for domain-specific rules and constraints?
 
 ---
 

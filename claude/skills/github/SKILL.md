@@ -8,7 +8,7 @@ description: |
 user-invocable: true
 ---
 
-# GitHub PR & Review Skill
+# GitHub PR & Review
 
 All GitHub interactions use the GitHub MCP Server tools when available, with `gh` CLI as fallback.
 

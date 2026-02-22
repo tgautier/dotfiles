@@ -153,6 +153,7 @@ After processing all comments from a Copilot review:
   If the count is not `0`, stop and resolve remaining threads first
 - Before merging, verify all todo list tasks are completed — never merge with pending or in-progress items
 - PR reviews (Copilot or any reviewer) may add new tasks — treat accepted review comments as todo items that must be resolved before merging
+- **Never merge with unchecked test plan items** — every item in the PR's test plan must be checked off before merging. If an item cannot be completed, remove it with an explanation or ask the user
 - Check that CI checks pass before merging: `gh pr checks`
 - Confirm the PR is still `OPEN` immediately before merging
 - If merge fails due to failing checks: inform the user and stop

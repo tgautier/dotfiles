@@ -209,7 +209,7 @@ Example: `(Tier 1, IETF RFC 9457, 2023)` or `(Tier 2, Stripe engineering blog, 2
 
 ### Structure
 
-Follow the `research.md` format defined by the **researcher agent** (`claude/agents/researcher.md`). Add a `## Sources` section at the end with tiered attribution for all referenced materials.
+Write findings to `research.md` with sections: Summary, Stack, Existing patterns, Integration points, Gotchas, Testing, Open questions. Add a `## Sources` section at the end with tiered attribution for all referenced materials.
 
 ---
 

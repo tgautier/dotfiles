@@ -41,7 +41,6 @@
 
 - Always use git worktrees for new tasks — never work directly in the main working tree
 - When spawning subagents via the Task tool, always set `isolation: "worktree"` so each agent gets its own copy of the repository
-- Custom agents in `.claude/agents/` should include `isolation: worktree` in their frontmatter
 
 ## Principles
 

@@ -56,6 +56,8 @@ const config = { theme: "dark", retries: 3 } as const satisfies Config;
 
 ### Branded types for domain identifiers
 
+> For identifying which concepts need branded types (entities vs value objects, aggregate boundaries), see the **Domain Design skill** (`/domain-design` §3-4).
+
 Prevent mixing semantically different values that share the same primitive type:
 
 ```typescript

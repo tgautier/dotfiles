@@ -35,6 +35,8 @@ APIs are user interfaces for developers. Design for the developer who has never 
 
 ## 2. Resource Design & URL Structure
 
+> For mapping domain aggregates to API resources, see the **Domain Design skill** (`/domain-design` §3, §8).
+
 - Plural nouns for collections: `/api/assets`, not `/api/getAssets` or `/api/asset`
 - Hierarchical nesting for ownership: `/api/users/{id}/assets` — max 2 levels, flatten beyond that
 - Collection (`/api/assets`) vs singleton (`/api/assets/{id}`) semantics

@@ -135,27 +135,16 @@ Inspired by Stripe: include `doc_url` linking to error documentation, and consid
 
 ---
 
-## 6. Pagination
+## 6. Pagination (Cursor-Based)
 
-### Offset pagination
+Use cursor-based pagination (keyset) for all list endpoints. Offset pagination degrades with depth, breaks under concurrent writes, and enables abuse via absurd offsets. Stripe, Google, and Slack all converge on this pattern.
 
-- Parameters: `?limit=25&offset=0`
-- Pros: simple, supports random page access, "page 3 of 10" UI
-- Cons: inconsistent under concurrent writes (items shift), performance degrades with depth (DB scans skipped rows), clients can request absurd offsets
-- Use for: admin UIs with page numbers, small datasets
+### Request params
 
-### Cursor pagination (keyset)
+- `limit` — integer, server-enforced default and max
+- `cursor` — opaque string for the next page (Stripe: `starting_after`, `ending_before`)
 
-- Parameters: `?limit=25&after=<opaque_cursor>` (Stripe: `starting_after`, `ending_before`)
-- Pros: stable under mutations, O(1) for any depth, opaque cursor prevents abuse
-- Cons: no random page access, no "page 3 of 10"
-- Use for: infinite scroll, feeds, large datasets, public APIs
-
-### Response shapes
-
-Pick one strategy per endpoint — never mix offset and cursor fields in the same response (Twilio's hybrid is a cautionary tale).
-
-**Cursor-based** (preferred — Stripe, Google, Slack pattern):
+### Response shape
 
 ```json
 {
@@ -167,27 +156,13 @@ Pick one strategy per endpoint — never mix offset and cursor fields in the sam
 
 - `has_more`: boolean — unambiguous signal, avoids client inferring end-of-list from `len(data) < limit`
 - `next_cursor`: opaque string, `null` when `has_more` is `false`. Never expose internal IDs or timestamps as the cursor format
-- Request params: `cursor` (opaque), `limit` (integer with default and max)
-
-**Offset-based** (only when random page access is a hard requirement):
-
-```json
-{
-  "data": [...],
-  "page": 1,
-  "page_size": 25,
-  "total": 1042
-}
-```
-
-- Request params: `page` (integer, 1-indexed), `page_size` (integer)
 
 ### Rules
 
 - Deterministic sort order — always include a unique tiebreaker column (e.g., `created_at DESC, id DESC`)
 - Server-enforced limits — clamp to `[1, 100]`, don't reject. If client requests 500, silently coerce to 100 (Google)
-- Omit `total` from cursor responses — expensive to compute at scale, often stale. Offer as a separate endpoint or opt-in field if needed (Zalando)
-- Never return pagination metadata without items (no empty `{ total: 0 }` without `data: []`)
+- Omit `total` — expensive to compute at scale, often stale. Offer as a separate endpoint or opt-in field if needed (Zalando)
+- Never return pagination metadata without items (no empty response without `data: []`)
 - Cursors must be opaque strings — clients must not parse or construct them
 
 ---
@@ -360,7 +335,7 @@ DX is what separates a good API from a great one. **Time to first successful API
 
 - snake_case for all JSON fields — matches Stripe, GitHub, Zalando, Cloudflare conventions. Rust emits snake_case natively; other languages configure their serializers accordingly
 - kebab-case for URL paths, plural nouns for collections
-- Same envelope for all list endpoints (`{ items, total, limit, offset }`)
+- Same envelope for all list endpoints (`{ data, has_more, next_cursor }`)
 - Same error shape from every endpoint (RFC 9457)
 - Same auth pattern on every endpoint
 - Same pagination parameters on every list endpoint

@@ -67,12 +67,11 @@ After each push:
 
 - If the request fails (Copilot not enabled, already requested), continue — an auto-triggered review may still arrive
 
-### Wait for CI and Copilot review
+### Wait for Copilot review
 
-After requesting a review, **always** wait for both CI and the Copilot review to complete before proceeding. Never skip this step.
+After requesting a review, **always** wait for the Copilot review before proceeding. Copilot reviews arrive faster than CI, so process them first. CI is checked later as a merge gate.
 
-1. **CI**: run `gh pr checks <number> --repo {owner}/{repo} --watch` to block until all check runs finish. The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs — do not use it for CI status.
-2. **Copilot review**: poll using **MCP** `get_pull_request_reviews`, checking for a review authored by `copilot-pull-request-reviewer[bot]`. Poll every 30 seconds, up to 10 attempts (5 minutes). **Fallback** (if MCP is unavailable):
+1. **Poll for the review**: use **MCP** `get_pull_request_reviews`, checking for a new review authored by `copilot-pull-request-reviewer[bot]`. Compare review IDs to detect new reviews (save the last known review ID before pushing). Poll every 30 seconds, up to 10 attempts (5 minutes). **Fallback** (if MCP is unavailable):
 
    ```sh
    for i in $(seq 1 10); do
@@ -84,8 +83,8 @@ After requesting a review, **always** wait for both CI and the Copilot review to
    done
    ```
 
-3. If the review has not appeared after 5 minutes, inform the user and ask whether to continue without it
-4. Once the review appears, read review comments below
+2. If the review has not appeared after 5 minutes, inform the user and ask whether to continue without it
+3. Once the review appears, read review comments below
 
 ### Read review comments
 
@@ -194,7 +193,7 @@ Before merging, verify all gates pass:
    If the count is not `0`, stop and resolve remaining threads first
 
 2. **All test plan items checked** — never merge with unchecked items. If an item cannot be completed, remove it with an explanation or ask the user
-3. **CI passes** — use `gh pr checks <number> --repo {owner}/{repo} --watch` to block until all checks complete. The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs, so it will miss CI results
+3. **CI passes** — use `gh pr checks <number> --repo {owner}/{repo} --watch` to block until all checks complete. This is the only point where you wait for CI — never block on CI earlier in the workflow. The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs, so it will miss CI results
 4. **PR still OPEN** — confirm immediately before merging
 5. **All todo list tasks completed** — never merge with pending or in-progress items
 

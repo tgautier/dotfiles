@@ -29,7 +29,7 @@
   - Add `-u` if no upstream is set
   - If `--force-with-lease` rejects (remote has unknown commits): stop and inform the user
   - If push fails because the remote branch was deleted: re-push with `-u` to recreate it
-- After every push, invoke the `/github` skill — to create a PR if none exists, or to update the PR and request a Copilot review
+- After every push, invoke the `/github` skill — to create a PR if none exists, or to update the PR, request a Copilot review, and process review comments. Wait for the Copilot review first (it arrives faster), then check CI only at merge time
 - Never use `gh pr create` or `gh pr edit` directly — all PR operations go through the `/github` skill
 
 ## Merge strategy

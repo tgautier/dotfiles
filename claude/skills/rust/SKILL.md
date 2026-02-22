@@ -517,6 +517,9 @@ Diesel migrations are the database schema source of truth.
 
 ## 9. Tower Middleware & Server Hardening
 
+> For security header requirements, CORS policies, and CSP configuration,
+> see the **Web Security skill** (`/web-security`).
+
 See API Design skill sections 11 and 15 for the security and resilience rationale. This section covers Rust/Axum implementation.
 
 ### Middleware stack order

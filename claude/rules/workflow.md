@@ -10,7 +10,7 @@ At the start of any task, read the project's `CLAUDE.md`. It contains:
 
 - Which verification commands to run and when
 - Critical constraints specific to this codebase
-- Pointers to reference docs (`.claude/docs/`) for the domain you're working in
+- Pointers to rules (`.claude/rules/`) — path-scoped rules auto-load for matching files
 
 ## Assess
 

@@ -27,7 +27,7 @@ Read these files before starting any implementation work. They contain the rules
 
 **Always read:**
 
-- `claude/rules/implementation.md` — execution discipline, verification cadence, correction policy
+- `claude/rules/workflow.md` — task lifecycle, execution discipline, verification, self-improvement
 - `claude/rules/security.md` — secret handling, what never to commit
 - `claude/rules/shell.md` — shell compatibility (jq/zsh pitfalls)
 - `claude/rules/git-workflow.md` — branching, commit conventions, push safety
@@ -35,7 +35,12 @@ Read these files before starting any implementation work. They contain the rules
 **Project-local rules (auto-discover):**
 
 - Glob for `.claude/rules/*.md` in the working directory and read all matches
-- These are project-specific rules that complement the global skills
+- These are project-specific constraints that are always enforced
+
+**Project reference docs (load based on task scope):**
+
+- Glob for `.claude/docs/*.md` and read files relevant to the task domain
+- These contain project-specific patterns, conventions, and reference material
 
 **Read based on detected stack:**
 

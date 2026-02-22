@@ -32,7 +32,12 @@ Read these files before starting research. They inform what patterns to look for
 **Project-local rules (auto-discover):**
 
 - Glob for `.claude/rules/*.md` in the working directory and read all matches
-- These are project-specific rules that complement the global skills
+- These are project-specific constraints that are always enforced
+
+**Project reference docs (load based on research scope):**
+
+- Glob for `.claude/docs/*.md` and read files relevant to the research topic
+- These contain project-specific patterns, conventions, and reference material
 
 **Read based on detected stack:**
 

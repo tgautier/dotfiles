@@ -36,18 +36,22 @@ lint-mise:
 # Update everything (brew, mac app store, mise, rust)
 update: update-brew update-mas update-mise update-rust
 
+# Platform-specific Brewfile
+brewfile := if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
+
 # Update Homebrew packages and clean up
 update-brew:
     brew update
-    brew bundle install
+    brew bundle install --file={{brewfile}}
     brew upgrade
     brew cleanup --prune=all
-    brew bundle cleanup --force
+    brew bundle cleanup --force --file={{brewfile}}
     brew doctor
 
 # Update Mac App Store apps (skipped if mas not installed)
 update-mas:
-    command -v mas > /dev/null && mas upgrade || true
+    command -v mas > /dev/null || exit 0
+    mas upgrade
 
 # Show outdated mise tools and upgrade them
 update-mise:

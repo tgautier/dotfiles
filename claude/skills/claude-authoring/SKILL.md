@@ -237,3 +237,4 @@ Before committing Claude config changes:
 - [ ] New skills are 200-800 lines
 - [ ] MEMORY.md stays under 200 lines after updates
 - [ ] Naming follows convention (kebab-case, layer prefixes for path-scoped rules)
+- [ ] No `\!` corruption in newly written files — grep for `\\!` (see `shell.md` §zsh corruption)

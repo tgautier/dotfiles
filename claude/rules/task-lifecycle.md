@@ -49,6 +49,7 @@ For iterating on plans before implementation, see the annotation cycle in `/code
 - Do not add unnecessary comments, jsdocs, or type annotations to code you didn't change
 - Keep corrections terse — single-sentence when context already exists. Reference existing code for consistency: "match the pattern in X"
 - If an approach isn't working after one fix attempt, **revert and re-plan** rather than layering patches. One failed fix attempt is the signal to step back — don't push through a bad approach
+- Compact proactively at ~50% context. Don't wait for auto-compaction — manual `/compact` preserves more useful context
 
 ### Subagent strategy
 

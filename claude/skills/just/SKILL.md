@@ -540,23 +540,31 @@ setup: install-tools
 ```just
 # Normal: assumes DB is clean
 app-test:
-    yarn test
+    R8N_ENV=test yarn test
 
 # Force: resets DB first, then runs the normal recipe
-app-test-force: db-reset-test app-test
+app-test-force target="test": (db-reset target)
+    just app-test
 ```
 
 Name the force variant `{recipe}-force`. Use dependencies to compose: reset, then run.
 
-### Environment-specific variables
+### Environment-parameterized recipes
 
 ```just
-# Computed from a config tool with fallback
-db-url := `cargo run -q --bin config -- database.url 2>/dev/null || echo "postgresql://localhost/mydb"`
+# Single env variable — reads from shell, defaults to "dev"
+default-env := env("R8N_ENV", "dev")
 
-# Environment override for a specific context
-db-url-test := `R8N_ENV=test cargo run -q --bin config -- database.url 2>/dev/null || echo "postgresql://localhost/mydb_test"`
+# Recipes accept positional env parameter, resolve URLs through config
+# NOTE: `env` is reserved in just — use a different parameter name (e.g. `target`)
+db-migrate target=default-env:
+    cd api && R8N_ENV={{target}} diesel migration run --database-url "$(R8N_ENV={{target}} cargo run -q --bin config -- database.url)"
+
+# Multi-env composites call sub-recipes with explicit positional args
+db-sync-all: (db-migrate) (db-migrate "test")
 ```
+
+Calling convention: `just db-migrate test` (positional), not `just db-migrate target=test` (`key=value` on the CLI sets variables, not parameters).
 
 ### CI simulation
 

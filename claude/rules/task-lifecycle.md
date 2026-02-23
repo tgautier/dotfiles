@@ -43,6 +43,7 @@ For iterating on plans before implementation, see the annotation cycle in `/code
 
 ## Implement
 
+- **Just-first**: if the project has a `Justfile`, always use `just` recipes instead of raw tool commands (`yarn`, `cargo`, `npx`, `docker compose`). Load the `/just` skill when editing or reviewing the Justfile
 - Mark each task complete as you go — never stop mid-implementation with tasks unchecked
 - Run verification (typecheck, lint, tests) **after every edit**, not batched at the end. If a test fails, fix it before moving on
 - Do not add unnecessary comments, jsdocs, or type annotations to code you didn't change
@@ -96,3 +97,4 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 - Making speculative fixes without understanding root cause
 - Dismissing failing tests as "pre-existing" or "unrelated" without investigating
 - Incrementally patching a bad approach instead of reverting and re-planning
+- Running raw `yarn test`, `cargo test`, `docker compose up` when a `just` recipe exists for the same operation

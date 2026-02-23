@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Code status line — beautiful one-liner with unicode emoji
+# Claude Code status line — mirrors zsh PROMPT style + Claude context
 # Input: JSON from stdin
 
 input=$(cat)
@@ -17,16 +17,23 @@ else
   short_model=""
 fi
 
-# --- Directory: replace $HOME with ~ ---
+# --- Directory: basename only (mirrors %c), replace $HOME with ~ ---
 if [ -n "$cwd" ]; then
   home="$HOME"
-  dir="${cwd/#$home/~}"
+  full_dir="${cwd/#$home/~}"
+  dir=$(basename "$full_dir")
+  # Keep ~ as-is when cwd == $HOME
+  [ "$cwd" = "$home" ] && dir="~"
 else
   dir="?"
 fi
 
-# --- Git branch ---
-branch=$(git -C "$cwd" symbolic-ref --short HEAD 2>/dev/null || git -C "$cwd" rev-parse --short HEAD 2>/dev/null)
+# --- Git branch (skip optional lock to avoid conflicts) ---
+branch=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null \
+         || git -C "$cwd" --no-optional-locks rev-parse --short HEAD 2>/dev/null)
+
+# --- Current environment name (mirrors _currentEnvironmentName) ---
+env_str="${CURRENT_ENVIRONMENT_NAME:-}"
 
 # --- Context bar (5 blocks) ---
 if [ -n "$used" ] && [ "$used" != "null" ]; then
@@ -42,7 +49,7 @@ if [ -n "$used" ] && [ "$used" != "null" ]; then
       bar="${bar}░"
     fi
   done
-  ctx_str="${bar} ${used}%"
+  ctx_str="${bar} ${used}%%"
 else
   ctx_str=""
 fi
@@ -63,14 +70,20 @@ CYAN='\033[36m'
 YELLOW='\033[33m'
 BLUE='\033[34m'
 GREEN='\033[32m'
+GREY='\033[38;5;250m'
 sep="${DIM} ｜ ${RESET}"
 
-# Directory segment
+# Directory segment (bold, mirrors %B%c%b)
 printf "${BOLD}${BLUE}📂 ${dir}${RESET}"
 
 # Branch segment
 if [ -n "$branch" ]; then
   printf "${sep}${GREEN}🌿 ${branch}${RESET}"
+fi
+
+# Environment name segment (grey, mirrors _currentEnvironmentName)
+if [ -n "$env_str" ]; then
+  printf "${sep}${GREY}[${env_str}]${RESET}"
 fi
 
 # Context segment

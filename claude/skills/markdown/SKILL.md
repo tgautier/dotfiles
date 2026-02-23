@@ -19,7 +19,7 @@ Formatting and structure conventions for Markdown files. Based on CommonMark spe
 These are arbitrary but must be consistent within a file and across a project:
 
 | Element | Convention | Rationale |
-|---|---|---|
+| --- | --- | --- |
 | Headings | ATX (`#`) | Consistent, easy to grep |
 | Unordered lists | Hyphens (`-`) | Avoids `*` ambiguity with emphasis |
 | Ordered lists | Lazy numbering (`1.` for all) | Diffs stay clean on reorder |
@@ -105,7 +105,7 @@ These are arbitrary but must be consistent within a file and across a project:
 - Use leading and trailing pipes: `| cell | cell |`
 - Align pipes vertically for source readability (not required by spec, but helps review)
 - Same number of columns in every row — no ragged tables
-- Header separator uses `---` (minimum three hyphens per column)
+- Header separator uses `---` (minimum three hyphens per column), with spaces around pipes: `| --- | --- |`
 
 ### Content
 
@@ -124,7 +124,7 @@ These are arbitrary but must be consistent within a file and across a project:
 
 ```markdown
 | Command | Description |
-|---|---|
+| --- | --- |
 | `just check` | Run linter and typecheck |
 | `just test` | Run all tests |
 ```
@@ -220,7 +220,7 @@ The [API design guide][api-guide] covers pagination patterns.
 Quick-reference table of common mistakes:
 
 | Anti-pattern | Problem | Fix |
-|---|---|---|
+| --- | --- | --- |
 | Mixed list markers (`-` and `*`) | Inconsistent, confusing diffs | Pick one, use throughout |
 | Skipped heading levels | Broken outline hierarchy | Increment by one |
 | Indented code blocks | Fragile, no language hint | Use fenced blocks |

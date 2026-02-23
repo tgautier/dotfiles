@@ -15,7 +15,7 @@ paths:
 When editing files that match a pattern below, load the corresponding skill before making changes.
 
 | File pattern | Skill | Why |
-|---|---|---|
+| --- | --- | --- |
 | `Justfile`, `justfile`, `*.just` | `/just` | Rare edits, specific conventions easy to forget |
 | `*.md` | `/markdown` | Consistent formatting across all Markdown files |
 | `**/CLAUDE.md`, `.claude/**`, `claude/**`, `memory/**` | `/claude-authoring` | Config structure and authoring conventions |
@@ -25,7 +25,7 @@ When editing files that match a pattern below, load the corresponding skill befo
 When the user's request matches an intent below, invoke the corresponding skill before starting work. Match on meaning, not exact keywords — the examples are illustrative, not exhaustive.
 
 | Skill | Intent | Example phrases |
-|---|---|---|
+| --- | --- | --- |
 | `/code-planning` | Planning an implementation | "plan", "design the approach", "how should we implement" |
 | `/code-research` | Researching patterns or evaluating approaches | "research", "evaluate", "compare options", "what's best practice" |
 | `/claude-authoring` | Auditing, writing, or reviewing Claude config | "audit rules", "review config hygiene", "write a rule for" |

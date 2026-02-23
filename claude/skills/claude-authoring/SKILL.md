@@ -20,7 +20,7 @@ Methodology for writing Claude Code configuration files: rules, skills, CLAUDE.m
 Where does something belong? Extended from the brief test in `claude-config.md`:
 
 | If... | Then... | Example |
-|---|---|---|
+| --- | --- | --- |
 | Must hold even if nobody invokes it | **Rule** | "Never use write_pool for GET handlers" |
 | Is a methodology applied deliberately | **Skill** | "How to design a REST endpoint" |
 | Is project architecture, commands, or concern map | **CLAUDE.md** | Tech stack, directory structure, verification commands |
@@ -209,7 +209,7 @@ CLAUDE.md is the project epicenter — the first file Claude reads for any task.
 ## 6. Evolution triggers
 
 | Signal | Action |
-|---|---|
+| --- | --- |
 | Rule > 80 lines | Split into focused rules, or extract methodology into a skill |
 | Rule referenced only from one skill | Merge into that skill |
 | Skill invoked on every task | Promote core constraint to a rule |

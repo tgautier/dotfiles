@@ -36,17 +36,6 @@ paths:
 - 80-line signal — rules over 80 lines likely cover too much; consider splitting or converting detailed sections into a skill
 - Path-scope when possible — reduces noise for unrelated work
 
-## Evolution triggers
-
-| Signal | Action |
-| --- | --- |
-| Rule > 80 lines | Split into focused rules, or extract methodology into a skill |
-| Rule referenced only from one skill | Merge into that skill |
-| Skill invoked on every task | Promote the core constraint to a rule |
-| Rule `paths:` globs match zero files | Fix the globs or delete the rule |
-| Two rules overlap significantly | Merge into one |
-| A convention is violated repeatedly | Tighten the rule or add a verification command |
-
 ## Naming convention
 
 - Rules: `kebab-case.md` — descriptive noun or noun-phrase (`domain-invariants`, `generated-code`)
@@ -63,14 +52,4 @@ Reference other config files with relative paths from the project root:
 
 **Global skills and rules must never reference project-local files** (`.claude/rules/`, project source paths). Global config is reusable across projects — project-specific bridging belongs in each project's `CLAUDE.md`. Use generic language like "check the project's `CLAUDE.md`" instead.
 
-## Hygiene checklist
-
-When modifying Claude config:
-
-- [ ] Each rule file covers exactly one concern
-- [ ] Path-scoped rules have valid `paths:` frontmatter
-- [ ] `just claude-check-rule-scopes` passes, if the project defines it (no orphaned globs)
-- [ ] No duplicate content across rules and skills
-- [ ] If the repo defines project-local rules in `.claude/rules/`, any rules table in `CLAUDE.md` reflects their current contents
-- [ ] Cross-references point to existing files
-- [ ] Global skills/rules don't reference project-local files (`.claude/rules/`, project source paths)
+For detailed authoring methodology (how to write rules, skills, CLAUDE.md, memory), evolution triggers, and hygiene checklists → `/claude-authoring`.

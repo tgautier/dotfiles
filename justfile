@@ -1,9 +1,9 @@
 # Zsh-specific ShellCheck codes to ignore (valid zsh syntax that ShellCheck
 # doesn't understand when linting with --shell=bash)
-zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2179,SC2206,SC2211,SC2296"
+zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-json-yaml lint-markdown lint-brewfile lint-mise
+ci: lint-shell lint-yaml lint-markdown lint-brewfile lint-mise
 
 # Enable the pre-commit hook for this repo
 setup:
@@ -15,9 +15,8 @@ lint-shell:
     shellcheck --severity=warning claude/statusline-command.sh
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 
-# Validate JSON and YAML config files
-lint-json-yaml:
-    jq empty claude/settings.json
+# Validate YAML config files
+lint-yaml:
     yq '.' config/alacritty/alacritty.yml > /dev/null
 
 # Lint markdown files

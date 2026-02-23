@@ -1,12 +1,14 @@
 #!/usr/bin/env zsh
-if [[ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" == "Dark" ]]; then
-  CLAUDE_THEME="dark"
-else
-  CLAUDE_THEME="light"
+local CLAUDE_THEME="light"
+
+if [[ "$PLATFORM" == "macos" ]] && command -v defaults &>/dev/null; then
+  if [[ "$(defaults read -g AppleInterfaceStyle 2>/dev/null)" == "Dark" ]]; then
+    CLAUDE_THEME="dark"
+  fi
 fi
 
 # Update ~/.claude.json theme before launching
-SETTINGS="$HOME/.claude.json"
+local SETTINGS="$HOME/.claude.json"
 if command -v jq &>/dev/null; then
   if [ -f "$SETTINGS" ]; then
     jq --arg theme "$CLAUDE_THEME" '. + {theme: $theme}' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"

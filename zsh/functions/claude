@@ -10,7 +10,7 @@ fi
 # Update ~/.claude.json theme before launching
 local SETTINGS="$HOME/.claude.json"
 if command -v jq &>/dev/null; then
-  if [ -f "$SETTINGS" ]; then
+  if [[ -f "$SETTINGS" ]]; then
     jq --arg theme "$CLAUDE_THEME" '. + {theme: $theme}' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"
   else
     echo "{\"theme\": \"$CLAUDE_THEME\"}" > "$SETTINGS"

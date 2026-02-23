@@ -1,16 +1,8 @@
----
-paths:
-  - Justfile
-  - justfile
-  - "*.just"
-  - "*.md"
-  - "**/CLAUDE.md"
-  - ".claude/**"
-  - "claude/**"
-  - "memory/**"
----
-
 # Skill Triggers
+
+Routing table for skill selection. Always loaded — no path scoping, because intent-based routing must be available regardless of which files are open.
+
+## File-pattern triggers
 
 When editing files that match a pattern below, load the corresponding skill before making changes.
 
@@ -22,17 +14,48 @@ When editing files that match a pattern below, load the corresponding skill befo
 
 ## Task-triggered skills
 
-When the user's request matches an intent below, invoke the corresponding skill before starting work. Match on meaning, not exact keywords — the examples are illustrative, not exhaustive.
+When the user's request matches an intent below, invoke the skill before starting work. Match on meaning, not exact keywords — examples are illustrative, not exhaustive.
 
-| Skill | Intent | Example phrases |
+| Skill | Intent | Example signals |
 | --- | --- | --- |
-| `/code-planning` | Planning an implementation | "plan", "design the approach", "how should we implement" |
-| `/code-research` | Researching patterns or evaluating approaches | "research", "evaluate", "compare options", "what's best practice" |
-| `/claude-authoring` | Auditing, writing, or reviewing Claude config | "audit rules", "review config hygiene", "write a rule for" |
-| `/rust` | Substantial Rust work | "add a handler", "new model", "write a migration" |
-| `/typescript` | Substantial frontend work | "add a component", "new route", "write a hook" |
-| `/api-design` | Designing or reviewing API contracts | "design the endpoint", "review the API", "what status code" |
-| `/domain-design` | Modeling business domains | "model the domain", "aggregate boundaries", "schema evolution" |
-| `/observability` | Instrumenting or adding telemetry | "add tracing", "instrument", "add metrics", "health check" |
-| `/web-security` | Security implementation or review | "security review", "add auth", "configure CORS", "harden" |
-| `/github` | After every push | Per `git-conventions` rule — automatic, not user-triggered |
+| `/code-planning` | Planning before implementation | "plan", "design the approach", "how should we" |
+| `/code-research` | Evaluating approaches or sources | "research", "compare options", "best practice" |
+| `/claude-authoring` | Writing or auditing Claude config | "audit rules", "write a rule", "config hygiene" |
+| `/rust` | Rust handlers, models, errors, config | "add a handler", "new model", "Rust error" |
+| `/react` | React components, hooks, routes, loaders | "add a component", "new route", "write a hook" |
+| `/typescript` | Type safety, testing, build tooling | "write a test", "fix type error", "bundle size" |
+| `/css-responsive` | Responsive layout, Tailwind, touch | "mobile layout", "responsive", "touch targets" |
+| `/ux-design` | Design system, accessibility, form UX | "design tokens", "a11y audit", "form validation UX" |
+| `/saas-product` | Product-level UX patterns | "onboarding", "empty state", "dashboard design" |
+| `/api-design` | API contracts and HTTP semantics | "design the endpoint", "status code", "pagination" |
+| `/domain-design` | Domain modeling and schema changes | "aggregate boundaries", "schema evolution" |
+| `/observability` | Tracing, metrics, health checks | "add tracing", "instrument", "health check" |
+| `/web-security` | Security review or hardening | "security review", "add auth", "CORS", "harden" |
+| `/github` | After every push | Per `git-conventions` — automatic, not user-triggered |
+
+## Composite workflows
+
+Most real tasks need multiple skills. When a task matches a pattern below, load all listed skills — primary first.
+
+| Task shape | Primary | Also load | Trigger signals |
+| --- | --- | --- | --- |
+| Full-stack feature (API + page) | project feature skill | `/rust`, `/api-design`, `/react` | "add X feature", "new endpoint with UI" |
+| API endpoint (no frontend) | `/rust` | `/api-design` | "add endpoint", "new handler" |
+| Frontend page with data | `/react` | `/css-responsive` | "new page", "add a route with data" |
+| Database/schema change | `/domain-design` | `/rust` | "add a migration", "new column", "change schema" |
+| Design system work | `/ux-design` | `/css-responsive` | "update tokens", "theme", "component variants" |
+| Dashboard or analytics | `/saas-product` | `/react`, `/css-responsive` | "build dashboard", "add charts", "KPI cards" |
+| Security hardening | `/web-security` | `/rust` or `/react` | "security audit", "pen test findings" |
+| Testing campaign | `/typescript` | `/react` or `/rust` | "add test coverage", "write E2E tests" |
+| Performance optimization | `/typescript` | `/css-responsive` | "bundle analysis", "lighthouse", "CLS" |
+
+For full-stack features: check the project's `CLAUDE.md` for an end-to-end feature skill (e.g., `/new-feature`) that orchestrates the pipeline order.
+
+## Disambiguation
+
+When intent is ambiguous, prefer the more specific skill:
+
+- "Fix a bug" → investigate first, then load the skill matching the root cause layer
+- "Add validation" → `/rust` if server-side, `/ux-design` if form UX, `/react` if client logic
+- "Refactor" → load the skill matching the code layer being refactored
+- "Write tests" → `/typescript` (testing methodology), plus the layer-specific skill for context

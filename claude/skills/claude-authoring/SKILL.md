@@ -5,7 +5,7 @@ description: >
   Covers: decision test, rule structure, skill structure, CLAUDE.md patterns, memory discipline, evolution, hygiene.
   Use when: creating or editing rules, skills, CLAUDE.md, or memory files.
   Companion to the `claude-config.md` rule (system structure) and `/markdown` skill (formatting).
-version: "1.0"
+version: 1.0.0
 date: 2026-02-23
 user-invocable: true
 argument-hint: ""
@@ -105,7 +105,7 @@ name: skill-name
 description: >
   One-paragraph description of what the skill covers and when to use it.
   First sentence is the summary. Use "Covers:" and "Use when:" patterns.
-version: "1.0"
+version: 1.0.0
 date: 2026-02-23
 user-invocable: true
 argument-hint: "optional hint for arguments"

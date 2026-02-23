@@ -4,7 +4,7 @@ description: >
   Markdown formatting and structure skill based on CommonMark, GFM, and markdownlint conventions.
   Covers: headings, lists, tables, code blocks, links, whitespace, and anti-patterns.
   Use when: writing or reviewing any `.md` file — docs, rules, skills, CLAUDE.md, memory, README.
-version: "1.0"
+version: 1.0.0
 date: 2026-02-23
 user-invocable: true
 argument-hint: ""

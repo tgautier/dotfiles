@@ -154,7 +154,7 @@ Prefer accessible behavior primitives with zero styling opinions:
 
 - **Radix UI** — shadcn/ui foundation, comprehensive
 - **React Aria** (Adobe) — extensive accessibility primitives
-- **ARIAKit** — lightweight alternative
+- **Ariakit** — lightweight alternative
 
 These handle keyboard navigation, focus trapping, ARIA attributes, and screen reader announcements automatically.
 

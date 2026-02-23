@@ -1,6 +1,6 @@
 # Zsh-specific ShellCheck codes to ignore (valid zsh syntax that ShellCheck
 # doesn't understand when linting with --shell=bash)
-zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2179,SC2206,SC2211,SC2296"
+zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
 ci: lint-shell lint-yaml lint-markdown lint-brewfile lint-mise

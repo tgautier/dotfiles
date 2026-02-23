@@ -405,7 +405,7 @@ vitest run                       # All unit/component tests pass
 ## 9. Quick Reference
 
 | Task | Command | When |
-|---|---|---|
+| --- | --- | --- |
 | Type check | `tsc --noEmit` | Before every commit |
 | Lint | `eslint .` | Before every commit |
 | Format check | `prettier --check .` | Before every commit |

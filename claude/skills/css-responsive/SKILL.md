@@ -79,7 +79,7 @@ Use `prettier-plugin-tailwindcss` to enforce this automatically.
 Most layouts need only two breakpoints:
 
 | Breakpoint | Viewport | Typical layout change |
-|---|---|---|
+| --- | --- | --- |
 | `md:` (768px) | Tablet | Single column → two columns, show sidebar |
 | `lg:` (1024px) | Desktop | Expand sidebar, widen content area |
 
@@ -113,7 +113,7 @@ Adjacent interactive elements need at least 8px gap to prevent mis-taps:
 ### Touch-friendly patterns
 
 | Pattern | Mobile | Desktop |
-|---|---|---|
+| --- | --- | --- |
 | Hover tooltip | Tap to reveal / long-press | Hover |
 | Right-click menu | Long-press or explicit menu button | Right-click |
 | Drag and drop | Touch-and-hold + drag | Mouse drag |
@@ -330,7 +330,7 @@ Container queries let components respond to their container width, not the viewp
 ### When to use container queries vs media queries
 
 | Use container queries when | Use media queries when |
-|---|---|
+| --- | --- |
 | Component is reused at different widths | Layout change affects the entire page |
 | Component is in a sidebar AND main content | Navigation pattern changes (sidebar → sheet) |
 | Widget is embedded in different contexts | Global typography or spacing changes |
@@ -374,7 +374,7 @@ Rules:
 ### Flexbox vs Grid
 
 | Use Flexbox when | Use Grid when |
-|---|---|
+| --- | --- |
 | Single axis alignment (row or column) | Two-dimensional layout |
 | Content determines size | Layout determines size |
 | Wrapping items of varying sizes | Strict column/row alignment |
@@ -428,7 +428,7 @@ function Navigation() {
 For PWAs or mobile-heavy apps, bottom nav is more thumb-friendly:
 
 ```html
-<nav class="fixed bottom-0 left-0 right-0 flex justify-around border-t bg-background pb-safe md:hidden">
+<nav class="fixed bottom-0 left-0 right-0 flex justify-around border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
   <NavItem icon={HomeIcon} label="Home" />
   <NavItem icon={SearchIcon} label="Search" />
   <NavItem icon={ProfileIcon} label="Profile" />
@@ -437,7 +437,7 @@ For PWAs or mobile-heavy apps, bottom nav is more thumb-friendly:
 
 Rules:
 - Max 5 items in bottom nav
-- Use `pb-safe` (safe-area-inset-bottom) for devices with home indicators
+- Use `pb-[env(safe-area-inset-bottom)]` for devices with home indicators (or define a `pb-safe` custom utility)
 - Only show on mobile (`md:hidden`)
 
 ### Breadcrumbs
@@ -521,7 +521,7 @@ Rules:
 ## 11. Anti-Patterns
 
 | Anti-pattern | Problem | Fix |
-|---|---|---|
+| --- | --- | --- |
 | `max-width` breakpoints | Desktop-first, overlapping ranges | `min-width` only (mobile-first) |
 | `h-screen` or `100vh` | Broken on iOS (URL bar) | `min-h-screen` (100dvh) |
 | Fixed `w-[400px]` containers | Breaks on mobile | `max-w-sm` or percentage widths |

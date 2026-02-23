@@ -26,7 +26,7 @@ For design system tokens and accessibility, see `/ux-design`. For React componen
 Start simple, reveal complexity as the user needs it. A new user should reach their first moment of value within 60 seconds. Advanced features unlock progressively.
 
 | Principle | Application |
-|---|---|
+| --- | --- |
 | **Time-to-value** | Minimize steps between signup and first meaningful action |
 | **Progressive disclosure** | Hide advanced options behind "Advanced" toggles or secondary menus |
 | **Jobs-to-be-done** | Design around what the user is trying to accomplish, not around data entities |
@@ -54,7 +54,7 @@ Each level has a clear responsibility:
 Define what "activated" means before building onboarding:
 
 | Metric | Example |
-|---|---|
+| --- | --- |
 | **Setup complete** | User has connected at least one data source |
 | **First value** | User has viewed their first dashboard with real data |
 | **Habit formed** | User returns 3 times in the first 7 days |
@@ -125,7 +125,7 @@ function OnboardingChecklist({ tasks }: { tasks: OnboardingTask[] }) {
 Every data-driven view must handle four empty conditions:
 
 | Type | When | Content |
-|---|---|---|
+| --- | --- | --- |
 | **First-use** | User hasn't created any data yet | Illustration + explanation + primary CTA |
 | **No results** | Search or filter returned nothing | "No results for X" + suggestion to broaden search |
 | **Error** | Data failed to load | Error message + retry button |
@@ -199,7 +199,7 @@ function KPICard({ label, value, change, period, sparklineData }: KPICardProps) 
 ### Chart selection guide
 
 | Data relationship | Chart type | When to use |
-|---|---|---|
+| --- | --- | --- |
 | Part-to-whole | Donut (max 5 segments) | Budget allocation, portfolio mix |
 | Change over time | Line / area | Revenue trends, growth metrics |
 | Comparison | Horizontal bar | Category comparison, rankings |
@@ -255,7 +255,7 @@ function AssetListSkeleton() {
 ### Loading state decision framework
 
 | Duration | Pattern |
-|---|---|
+| --- | --- |
 | < 100ms | No indicator needed |
 | 100-300ms | Subtle inline indicator (button spinner) |
 | 300ms-2s | Skeleton screen |
@@ -295,7 +295,7 @@ For pages with mixed fast/slow data sources:
 ### Notification channels
 
 | Channel | Use for | Urgency |
-|---|---|---|
+| --- | --- | --- |
 | **In-app toast** | Action confirmation, minor errors | Low — auto-dismiss 5s |
 | **In-app bell** | New activity, status changes | Medium — persists until read |
 | **Email** | Transactional (receipts, invites), digests | Low — batched where possible |
@@ -330,7 +330,7 @@ Rules:
 Implement as a channel-by-event matrix:
 
 | Event | In-App | Email | Push |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | New team member | Default on | Default on | Default off |
 | Weekly digest | N/A | Default on | N/A |
 | Payment failed | Default on | Default on | Default on |
@@ -405,7 +405,7 @@ function FeatureLimitPrompt({ feature, limit, current }: LimitPromptProps) {
 ### Implementation patterns
 
 | Pattern | Use when |
-|---|---|
+| --- | --- |
 | **Feature flag** | Rolling out new features gradually (% of users) |
 | **Plan gating** | Feature is available only on certain subscription tiers |
 | **Role gating** | Feature is restricted to certain user roles (admin, member) |
@@ -443,7 +443,7 @@ Rules:
 ### Settings organization
 
 | Section | Contents |
-|---|---|
+| --- | --- |
 | **Account** | Profile, email, password, 2FA |
 | **Team** | Members, invitations, roles |
 | **Billing** | Plan, payment method, invoices |
@@ -540,7 +540,7 @@ Some resources span tenants (billing admin, super admin views). Clearly distingu
 ## 12. Anti-Patterns
 
 | Anti-pattern | Why it fails | Better approach |
-|---|---|---|
+| --- | --- | --- |
 | Blocking modal on first visit | Users close it immediately, miss the content | Inline checklist or contextual hints |
 | "No data" as empty state | Feels broken, gives no guidance | First-use empty state with CTA |
 | Spinner for every load | Users perceive it as slow | Skeleton screens matching content shape |

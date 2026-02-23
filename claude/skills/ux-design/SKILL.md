@@ -23,7 +23,7 @@ For responsive CSS and Tailwind patterns, see `/css-responsive`. For SaaS-specif
 ## 1. Design Philosophy
 
 | Principle | Application |
-|---|---|
+| --- | --- |
 | **Consistency > aesthetics** | A consistent but plain UI outperforms an inconsistent beautiful one |
 | **Constraints enable creativity** | Tokens and scales prevent visual entropy and speed up decisions |
 | **Accessibility is design** | A11y isn't a bolt-on — it shapes hierarchy, contrast, spacing, and interaction |
@@ -69,7 +69,7 @@ Tokens flow through three layers: **primitive** → **semantic** → **component
 ### Token categories
 
 | Category | Examples | Scale |
-|---|---|---|
+| --- | --- | --- |
 | **Color** | `bg-primary`, `text-muted`, `border-default` | Semantic names, not color names |
 | **Spacing** | `space-1` through `space-16` | 4px base scale (0.25rem increments) |
 | **Typography** | `text-sm`, `text-base`, `text-xl` | Modular scale (1.25 ratio) |
@@ -91,7 +91,7 @@ Rules:
 Use a modular scale (ratio 1.25) anchored at 16px base:
 
 | Token | Size | Use |
-|---|---|---|
+| --- | --- | --- |
 | `text-xs` | 12px | Captions, labels, timestamps |
 | `text-sm` | 14px | Secondary text, descriptions |
 | `text-base` | 16px | Body text (minimum for readability) |
@@ -112,7 +112,7 @@ Consistent spacing creates visual rhythm. Use the 4px grid:
 ### Color as hierarchy
 
 | Level | Treatment | Example |
-|---|---|---|
+| --- | --- | --- |
 | **Primary** | Full contrast (`text-foreground`) | Headlines, primary actions |
 | **Secondary** | Reduced contrast (`text-muted-foreground`) | Descriptions, labels |
 | **Tertiary** | Lowest contrast (`text-muted-foreground/60`) | Timestamps, metadata |
@@ -289,7 +289,7 @@ Client-side validation is a UX convenience. The API must always validate indepen
 ### Validation timing
 
 | Strategy | When | UX tradeoff |
-|---|---|---|
+| --- | --- | --- |
 | `onBlur` | Default for most fields | Low noise, feedback after user finishes |
 | `onChange` | After first error shown | Re-validate immediately so user sees fix |
 | `onSubmit` | Expensive checks (uniqueness) | Avoid per-keystroke API calls |
@@ -438,7 +438,7 @@ Keyboard: Arrow keys navigate. Enter activates. Escape closes.
 ### Color contrast
 
 | Content type | Minimum ratio (WCAG AA) |
-|---|---|
+| --- | --- |
 | Body text | 4.5:1 |
 | Large text (18px+ or 14px+ bold) | 3:1 |
 | UI components & graphical objects | 3:1 |
@@ -470,7 +470,7 @@ it("has no accessibility violations", async () => {
 ### Purpose-driven motion
 
 | Purpose | Example | Duration |
-|---|---|---|
+| --- | --- | --- |
 | **Orient** | Page transitions, element repositioning | 200-300ms |
 | **Inform** | Loading spinners, progress bars | 100-500ms |
 | **Delight** | Micro-interactions, hover effects | 100-200ms |
@@ -559,6 +559,7 @@ function ThemeProvider({ children, defaultTheme = "system" }: ThemeProviderProps
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const resolvedTheme = useMemo(() => {
     if (theme !== "system") return theme;
+    if (typeof window === "undefined") return "light"; // SSR fallback
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }, [theme]);
 
@@ -588,7 +589,7 @@ Nested `data-theme` attributes override the parent — CSS custom properties inh
 Choose one icon library and use it everywhere:
 
 | Library | Style | Notes |
-|---|---|---|
+| --- | --- | --- |
 | Lucide | Outlined, consistent stroke | Tree-shakeable React components |
 | Heroicons | Outline + solid variants | From the Tailwind team |
 | Phosphor | 6 weight variants | Most flexible |
@@ -618,7 +619,7 @@ Choose one icon library and use it everywhere:
 ### Chart type by data relationship
 
 | Relationship | Chart type | Rule |
-|---|---|---|
+| --- | --- | --- |
 | Part-to-whole | Donut (max 5 segments) | Never pie with 6+ segments |
 | Change over time | Line / area | Continuous x-axis required |
 | Comparison | Horizontal bar | Best for ranked categories |
@@ -646,7 +647,7 @@ Every chart needs three states: loading (skeleton), empty (illustration + CTA), 
 ## 12. Anti-Patterns
 
 | Anti-pattern | Problem | Fix |
-|---|---|---|
+| --- | --- | --- |
 | Magic numbers (`padding: 13px`) | Breaks consistency | Use spacing tokens |
 | Color by hex everywhere | Impossible to theme | Use semantic tokens |
 | `div` with click handler | No keyboard/a11y support | Use `<button>` or `<a>` |

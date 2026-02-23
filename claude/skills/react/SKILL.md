@@ -177,7 +177,7 @@ Use for non-blocking errors (e.g., "Failed to save, retrying..."). Libraries: `s
 Choose the right tool for each type of state:
 
 | State type | Tool | Example |
-|---|---|---|
+| --- | --- | --- |
 | Server data | TanStack Query / route loaders | Fetched resources, lists |
 | URL state | `useSearchParams` | Filters, pagination, search |
 | Form state | React Hook Form / `useActionState` | Input values, validation |
@@ -330,7 +330,7 @@ const { result } = renderHook(() => useAssets(), { wrapper });
 ## 7. Anti-Patterns
 
 | Anti-pattern | Problem | Fix |
-|---|---|---|
+| --- | --- | --- |
 | Copy server data into `useState` | Stale data, double source of truth | Let TanStack Query / loaders own it |
 | `useEffect` for data fetching | Waterfalls, race conditions, no caching | Route loaders or TanStack Query |
 | Manual `useMemo`/`useCallback` everywhere | Noise, premature optimization | React Compiler handles memoization |

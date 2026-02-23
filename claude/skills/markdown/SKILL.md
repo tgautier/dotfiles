@@ -77,7 +77,7 @@ These are arbitrary but must be consistent within a file and across a project:
 
 - Single-sentence items: no trailing period
 - Multi-sentence items: use periods on all sentences
-- Indent continuation lines to align with the first character of the item text (3 spaces for `-`, 3 spaces for `1.`)
+- Indent continuation lines to align with the first character of the item text (2 spaces for `-`, 3 spaces for `1.`)
 
 ### Nesting
 

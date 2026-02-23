@@ -114,9 +114,10 @@ For each comment:
 2. State your recommendation (accept or reject) with a brief rationale
 3. **Stop and wait** for the user to confirm or override
 4. Act on the decision:
-   - **Accept**: fix the issue, then resolve the thread
-   - **Reject**: reply explaining why, then resolve the thread
+   - **Accept**: fix the issue in code (do not resolve the thread yet)
+   - **Reject**: reply explaining why (do not resolve the thread yet)
 5. Move to the next comment
+6. After all comments are processed, follow the review-fix cycle below (commit → resolve → push)
 
 ### Resolve threads
 

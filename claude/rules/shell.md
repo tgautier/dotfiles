@@ -1,10 +1,12 @@
 # Shell Compatibility
 
-## jq and zsh
+## zsh `!` corruption
 
-**Never use `!=` in jq filters.** zsh history expansion corrupts `!` to `\!` even inside single quotes when the command passes through shell wrappers (including the Claude Code Bash tool). This causes silent jq parse failures — the filter errors out, variables stay empty, and loops run forever.
+zsh history expansion corrupts `!` to `\!` even inside single quotes when commands pass through shell wrappers (including the Claude Code Bash tool). This affects **all** shell contexts — not just commands, but also file content written via Bash heredocs, echo, or piped writes.
 
-Use `== ... | not` instead:
+### In jq filters
+
+Never use `!=` in jq filters — use `== ... | not`:
 
 ```sh
 # BROKEN — zsh corrupts != to \!=
@@ -22,4 +24,17 @@ jq 'select(.field != null)'
 
 # CORRECT
 jq 'select((.field == null) | not)'
+```
+
+### In file content
+
+Files written through the Bash tool (heredocs, `cat >`, `echo >>`) will have `!` silently corrupted to `\!`. This breaks code examples containing `!==`, `!important`, `!mounted`, etc.
+
+**Always use the Write or Edit tools** for file creation and modification — they bypass the shell entirely. Reserve the Bash tool for commands that must run in a shell (git, just, docker, etc.), never for writing file content.
+
+If you must write files via Bash (e.g., outside the sandbox allowlist), verify the output:
+
+```sh
+# After writing, check for corruption
+grep '\\!' path/to/file.md
 ```

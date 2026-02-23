@@ -5,6 +5,8 @@ description: |
   Use when: creating PRs, updating PRs, requesting Copilot reviews, processing review comments,
   merging PRs, or reviewing PRs as a code reviewer.
   Covers: PR lifecycle, automated Copilot reviews, outbound code review, merge gates.
+version: 1.0.0
+date: 2026-02-23
 user-invocable: true
 ---
 
@@ -12,7 +14,7 @@ user-invocable: true
 
 All GitHub interactions use the GitHub MCP Server tools when available, with `gh` CLI as fallback.
 
-## PR Lifecycle
+## 1. PR Lifecycle
 
 ### Check for existing PR
 
@@ -51,7 +53,7 @@ After every push to a branch with an open PR:
 - **Fallback**: `gh pr edit` with `--title` and `--body`
 - Title, summary, and test plan must reflect ALL commits on the branch vs main
 
-## Automated Reviews (Copilot)
+## 2. Automated Reviews (Copilot)
 
 ### Request a review
 
@@ -147,7 +149,7 @@ After processing all comments from a Copilot review:
 - **3-round cap**: if the reviewer keeps finding issues after 3 rounds, inform the user and let them decide
 - Never skip re-requesting the review — every push that fixes review comments must trigger a fresh Copilot review
 
-## Outbound PR Reviewing
+## 3. Outbound PR Reviewing
 
 Triggered by: `review this pr`, `code review`, or a PR URL.
 
@@ -178,7 +180,7 @@ Two-stage process:
 2. Add inline comments via `add_comment_to_pending_review` to a pending review
 3. After user approval, submit via **MCP**: `create_pull_request_review` with `event` (`APPROVE`, `REQUEST_CHANGES`, `COMMENT`)
 
-## Merge Gates
+## 4. Merge Gates
 
 Before merging, verify all gates pass:
 
@@ -210,7 +212,7 @@ Before merging, verify all gates pass:
 3. Delete the remote branch: `git push origin --delete <branch>` (skip if already deleted by GitHub)
 4. Delete the local branch: `git branch -D <branch>` (squash merge requires `-D` since commit hashes differ)
 
-## Shell Compatibility
+## 5. Shell Compatibility
 
 For any `gh` CLI fallback commands that use jq, reference `claude/rules/shell.md`:
 

@@ -184,7 +184,7 @@ APIs serve no HTML — lock everything down. Cloudflare recommends different hea
 ### Recommended cookie configuration (Mozilla)
 
 ```
-__Host-SESSION=<value>; Path=/; Secure; HttpOnly; SameSite=Strict
+__Host-SESSION=<value>; Path=/; Secure; HttpOnly; SameSite=Lax
 ```
 
 ### Cookie prefixes
@@ -200,7 +200,7 @@ __Host-SESSION=<value>; Path=/; Secure; HttpOnly; SameSite=Strict
 |-----------|-------|-----|
 | `Secure` | (flag) | HTTPS only — prevents network sniffing |
 | `HttpOnly` | (flag) | No JavaScript access — mitigates XSS token theft |
-| `SameSite` | `Strict` or `Lax` | CSRF mitigation (see §2 for limitations) |
+| `SameSite` | `Lax` (default) or `Strict` | CSRF mitigation — `Lax` is safe default; use `Strict` only when no OAuth/external redirect flows exist (see §2) |
 | `Path` | `/` | Scope to entire site |
 
 ### Session cookies
@@ -248,9 +248,9 @@ Server-side destruction is mandatory — expiring the cookie alone is insufficie
 2. Clear session cookie (`Set-Cookie` with `Max-Age=0`)
 3. Clear any related tokens (refresh tokens, CSRF tokens)
 
-### Session binding
+### Session anomaly detection (optional)
 
-Bind sessions to client fingerprint for theft detection:
+Monitor session attributes for theft detection — use as step-up auth trigger, not hard binding. Mobile networks, VPNs, and IPv6 cause frequent IP/fingerprint changes that will lock out legitimate users if enforced strictly.
 
 - Client IP address (detect IP change → force re-auth)
 - User-Agent string (detect browser change)
@@ -414,7 +414,7 @@ OAuth 2.1 is a draft that consolidates secure OAuth 2.0 patterns. RFC 9700 is a 
 ### API vs HTML distinction (Cloudflare)
 
 - HTML responses: full security header set (CSP, HSTS, X-Frame-Options, etc.)
-- API responses: minimal headers (CORS, Content-Type, cache controls) — HTML-specific headers are unnecessary noise
+- API responses: skip HTML-specific headers (`Content-Security-Policy` script/style directives, `X-Frame-Options`, `frame-ancestors`), but still include: `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy`, and CORS headers
 
 > See **Rust skill** (`/rust` §9) for Axum Tower CORS middleware implementation.
 
@@ -426,7 +426,7 @@ OAuth 2.1 is a draft that consolidates secure OAuth 2.0 patterns. RFC 9700 is a 
 
 | Header | Value | Notes |
 |--------|-------|-------|
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` | 2 years, all subdomains, HSTS preload list |
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains` | 2 years, all subdomains. Add `preload` only after confirming all subdomains support HTTPS — removal from the preload list takes months |
 | `X-Content-Type-Options` | `nosniff` | Prevents MIME-type sniffing |
 | `X-Frame-Options` | `DENY` | Clickjacking defense (pair with CSP `frame-ancestors`) |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` | Send origin only on cross-origin, full URL same-origin |

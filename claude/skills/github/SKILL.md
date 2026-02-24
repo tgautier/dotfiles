@@ -114,9 +114,10 @@ For each comment:
 2. State your recommendation (accept or reject) with a brief rationale
 3. **Stop and wait** for the user to confirm or override
 4. Act on the decision:
-   - **Accept**: fix the issue, then resolve the thread
-   - **Reject**: reply explaining why, then resolve the thread
+   - **Accept**: fix the issue in code (do not resolve the thread yet)
+   - **Reject**: reply explaining why (do not resolve the thread yet)
 5. Move to the next comment
+6. After all comments are processed, follow the review-fix cycle below (commit → resolve → push)
 
 ### Resolve threads
 
@@ -140,11 +141,12 @@ For each comment:
 
 After processing all comments from a Copilot review:
 
-1. Resolve all accepted/rejected threads
+1. Fix the accepted issues in code
 2. Commit the fixes
-3. Push (triggers the standard push workflow — update PR description, request new Copilot review)
-4. Read the new review and process any new comments
-5. Repeat until the review comes back clean (no new comments)
+3. Resolve all accepted/rejected threads
+4. Push (triggers the standard push workflow — update PR description, request new Copilot review)
+5. Read the new review and process any new comments
+6. Repeat until the review comes back clean (no new comments)
 
 - **3-round cap**: if the reviewer keeps finding issues after 3 rounds, inform the user and let them decide
 - Never skip re-requesting the review — every push that fixes review comments must trigger a fresh Copilot review
@@ -174,7 +176,7 @@ Categorize each finding: `blocker` | `important` | `nit` | `suggestion` | `quest
 
 ### Post the review
 
-Two-stage process:
+Three-stage process:
 
 1. Generate review locally — show the user all findings before posting
 2. Add inline comments via `add_comment_to_pending_review` to a pending review

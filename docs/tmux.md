@@ -23,7 +23,7 @@ the system clipboard using the right tool for the platform:
 | --- | --- |
 | macOS | `pbcopy` |
 | WSL | `clip.exe` |
-| Linux | `xclip -selection clipboard` |
+| Linux | `xclip -in -selection clipboard` |
 
 This is handled via `if-shell` platform detection in the config — no
 manual setup needed.

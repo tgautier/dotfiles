@@ -46,6 +46,15 @@
 - Always squash merge — never use merge or rebase strategies
 - Post-merge cleanup is handled by the `/github` skill
 
+## Merge gates
+
+Before merging any PR, **all** of these must be true:
+
+- Zero unresolved review threads
+- All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
+- CI passes — use `gh pr checks <number> --watch` to confirm
+- PR is still in `OPEN` state
+
 ## Worktree isolation
 
 - Always use git worktrees for new tasks — never work directly in the main working tree

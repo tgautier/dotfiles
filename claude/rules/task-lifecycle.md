@@ -43,6 +43,7 @@ For iterating on plans before implementation, see the annotation cycle in `/code
 
 ## Implement
 
+- **Scope to what was asked** — do not build features, integrations, or configuration the user did not request. If you think something adjacent would be valuable, suggest it and wait for approval. "Add a tmux conf" does not mean "add iTerm2 keybindings"
 - **Just-first**: if the project has a `Justfile`, always use `just` recipes instead of raw tool commands (`yarn`, `cargo`, `npx`, `docker compose`). Load the `/just` skill when editing or reviewing the Justfile
 - Mark each task complete as you go — never stop mid-implementation with tasks unchecked
 - Run verification (typecheck, lint, tests) **after every edit**, not batched at the end. If a test fails, fix it before moving on
@@ -66,6 +67,7 @@ Before presenting work as done:
 - **Staff engineer bar** — "Would a staff engineer approve this?" If the answer is hesitant, improve it before presenting
 - **Demand elegance (non-trivial changes only)** — pause and ask "is there a more elegant way?" If a fix feels hacky: "Knowing everything I know now, what's the clean solution?" Skip this for simple, obvious fixes
 - **Diff against intent** — does the change do exactly what was asked? No more, no less?
+- **CLAUDE.md drift check** — if the PR adds new files, config, rules, or docs, verify CLAUDE.md still reflects reality. New config files need architecture entries, new rules need the rules index, new docs need the documentation section. Update CLAUDE.md in the same PR — not as a follow-up
 
 ### Failing tests are blockers
 
@@ -99,3 +101,4 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 - Dismissing failing tests as "pre-existing" or "unrelated" without investigating
 - Incrementally patching a bad approach instead of reverting and re-planning
 - Running raw `yarn test`, `cargo test`, `docker compose up` when a `just` recipe exists for the same operation
+- Building adjacent features the user didn't ask for (e.g., adding keybindings when asked for a config file)

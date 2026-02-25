@@ -52,4 +52,13 @@ Reference other config files with relative paths from the project root:
 
 **Global skills and rules must never reference project-local files** (`.claude/rules/`, project source paths). Global config is reusable across projects — project-specific bridging belongs in each project's `CLAUDE.md`. Use generic language like "check the project's `CLAUDE.md`" instead.
 
+## Placement: project-local vs global
+
+When creating a new rule, decide where it lives:
+
+- **`.claude/rules/`** (project-local) — constraints specific to this repo: file conventions, repo structure, project-specific workflows. Not symlinked elsewhere
+- **`claude/rules/`** (global, via dotfiles) — constraints that apply to all projects: git workflow, secrets, shell compatibility, task lifecycle
+
+**Test:** "Would this rule make sense in a completely different repo?" If no → project-local. If yes → global.
+
 For detailed authoring methodology (how to write rules, skills, CLAUDE.md, memory), evolution triggers, and hygiene checklists → `/claude-authoring`.

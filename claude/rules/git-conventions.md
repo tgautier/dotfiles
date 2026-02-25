@@ -2,7 +2,8 @@
 
 ## Branching
 
-- If on `main` or `master`, create a new feature branch before committing
+- Never commit directly to `main` or `master` — always create a feature branch first
+- If on `main` or `master` with uncommitted changes, create a branch before committing
 - Branch naming: `type/short-description` (lowercase, hyphens, no spaces)
 - Derive the branch name from the changes (e.g. `feat/add-libpq`, `fix/shell-startup`)
 - Detect stale branches early — PRs can be merged outside your control (GitHub UI, standalone `gh`); check before committing on top
@@ -31,6 +32,14 @@
   - If push fails because the remote branch was deleted: re-push with `-u` to recreate it
 - After every push, invoke the `/github` skill — to create a PR if none exists, or to update the PR, request a Copilot review, and process review comments. Wait for the Copilot review first (it arrives faster), then check CI only at merge time
 - Never use `gh pr create` or `gh pr edit` directly — all PR operations go through the `/github` skill
+
+## Issue linking
+
+- Each PR should reference at least one GitHub issue
+- Multi-concern PRs: each distinct fix or feature gets its own issue
+- Use `Fixes #N` (auto-closes on merge) or `Addresses #N` (no auto-close) in the PR body
+- If work addresses something not yet tracked, create the issue before or at PR time
+- Branch names may include the issue number: `fix/42-shell-startup`
 
 ## Merge strategy
 

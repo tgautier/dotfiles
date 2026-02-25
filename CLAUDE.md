@@ -28,6 +28,15 @@ just update
 just setup
 ```
 
+## Cross-Platform Discipline
+
+This repo targets **three platforms**: macOS, Linux, and WSL2. Every change must consider all three:
+
+- Shell config: guard platform-specific code with `$PLATFORM` checks (set in `zshenv`)
+- Brewfiles: edit **both** `Brewfile` and `Brewfile.linux` for CLI tools (see `.claude/rules/brewfile.md`)
+- tmux: use `if-shell` platform detection for OS-specific commands (clipboard, terminfo)
+- Never assume macOS-only tools exist (`pbcopy`, `open`) — provide WSL (`clip.exe`) and Linux (`xclip`) alternatives
+
 ## Architecture
 
 ### Platform Detection
@@ -56,6 +65,10 @@ The `justfile` defines local CI targets mirroring the GitHub Actions workflow:
 - `just lint-shell` — shellcheck on `bin/*` and zsh files
 - `just setup` — enables `.githooks/pre-commit`
 
+### tmux
+
+`tmux.conf` (symlinked to `~/.tmux.conf` by rcm). Prefix is `C-a`, vi-style bindings, platform-aware clipboard. See `docs/tmux.md` for the full cheat sheet.
+
 ### Git Configuration
 
 - SSH key signing via 1Password (`op-ssh-sign`)
@@ -82,3 +95,17 @@ When spawning subagents via the Task tool, always set `isolation: "worktree"` so
 ## GitHub Integration
 
 GitHub PR workflows (creating, reviewing, merging) use the GitHub MCP Server (`github`, configured in `~/.claude.json` user scope). The `/github` skill (`claude/skills/github/SKILL.md`) provides the full workflow instructions. The always-on `claude/rules/git-conventions.md` handles local git safety only.
+
+## Project-Local Rules
+
+`.claude/rules/` contains rules specific to this repo (not symlinked to other projects):
+
+| Rule | Scope | Purpose |
+| --- | --- | --- |
+| `brewfile.md` | `Brewfile`, `Brewfile.linux` | Dual-Brewfile sync and alphabetical sorting |
+
+## Documentation
+
+Detailed guides live in `docs/`:
+
+- `docs/tmux.md` — configuration overview, cheat sheet, troubleshooting

@@ -10,6 +10,7 @@ When editing files that match a pattern below, load the corresponding skill befo
 | --- | --- | --- |
 | `Justfile`, `justfile`, `*.just` | `/just` | Rare edits, specific conventions easy to forget |
 | `*.md` | `/markdown` | Consistent formatting across all Markdown files |
+| `docs/**` | `/documentation` | Doc structure, navigation, drift prevention |
 | `**/CLAUDE.md`, `.claude/**`, `claude/**`, `memory/**` | `/claude-authoring` | Config structure and authoring conventions |
 
 ## Task-triggered skills
@@ -31,6 +32,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/domain-design` | Domain modeling and schema changes | "aggregate boundaries", "schema evolution" |
 | `/observability` | Tracing, metrics, health checks | "add tracing", "instrument", "health check" |
 | `/web-security` | Security review or hardening | "security review", "add auth", "CORS", "harden" |
+| `/documentation` | Doc audit, writing, or restructuring | "audit docs", "update docs", "docs are stale", "revamp documentation" |
 | `/github` | After every push | Per `git-conventions` — automatic, not user-triggered |
 
 ## Composite workflows

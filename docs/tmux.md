@@ -116,8 +116,10 @@ tmux kill-session -t name
 ### Colors look wrong
 
 Make sure your terminal reports as `xterm-256color`. The config sets
-`default-terminal` to `tmux-256color` with RGB override, but your
-terminal emulator needs to match.
+`default-terminal` to `tmux-256color` (falling back to `screen-256color`
+if the terminfo is missing) and adds an RGB `terminal-overrides` entry
+for `xterm-256color`, so your terminal emulator should use that terminfo
+name.
 
 ### Clipboard not working on Linux
 

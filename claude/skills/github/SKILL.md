@@ -4,7 +4,7 @@ description: |
   GitHub PR & review skill powered by GitHub MCP Server.
   Use when: creating PRs, updating PRs, requesting Copilot reviews, processing review comments,
   merging PRs, or reviewing PRs as a code reviewer.
-  Covers: PR lifecycle, automated Copilot reviews, outbound code review, merge gates.
+  Covers: PR lifecycle, issue linking, automated Copilot reviews, outbound code review, merge gates.
 version: 1.0.0
 date: 2026-02-23
 user-invocable: true
@@ -23,6 +23,17 @@ Before creating a PR, check for an existing one:
 - **MCP**: `get_me` to identify the current user, then `list_pull_requests` or `get_pull_request`
 - **Fallback**: `gh pr view --json number,url,state 2>/dev/null`
 - Check `state` is `OPEN` before acting — closed/merged PRs are also returned
+
+### Link issues before creating or updating a PR
+
+Before creating or updating a PR, ensure every distinct fix or feature on the branch has a corresponding GitHub issue:
+
+1. Review all commits on the branch vs main — enumerate each distinct change
+2. Check for existing issues: **MCP** `list_issues` or `search_issues`, **Fallback** `gh issue list --search "keyword"`
+3. Create missing issues: **MCP** `issue_write`, **Fallback** `gh issue create --title "short title" --body "description"`
+4. Reference all linked issues in the PR body using `Fixes #N` (auto-closes on merge) or `Addresses #N` (no auto-close)
+
+If a single commit addresses multiple concerns, each concern should have its own issue.
 
 ### Create a PR
 

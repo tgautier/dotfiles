@@ -10,6 +10,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
 - Homebrew integration with platform-specific Brewfiles
 - Runtime version management via [mise](https://mise.jdx.dev/)
 - Optimized shell startup with intelligent caching
+- [tmux](docs/tmux.md) with vi-style bindings and platform-aware clipboard
 - CI with [just](https://just.systems/) + GitHub Actions
 - One-command system updates via `just update`
 
@@ -178,6 +179,12 @@ Or run individual update steps:
 | `just update-mise` | Show outdated mise tools and upgrade them         |
 | `just update-rust` | Update Rust toolchain                             |
 
+## Documentation
+
+Detailed guides live in the `docs/` folder:
+
+- [tmux](docs/tmux.md) — configuration overview, cheat sheet, and troubleshooting
+
 ## Structure
 
 ```text
@@ -192,11 +199,13 @@ bin/                    # Scripts added to PATH
 config/
   mise/config.toml      # Pinned tool versions (node, python, ruby, go, etc.)
   alacritty/alacritty.yml
+tmux.conf               # tmux config (C-a prefix, vi mode, platform clipboard)
 gitconfig               # SSH signing via 1Password, rebase-based pulls
 rcrc                    # rcm config (DOTFILES_DIRS, EXCLUDES)
 Brewfile                # macOS Homebrew packages
 Brewfile.linux          # Linux Homebrew packages
 justfile                # CI and update recipes
+docs/                   # Detailed guides and cheat sheets
 .github/workflows/ci.yml
 ```
 

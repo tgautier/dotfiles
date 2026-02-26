@@ -33,7 +33,8 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/observability` | Tracing, metrics, health checks | "add tracing", "instrument", "health check" |
 | `/web-security` | Security review or hardening | "security review", "add auth", "CORS", "harden" |
 | `/documentation` | Doc audit, writing, or restructuring | "audit docs", "update docs", "docs are stale", "revamp documentation" |
-| `/github` | After every push | Per `git-conventions` — automatic, not user-triggered |
+| `/roborev` | Automated review management | "check reviews", "fix findings", "review status", "before push" |
+| `/github` | After every push | Per `git-conventions` — automatic, not user-triggered. `/roborev` runs first |
 
 ## Composite workflows
 
@@ -50,6 +51,7 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 | Security hardening | `/web-security` | `/rust` or `/react` | "security audit", "pen test findings" |
 | Testing campaign | `/typescript` | `/react` or `/rust` | "add test coverage", "write E2E tests" |
 | Performance optimization | `/typescript` | `/css-responsive` | "bundle analysis", "lighthouse", "CLS" |
+| Pre-push workflow | `/roborev` | `/github` (after push) | "push my changes", "ready to push" |
 
 For full-stack features: check the project's `CLAUDE.md` for an end-to-end feature skill (e.g., `/new-feature`) that orchestrates the pipeline order.
 

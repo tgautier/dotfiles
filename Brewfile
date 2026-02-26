@@ -1,3 +1,4 @@
+tap "roborev-dev/tap"
 tap "terror/tap"
 
 # CLI Tools & Development
@@ -77,6 +78,7 @@ brew "pnpm"
 brew "podman"
 brew "rcm"
 brew "redis"
+brew "roborev"
 brew "rustup"
 brew "shellcheck"
 brew "sops"

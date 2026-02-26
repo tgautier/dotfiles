@@ -2,6 +2,8 @@
 # Install Homebrew on Linux: https://docs.brew.sh/Homebrew-on-Linux
 # Usage: brew bundle --file=~/.Brewfile.linux
 
+tap "roborev-dev/tap"
+
 # CLI Tools & Development
 brew "act"
 brew "argocd"
@@ -51,6 +53,7 @@ brew "pnpm"
 brew "podman"
 brew "rcm"
 brew "redis"
+brew "roborev"
 brew "rustup"
 brew "sops"
 brew "step"

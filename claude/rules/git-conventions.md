@@ -23,6 +23,10 @@
 ## Pushing
 
 - Never push directly to `main` or `master`
+- If roborev is installed, check review status before pushing: `roborev list`
+  - If any reviews failed, fix them: `roborev fix` or `roborev refine`
+  - Only push after all branch reviews pass (zero unaddressed failures)
+  - If roborev is not installed or the daemon is not running, skip this gate
 - Fetch latest before pushing: `git fetch origin`
 - Rebase onto main if needed — check with `git merge-base --is-ancestor origin/main HEAD` (exit 0 = clean)
   - If rebase hits conflicts: abort, inform the user of the conflicting files, and stop

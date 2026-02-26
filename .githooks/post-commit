@@ -1,0 +1,5 @@
+#!/bin/sh
+# roborev post-commit hook v3 - auto-reviews every commit
+ROBOREV=$(command -v roborev 2>/dev/null)
+if [ -z "$ROBOREV" ] || [ ! -x "$ROBOREV" ]; then exit 0; fi
+"$ROBOREV" enqueue --quiet

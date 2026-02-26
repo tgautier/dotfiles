@@ -2,8 +2,8 @@
 name: github
 description: |
   GitHub PR lifecycle skill powered by GitHub MCP Server.
-  Use when: creating PRs or merging PRs.
-  Covers: PR creation, issue linking, merge gates, post-merge cleanup.
+  Use when: creating PRs, updating PR format, or merging PRs.
+  Covers: PR creation, PR format (summary, test plan, issue refs), merge gates, post-merge cleanup.
 version: 1.0.0
 date: 2026-02-23
 user-invocable: true

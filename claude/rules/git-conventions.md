@@ -60,11 +60,6 @@ Before merging any PR, **all** of these must be true:
 - CI passes — use `gh pr checks <number> --watch` to confirm
 - PR is still in `OPEN` state
 
-## Worktree isolation
-
-- Always use git worktrees for new tasks — never work directly in the main working tree
-- When spawning subagents via the Task tool, always set `isolation: "worktree"` so each agent gets its own copy of the repository
-
 ## Principles
 
 - Prevent problems, don't recover from them — design workflows so errors can't happen rather than adding complex recovery logic

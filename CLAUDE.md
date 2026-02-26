@@ -86,15 +86,27 @@ Per `claude/rules/git-conventions.md` (commit conventions section):
 - Never mention Claude, AI, or LLM in commit messages
 - Only commit when explicitly asked
 
-## Worktrees
-
-Always use git worktrees for new tasks. This keeps the main working tree clean and allows parallel work without stashing or switching branches.
-
-When spawning subagents via the Task tool, always set `isolation: "worktree"` so each agent works on an isolated copy of the repository. This prevents agents from interfering with each other or with the main working tree.
-
 ## GitHub Integration
 
-GitHub PR workflows (creating, reviewing, merging) use the GitHub MCP Server (`github`, configured in `~/.claude.json` user scope). The `/github` skill (`claude/skills/github/SKILL.md`) provides the full workflow instructions. The always-on `claude/rules/git-conventions.md` handles local git safety only.
+GitHub PR workflows (creating, merging) use the GitHub MCP Server (`github`, configured in `~/.claude.json` user scope). The `/github` skill (`claude/skills/github/SKILL.md`) handles PR creation and merge gates. Post-push PR updates (title/body) are done directly via `gh pr edit` per `claude/rules/git-conventions.md`.
+
+Pre-push code reviews are handled locally by **roborev** (`/roborev` skill). The `git-conventions` rule gates pushes on roborev passing.
+
+## Global Rules and Skills
+
+Global rules (`claude/rules/`) are symlinked from this repo to all projects:
+
+| Rule | Purpose |
+| --- | --- |
+| `git-conventions.md` | Branching, commits, push workflow, merge strategy |
+| `skill-triggers.md` | Routing table — maps intents and file patterns to skills |
+| `task-lifecycle.md` | How to assess, plan, implement, and verify work |
+| `ci-integrity.md` | CI must reflect reality — no silencing failures |
+| `secrets.md` | Never commit credentials outside dotfiles-private |
+| `shell.md` | zsh `!` corruption, jq compatibility |
+| `claude-config.md` | Two-tier config system (rules vs skills) |
+
+Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name`. Routing is defined in `skill-triggers.md`.
 
 ## Project-Local Rules
 

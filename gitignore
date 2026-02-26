@@ -16,5 +16,11 @@ Thumbs.db
 .env.local
 .env.*.local
 
+# Secrets & certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
 # Claude Code
 .claude/settings.local.json

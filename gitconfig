@@ -2,7 +2,7 @@
 	ba = branch --all
 	br = branch
 	ci = commit
-	circleci = !open "https://circleci.com/gh/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//' | cut -f 1 -d '/')/workflows/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//' | cut -f 2 -d '/')/tree/$(git current | sed 's/#/%23/g')"
+	circleci = "!f() { url=\"https://circleci.com/gh/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//' | cut -f 1 -d '/')/workflows/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//' | cut -f 2 -d '/')/tree/$(git current | sed 's/#/%23/g')\"; case \"$(uname)\" in Darwin) open \"$url\";; Linux) if [ -n \"$WSL_DISTRO_NAME\" ]; then explorer.exe \"$url\"; else xdg-open \"$url\"; fi;; esac; }; f"
 	clean-branches = ! git branch -vv | grep "gone]" | awk '{ print $1 }' | xargs git branch -D
 	co = checkout
 	create-branch = !sh -c 'git checkout -b $1-$2' -
@@ -21,9 +21,8 @@
 	p = push -u
 	pf = push --force-with-lease
 	pff = push --force-with-lease --no-verify
-	pr = !open "https://github.com/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//')/compare/$(git current)?expand=1"
-	pr-create = !gitpr
-	issue = !open "https://github.com/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//')/issues/$(git current | grep -Eo '[0-9]+' | sed 's/#//')"
+	pr = "!f() { url=\"https://github.com/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//')/compare/$(git current)?expand=1\"; case \"$(uname)\" in Darwin) open \"$url\";; Linux) if [ -n \"$WSL_DISTRO_NAME\" ]; then explorer.exe \"$url\"; else xdg-open \"$url\"; fi;; esac; }; f"
+	issue = "!f() { url=\"https://github.com/$(git remote get-url --push origin | sed -e 's/.*://' -e 's/\\.git//')/issues/$(git current | grep -Eo '[0-9]+' | sed 's/#//')\"; case \"$(uname)\" in Darwin) open \"$url\";; Linux) if [ -n \"$WSL_DISTRO_NAME\" ]; then explorer.exe \"$url\"; else xdg-open \"$url\"; fi;; esac; }; f"
 	s = status --branch --short
 	serve-ro = !git daemon --reuseaddr --verbose --base-path=. --export-all --informative-errors --verbose ./.git
 	serve-rw = !git daemon --reuseaddr --verbose --base-path=. --export-all --enable=receive-pack --informative-errors --verbose ./.git
@@ -72,8 +71,6 @@
 	useconfigonly = true
 	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBRkKL/xhEWzA+O2DnrqTofc3gB42ixv5+P77K6zELfC
 [credential "https://github.com"]
-	helper =
 	helper = !/usr/bin/gh auth git-credential
 [credential "https://gist.github.com"]
-	helper =
 	helper = !/usr/bin/gh auth git-credential

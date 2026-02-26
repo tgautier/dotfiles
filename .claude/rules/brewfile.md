@@ -11,6 +11,8 @@ Both Brewfiles must stay in sync and sorted.
 ## Rules
 
 - When adding or removing a package, apply the change to **both** `Brewfile` and `Brewfile.linux` unless the package is platform-specific (casks, Mac App Store apps, or Linux-only tools)
+- When adding a CLI tool, check if it has a `completion zsh` subcommand but no `_<tool>` file in `$(brew --prefix)/share/zsh/site-functions/`. If so, add it to `just update-completions` and generate the initial `zsh/functions/_<tool>` file
+- When removing a CLI tool, delete its vendored completion file from `zsh/functions/_<tool>` (if one exists) and remove its entry from `just update-completions`
 - Casks (`cask`) and Mac App Store (`mas`) entries only exist in `Brewfile` — they are not available on Linux
 - The macOS `Brewfile` is organized into comment-delimited blocks: `# CLI Tools & Development`, `# Applications`, `# Fonts`, `# Mac App Store Applications`
 - The `Brewfile.linux` is organized into a `# CLI Tools & Development` block (casks and Mac App Store apps are not supported on Linux)

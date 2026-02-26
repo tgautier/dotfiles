@@ -12,7 +12,7 @@ bindkey '^F' edit-command-line # Edit current line with C-f
 bindkey '^[[1;9D' backward-word # Alt-Left
 bindkey '^[[1;9C' forward-word # Alt-Right
 bindkey '^[[3~' delete-char # Delete
-bindkey '^[[Z' reverse-menu-complete # Ctrl-r
+bindkey '^[[Z' reverse-menu-complete # Shift-Tab
 bindkey '^[[A' up-line-or-search # Arrow up
 bindkey '^[[B' down-line-or-search # Arrow down
 

@@ -34,7 +34,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/web-security` | Security review or hardening | "security review", "add auth", "CORS", "harden" |
 | `/documentation` | Doc audit, writing, or restructuring | "audit docs", "update docs", "docs are stale", "revamp documentation" |
 | `/roborev` | Automated review management | "check reviews", "fix findings", "review status", "before push" |
-| `/github` | Creating or merging PRs | Per `git-conventions` — invoked for new PRs and merges, not routine post-push updates |
+| `/github` | Creating or merging PRs | Per `git-conventions` — invoked to create new PRs (issue linking, format) and to merge (gates, cleanup). Post-push title/body updates use direct `gh pr edit` |
 
 ## Composite workflows
 

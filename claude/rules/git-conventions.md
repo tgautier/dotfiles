@@ -34,8 +34,9 @@
   - Add `-u` if no upstream is set
   - If `--force-with-lease` rejects (remote has unknown commits): stop and inform the user
   - If push fails because the remote branch was deleted: re-push with `-u` to recreate it
-- After every push, invoke the `/github` skill — to create a PR if none exists, or to update the PR, request a Copilot review, and process review comments. Wait for the Copilot review first (it arrives faster), then check CI only at merge time
-- Never use `gh pr create` or `gh pr edit` directly — all PR operations go through the `/github` skill
+- After every push, if no PR exists for the branch, invoke the `/github` skill to create one (handles issue linking, test plan, PR format)
+- After every push to a branch with an open PR, update the PR title and body to reflect ALL commits on the branch vs main — use MCP `update_pull_request` or `gh pr edit`. Keep the PR format from the `/github` skill (summary bullets, test plan checklist, issue references)
+- For merging, invoke the `/github` skill (handles merge gates, squash merge, post-merge cleanup)
 
 ## Issue linking
 

@@ -7,7 +7,7 @@ theme = light:Gruvbox Light,dark:Gruvbox Dark
 
 # Window
 window-height = 35
-window-width = 180
+window-width = 140
 window-padding-x = 4
 window-padding-y = 4
 window-decoration = auto

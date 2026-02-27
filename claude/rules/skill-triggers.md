@@ -35,6 +35,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/documentation` | Doc audit, writing, or restructuring | "audit docs", "update docs", "docs are stale", "revamp documentation" |
 | `/roborev` | Automated review management | "check reviews", "fix findings", "review status", "before push" |
 | `/github` | Creating or merging PRs | Per `git-conventions` — invoked to create new PRs (issue linking, format) and to merge (gates, cleanup). Post-push title/body updates use direct `gh pr edit` |
+| `/requirements` | Clarifying what to build before implementation | "what should this do", "requirements", "acceptance criteria", "EARS", "user stories" |
 
 ## Composite workflows
 
@@ -52,6 +53,7 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 | Testing campaign | `/typescript` | `/react` or `/rust` | "add test coverage", "write E2E tests" |
 | Performance optimization | `/typescript` | `/css-responsive` | "bundle analysis", "lighthouse", "CLS" |
 | Pre-push workflow | `/roborev` | `/github` (if no PR exists) | "push my changes", "ready to push" |
+| Complex domain feature | `/requirements` | `/domain-design`, `/code-planning` | "new entity", "new domain concept", "multi-entity feature" |
 
 For full-stack features: check the project's `CLAUDE.md` for an end-to-end feature skill (e.g., `/new-feature`) that orchestrates the pipeline order.
 

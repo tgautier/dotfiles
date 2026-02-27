@@ -43,7 +43,7 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 
 | Task shape | Primary | Also load | Trigger signals |
 | --- | --- | --- | --- |
-| Full-stack feature (API + page) | project feature skill | `/requirements`, `/rust`, `/api-design`, `/react` | "add X feature", "new endpoint with UI" |
+| Full-stack feature (API + page) | project feature skill | `/rust`, `/api-design`, `/react` | "add X feature", "new endpoint with UI" |
 | API endpoint (no frontend) | `/rust` | `/api-design` | "add endpoint", "new handler" |
 | Frontend page with data | `/react` | `/css-responsive` | "new page", "add a route with data" |
 | Database/schema change | `/domain-design` | `/rust` | "add a migration", "new column", "change schema" |

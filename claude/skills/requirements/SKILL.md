@@ -141,4 +141,4 @@ List anything that needs a decision before implementation. Tag each with who sho
 - `/domain-design` (section 10) — pre-design checklist that validates domain modeling decisions
 - `/code-planning` — plan structure for the implementation phase
 - `/new-feature` — end-to-end pipeline checklist (invoke after requirements are clear)
-- `model-first-pipeline.md` — the derivation direction that implementation must follow
+- Check the project's `CLAUDE.md` for pipeline rules governing derivation direction

@@ -410,6 +410,7 @@ Task-based operations capture intent, enable richer validation, and produce mean
 
 Before implementing a new domain model or modifying an existing one:
 
+- [ ] **Requirements gathered** — for the process that produces inputs to this checklist, see `/requirements`
 - [ ] **Ubiquitous language** — have you confirmed naming with domain experts? Do code names match business vocabulary?
 - [ ] **Aggregate boundaries** — what invariants must be immediately consistent? Is the aggregate as small as possible while still enforcing them?
 - [ ] **Entity vs value object** — does this concept have identity? If not, model as a value object (immutable, equality by value)

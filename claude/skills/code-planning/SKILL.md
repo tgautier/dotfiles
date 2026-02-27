@@ -16,6 +16,7 @@ user-invocable: true
 Methodology for structuring high-quality implementation plans. This skill governs *how to plan well* — evaluating trade-offs, decomposing work, managing scope, and identifying risks. A good plan eliminates ambiguity before code is written.
 
 > **Scope boundary:** This skill covers plan *quality* — what makes a plan good. For related concerns:
+> - Pre-implementation requirements (EARS notation, acceptance criteria) → **Requirements skill** (`/requirements`)
 > - Planning *process*, execution discipline, and verification → **task lifecycle rule** (`claude/rules/task-lifecycle.md`)
 > - Source evaluation for research that informs plans → **Code Research skill** (`/code-research`)
 > - Domain-specific decisions are delegated to the relevant skill (see Trade-off Evaluation below)

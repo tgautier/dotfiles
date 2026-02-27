@@ -237,7 +237,7 @@ Individual targets:
 | Target                 | Description                                          |
 | ---------------------- | ---------------------------------------------------- |
 | `just lint-shell`      | ShellCheck on `bin/*` and zsh files                  |
-| `just lint-json-yaml`  | Validate `claude/settings.json` and `alacritty.yml`  |
+| `just lint-yaml`       | Validate YAML files (`alacritty.yml`)                |
 | `just lint-markdown`   | markdownlint-cli2                                    |
 | `just lint-brewfile`   | Ruby syntax check on Brewfiles                       |
 | `just lint-mise`       | Validate mise config                                 |

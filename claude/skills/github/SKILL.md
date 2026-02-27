@@ -65,22 +65,18 @@ After every push to a branch with an open PR:
 
 ## 2. Merge Gates
 
-Before merging, verify all gates pass:
+Verify all gates from `claude/rules/git-conventions.md` § Merge gates. Implementation details for checking:
 
-1. **Zero unresolved threads** — check via `get_pull_request_comments` or GraphQL:
+- **Unresolved threads** — `get_pull_request_comments` or GraphQL:
 
-   ```sh
-   gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
-     pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved } } } } }' \
-     --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length'
-   ```
+  ```sh
+  gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") {
+    pullRequest(number: <PR_NUMBER>) { reviewThreads(first: 100) { nodes { id isResolved } } } } }' \
+    --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length'
+  ```
 
-   If the count is not `0`, stop and resolve remaining threads first
-
-2. **All test plan items checked** — never merge with unchecked items. If an item cannot be completed, remove it with an explanation or ask the user
-3. **CI passes** — use `gh pr checks <number> --repo {owner}/{repo} --watch` to block until all checks complete. This is the only point where you wait for CI — never block on CI earlier in the workflow. The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs, so it will miss CI results
-4. **PR still OPEN** — confirm immediately before merging
-5. **All todo list tasks completed** — never merge with pending or in-progress items
+- **CI** — use `gh pr checks <number> --repo {owner}/{repo} --watch` to block until all checks complete. This is the only point where you wait for CI — never block on CI earlier in the workflow. The MCP `get_status` method only reads legacy commit statuses, not GitHub Actions check runs, so it will miss CI results
+- **PR state** — confirm `state == "OPEN"` immediately before merging (`gh pr view <number> --repo {owner}/{repo} --json state` or MCP `get_pull_request`); another actor may have closed it between the CI check and the merge call
 
 ### Execute merge
 

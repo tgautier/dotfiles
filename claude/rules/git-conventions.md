@@ -57,8 +57,10 @@ Before merging any PR, **all** of these must be true:
 
 - Zero unresolved review threads
 - All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
-- CI passes — use `gh pr checks <number> --watch` to confirm
+- CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state
+- All session todos completed — never merge with pending or in-progress task items
+- PR body is up to date — check off verified test plan items (`[x]`), update summary/title if commits changed. Do this via `gh pr edit` **before** merging, not after
 
 ## Principles
 

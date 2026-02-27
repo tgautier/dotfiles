@@ -6,7 +6,7 @@ trusted_config_paths = ["~/Workspace/tgautier"]
 [tools]
 deno = "2.7.1"
 elixir = "1.19.5-otp-28"
-erlang = "28.3.2"
+erlang = "28.3.3"
 go = "1.26.0"
 helm = "4.1.1"
 node = "25"

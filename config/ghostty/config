@@ -1,0 +1,20 @@
+# Font
+font-family = Fira Code
+font-size = 13
+
+# Theme — auto light/dark switching
+theme = light:GruvboxLight,dark:GruvboxDark
+
+# Window
+window-height = 35
+window-width = 180
+window-padding-x = 4
+window-padding-y = 4
+window-decoration = auto
+
+# Shell integration (built-in for zsh)
+shell-integration = zsh
+
+# Keybindings — Alt+Left/Right for word navigation
+keybind = alt+left=esc:b
+keybind = alt+right=esc:f

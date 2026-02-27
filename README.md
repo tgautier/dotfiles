@@ -198,13 +198,13 @@ zsh/
 bin/                    # Scripts added to PATH
 config/
   mise/config.toml      # Pinned tool versions (node, python, ruby, go, etc.)
-  alacritty/alacritty.yml
+  ghostty/config
 tmux.conf               # tmux config (C-a prefix, vi mode, platform clipboard)
 gitconfig               # SSH signing via 1Password, rebase-based pulls
 rcrc                    # rcm config (DOTFILES_DIRS, EXCLUDES)
 Brewfile                # macOS Homebrew packages
 Brewfile.linux          # Linux Homebrew packages
-justfile                # CI and update recipes
+Justfile                # CI and update recipes
 docs/                   # Detailed guides and cheat sheets
 .github/workflows/ci.yml
 ```
@@ -237,7 +237,6 @@ Individual targets:
 | Target                 | Description                                          |
 | ---------------------- | ---------------------------------------------------- |
 | `just lint-shell`      | ShellCheck on `bin/*` and zsh files                  |
-| `just lint-yaml`       | Validate YAML files (`alacritty.yml`)                |
 | `just lint-markdown`   | markdownlint-cli2                                    |
 | `just lint-brewfile`   | Ruby syntax check on Brewfiles                       |
 | `just lint-mise`       | Validate mise config                                 |

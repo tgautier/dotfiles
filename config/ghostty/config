@@ -15,8 +15,9 @@ window-decoration = auto
 # Cursor
 cursor-style = block
 
-# Shell integration (built-in for zsh)
+# Shell integration (built-in for zsh, no-cursor preserves block cursor)
 shell-integration = zsh
+shell-integration-features = no-cursor
 
 # Keybindings — Alt+Left/Right for word navigation
 keybind = alt+left=esc:b

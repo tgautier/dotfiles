@@ -56,7 +56,7 @@ For iterating on plans before implementation, see the annotation cycle in `/code
 
 - Use subagents liberally — one focused task per subagent
 - For complex problems, throw more compute at it: spin up multiple subagents in parallel
-- When spawning teammates for implementation, use worktree isolation so agents don't conflict
+- When spawning teammates for implementation, give each agent a focused, non-overlapping scope to avoid conflicts
 
 ## Verify
 

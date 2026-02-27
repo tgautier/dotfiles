@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Only run if just and the justfile are available
-if command -v just &>/dev/null && [ -f justfile ]; then
+# Only run if just and the Justfile are available
+if command -v just &>/dev/null && [ -f Justfile ]; then
   mise x -- just ci
 fi

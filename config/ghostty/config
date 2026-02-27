@@ -1,0 +1,24 @@
+# Font
+font-family = Fira Code
+font-size = 13
+
+# Theme — auto light/dark switching
+theme = light:Builtin Solarized Light,dark:Builtin Solarized Dark
+
+# Window
+window-height = 35
+window-width = 140
+window-padding-x = 4
+window-padding-y = 4
+window-decoration = auto
+
+# Cursor
+cursor-style = block
+
+# Shell integration (built-in for zsh, no-cursor preserves block cursor)
+shell-integration = zsh
+shell-integration-features = no-cursor
+
+# Keybindings — Alt+Left/Right for word navigation
+keybind = alt+left=esc:b
+keybind = alt+right=esc:f

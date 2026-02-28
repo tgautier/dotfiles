@@ -29,7 +29,7 @@ Before planning, deeply read all code that will be affected:
 1. Read the files you'll change AND the files that call/import them
 2. Document findings: existing patterns, conventions, gotchas, and integration points
 
-Use subagents for research to keep the main context window clean. Offload exploration and parallel analysis — don't pollute the main conversation with hundreds of lines of search results.
+Use subagents for research — see *context-management* rule for delegation strategy.
 
 ## Plan
 
@@ -50,13 +50,7 @@ For iterating on plans before implementation, see the annotation cycle in `/code
 - Do not add unnecessary comments, jsdocs, or type annotations to code you didn't change
 - Keep corrections terse — single-sentence when context already exists. Reference existing code for consistency: "match the pattern in X"
 - If an approach isn't working after one fix attempt, **revert and re-plan** rather than layering patches. One failed fix attempt is the signal to step back — don't push through a bad approach
-- Compact proactively at ~50% context. Don't wait for auto-compaction — manual `/compact` preserves more useful context
-
-### Subagent strategy
-
-- Use subagents liberally — one focused task per subagent
-- For complex problems, throw more compute at it: spin up multiple subagents in parallel
-- When spawning teammates for implementation, give each agent a focused, non-overlapping scope to avoid conflicts
+- Compact proactively — see *context-management* rule for compaction and subagent strategy
 
 ## Verify
 

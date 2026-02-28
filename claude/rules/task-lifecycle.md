@@ -2,7 +2,7 @@
 
 How Claude approaches tasks, from intake to completion. Organized by the task lifecycle: assess → research → plan → implement → verify → done.
 
-> **Scope boundary:** This rule governs *process* — when to plan, how to work, verification discipline. For plan *quality* methodology (trade-off evaluation, task decomposition, scope management, risk identification, annotation cycles) → **Code Planning skill** (`/code-planning`).
+> **Scope boundary:** This rule governs *process* — when to plan, how to work, verification discipline. For quality principles and anti-patterns → *quality-standards* rule. For plan *quality* methodology (trade-off evaluation, task decomposition, scope management, risk identification, annotation cycles) → **Code Planning skill** (`/code-planning`).
 
 ## Project grounding
 
@@ -44,6 +44,7 @@ For iterating on plans before implementation, see the annotation cycle in `/code
 ## Implement
 
 - **Scope to what was asked** — do not build features, integrations, or configuration the user did not request. If you think something adjacent would be valuable, suggest it and wait for approval. "Add a tmux conf" does not mean "add iTerm2 keybindings"
+- **Always the proper fix** — when you identify the clean solution, implement it. Never describe the right approach and then implement the easier one. "That changes more than needed" is not a valid reason to choose an inferior fix. Every shortcut quietly lowers the bar — the cumulative effect is a degraded codebase
 - **Just-first**: if the project has a `Justfile`, always use `just` recipes instead of raw tool commands (`yarn`, `cargo`, `npx`, `docker compose`). Load the `/just` skill when editing or reviewing the Justfile
 - Mark each task complete as you go — never stop mid-implementation with tasks unchecked
 - Run verification (typecheck, lint, tests) **after every edit**, not batched at the end. If a test fails, fix it before moving on
@@ -59,7 +60,7 @@ Before presenting work as done:
 - **Prove it works** — run tests, show output, demonstrate the fix. Never mark a task complete on faith
 - **Run all verification commands** in the plan, not just the ones you expect to pass
 - **Staff engineer bar** — "Would a staff engineer approve this?" If the answer is hesitant, improve it before presenting
-- **Demand elegance (non-trivial changes only)** — pause and ask "is there a more elegant way?" If a fix feels hacky: "Knowing everything I know now, what's the clean solution?" Skip this for simple, obvious fixes
+- **Demand elegance** — pause and ask "is there a more elegant way?" If a fix feels hacky: "Knowing everything I know now, what's the clean solution?" Then implement that clean solution — never settle for the hacky one after identifying the better approach
 - **Diff against intent** — does the change do exactly what was asked? No more, no less?
 - **CLAUDE.md drift check** — if the PR adds new files, config, rules, or docs, verify CLAUDE.md still reflects reality. New config files need architecture entries, new rules need the rules index, new docs need the documentation section. Update CLAUDE.md in the same PR — not as a follow-up
 
@@ -69,30 +70,4 @@ Before presenting work as done:
 - If a test fails, **stop and fix it** before continuing with the original task
 - If the fix is genuinely out of scope, explain the root cause to the user and let them decide — don't silently move on
 
-## Self-improvement
-
-After ANY correction from the user:
-
-1. Identify the pattern — what class of mistake was this? (wrong assumption, missed convention, skipped verification)
-2. Update memory (`MEMORY.md` or a topic-specific memory file) with the lesson
-3. If the mistake could recur across sessions, write or update a rule that prevents it
-
-Write lessons to `MEMORY.md` (auto-memory) so they persist across sessions and inform future work.
-
-The goal is zero repeat mistakes. If the same correction happens twice, the rule wasn't specific enough — tighten it.
-
-## Principles
-
-- **Simplicity first** — make every change as simple as possible. The right amount of complexity is the minimum needed for the current task
-- **No laziness** — find root causes. No temporary fixes. No "this works for now" patches. Senior developer standards
-- **Minimal impact** — changes should only touch what's necessary. Avoid introducing bugs by changing code outside the task scope
-- **Stop early, not late** — if something goes sideways, STOP and re-plan immediately. Don't push through hoping it will work out
-
-## Anti-patterns
-
-- Writing code before reading the files you'll change
-- Making speculative fixes without understanding root cause
-- Dismissing failing tests as "pre-existing" or "unrelated" without investigating
-- Incrementally patching a bad approach instead of reverting and re-planning
-- Running raw `yarn test`, `cargo test`, `docker compose up` when a `just` recipe exists for the same operation
-- Building adjacent features the user didn't ask for (e.g., adding keybindings when asked for a config file)
+Quality principles, self-improvement discipline, and anti-patterns → *quality-standards* rule.

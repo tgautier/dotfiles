@@ -30,7 +30,7 @@ A plan is a contract between research and implementation. It translates findings
 **Quality dimensions** — evaluate every plan against these, in priority order:
 
 1. **Correctness** — does it solve the right problem? Does it address the root cause, not a symptom?
-2. **Simplicity** — is it the minimal solution? Could anything be removed without losing the requested value?
+2. **Coherence** — is the solution internally consistent? Does every part serve the stated goal, with nothing extraneous and nothing missing?
 3. **Robustness** — does it handle failure? What happens when inputs are invalid, services are down, or data is missing?
 4. **Maintainability** — can it evolve? Will the next person understand the changes six months from now?
 
@@ -56,7 +56,7 @@ Compare approaches against these dimensions:
 | Dimension | Question |
 |-----------|----------|
 | Correctness | Does it fully solve the problem? Any edge cases it misses? |
-| Complexity | How many moving parts? How many files touched? |
+| Complexity | How many moving parts? Are they all necessary? |
 | Performance | Does it meet latency/throughput requirements? |
 | Operability | Can it be monitored, debugged, and rolled back? |
 | Reversibility | How hard is it to undo if the approach is wrong? |

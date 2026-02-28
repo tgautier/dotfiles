@@ -13,7 +13,7 @@ When adding, removing, or modifying any file in `.claude/rules/`, `.claude/skill
 - [ ] **`just check` passes** — escaping + cross-refs + lint + typecheck
 - [ ] **No orphaned cross-references** — if removing a rule or skill, grep for references to it and update or remove them
 - [ ] **One concern per file** — if a rule covers two unrelated topics, split it
-- [ ] **80-line signal** — rules over 80 lines likely cover too much; consider splitting or converting detailed sections into a skill
+- [ ] **80-line limit** — rules over 80 lines must be split or converted to skills. If a rule exceeds 80 lines, the concern is too broad for a single file
 
 ## Scope
 

@@ -31,7 +31,7 @@ The domain model reflects business reality, not database tables or UI screens.
 
 - **Ubiquitous language** — code names match domain expert vocabulary. If the business says "asset kind," the code says `AssetKind`, not `asset_type` or `asset_category`. Rename code to match the domain, not the other way around
 - **Model behavior, not just data** — entities and value objects carry the business logic that protects their invariants. A `Money` type that can represent negative amounts when the domain forbids it is a data structure, not a domain model
-- **Start simple, extract complexity only when proven necessary** — a single module with clear boundaries beats premature microservice decomposition. Complexity is a cost; justify every addition
+- **Right-size the architecture upfront** — a single module with clear boundaries beats premature microservice decomposition, but design the proper internal structure from the start. Deferring necessary architecture creates debt that compounds silently
 - **Separate what changes together from what changes independently** — this is the fundamental driver for aggregate boundaries, bounded contexts, and module structure
 
 > **Scope boundary:** This skill defines *what* to model. For plan structure and task decomposition, see the **Code Planning skill** (`/code-planning`). For implementation patterns, see `/rust` or `/typescript`. For API contract design, see `/api-design`.

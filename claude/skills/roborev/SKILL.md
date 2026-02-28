@@ -2,9 +2,10 @@
 name: roborev
 description: |
   Automated code review management with roborev daemon and CLI.
-  Covers: review modes (interactive/auto), fixing findings, pre-push workflow, daemon management, per-project config.
+  Covers: multi-agent reviews (copilot, codex, gemini), review modes (interactive/auto),
+  fixing findings, pre-push workflow, daemon management, per-project config.
   Use when: checking reviews, fixing findings, managing review status, or before pushing.
-version: 1.1.0
+version: 1.2.0
 date: 2026-02-28
 user-invocable: true
 ---
@@ -28,15 +29,18 @@ Invoked with `/roborev` or `/roborev interactive`. Walks through each finding wi
 1. Run `roborev show` to get the latest review
 2. If no findings → report clean and stop
 3. For each finding (severity order: blocker → medium → low):
-   - Present: severity, file, location, reviewer's description
-   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip**
+   - **Reflect first** — before presenting options, reason about the finding against the project's architecture and design philosophy. Read the relevant code, check project rules, and determine which action best serves codebase coherence. Present your recommendation with rationale, not a bare option list
+   - Present: severity, file, location, reviewer's description, **your recommendation and why**
+   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip** — with your recommended option clearly marked
    - **Fix** → implement the change, move to next finding
    - **Dismiss** → note the user's reason, no code change
-   - **Discuss** → investigate (read code, verify claims, check docs), report back, re-ask
+   - **Discuss** → investigate deeper (read code, verify claims, check docs), report back, re-ask
    - **Skip** → defer, revisit after remaining findings
 4. After all findings processed, commit fixes (if any), wait for re-review
 5. Repeat until clean or user says stop
 6. Summarize: what was fixed, what was dismissed (with reasons)
+
+**Never auto-resolve in interactive mode.** Every finding requires the user's explicit decision. Claude recommends — the user decides. Never mark a finding as addressed, dismissed, or resolved without the user choosing that action through `AskUserQuestion`. This applies even when the recommendation is obvious — the user must confirm.
 
 ### Auto mode
 
@@ -50,10 +54,73 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 
 ### Behavioral rules (both modes)
 
+- **Reflect and recommend** — for every finding, reason about which action best fits the project's architecture before presenting options. Never present a bare option list without a recommendation and rationale
+- **Never auto-resolve in interactive mode** — every finding requires the user's explicit decision via `AskUserQuestion`. Claude recommends, the user decides. This is non-negotiable even for obvious fixes
 - **Never auto-dismiss** — only the user (interactive) or verified-wrong claims (auto) can dismiss
 - **Verify before fixing** — check the reviewer's technical claims before implementing
 - **Severity-first** — blockers before mediums before lows
 - **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
+
+## Multi-Agent Reviews
+
+### Why multiple agents
+
+Different AI reviewers catch different things. Copilot focuses on correctness and security, Codex on architecture and patterns, Gemini on edge cases and testing gaps. Running all three gives broad coverage with minimal overlap.
+
+### Trigger reviews with multiple agents
+
+Use `--branch` to review all commits on the branch vs main, and `--agent` to specify the reviewer:
+
+```sh
+roborev review --branch --agent copilot
+roborev review --branch --agent codex
+roborev review --branch --agent gemini
+```
+
+Each command creates a separate job. Run all three before reading any — they execute concurrently in the daemon.
+
+### Default workflow (interactive)
+
+The default behavior is to wait for all agents, consolidate, and walk through findings interactively:
+
+1. **Trigger** — run `roborev review --branch --agent <name>` for each agent
+2. **Wait** — poll `roborev list` until all jobs show `done`. Do not read partial results — wait for every agent to finish so you can cross-reference findings. If a job shows `failed`, skip it immediately. If a job stays `running` for more than 5 minutes, it may be stuck — skip it and proceed with the agents that completed
+3. **Collect** — read all findings from all agents (`roborev show <job-id>` for each). Merge into a single list, deduplicating findings that multiple agents flagged on the same code
+4. **Sort by severity** — order the consolidated list: blocker → medium → low. Within the same severity, group by file path for context
+5. **Reflect and recommend** — for each finding (highest severity first):
+   - Read the relevant code and check project rules before presenting the finding
+   - Reason about which action best serves the project's architecture and design philosophy
+   - Show: severity, file, location, which agent(s) flagged it, description, **your recommendation and why**
+   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip** — with your recommended option marked
+   - **Fix** → implement the change, move to next
+   - **Dismiss** → note the user's reason, move to next
+   - **Discuss** → investigate the claim deeper, report back, re-ask
+   - **Skip** → defer, revisit after remaining findings
+   - Multi-agent consensus increases confidence: if 2+ agents flag the same issue, recommend **Fix**
+   - Never resolve any finding without the user's explicit choice — see interactive mode rules
+6. **Commit** — batch all fixes into a single commit (`fix: address review findings`)
+7. **Re-review** — re-trigger multi-agent reviews if fixes were substantial (logic changes, not typos)
+8. **Push** — when all agents are clean or remaining findings are dismissed with rationale
+
+### Triage signals
+
+| Signal | Confidence | Action |
+| --- | --- | --- |
+| Multiple agents flag same issue | High | Fix it — independent reviewers agree |
+| One agent flags, others silent | Medium | Verify the claim before fixing |
+| Agent reports zero issues | Clean | Move on — no further action needed |
+| Finding contradicts project rules | Low | Dismiss with reference to the rule |
+
+### Available agents
+
+The `--agent` flag overrides the default agent from `.roborev.toml` for a single review. Common agents:
+
+- `copilot` — GitHub Copilot reviewer
+- `codex` — OpenAI Codex reviewer
+- `gemini` — Google Gemini reviewer
+- `claude-code` — Claude Code reviewer (often the default in `.roborev.toml`)
+
+The `.roborev.toml` only configures one `agent` (default) and one `backup_agent`. Multi-agent reviews use CLI `--agent` overrides, not toml configuration.
 
 ## Commands
 
@@ -97,11 +164,11 @@ roborev review --since HEAD~3  # Review last 3 commits
 
 ## Push and Merge Enforcement
 
-A global PreToolUse hook blocks `git push` and `gh pr merge` when roborev has running or failed reviews. The workflow is:
+A global PreToolUse hook blocks `git push` and `gh pr merge` when roborev has running reviews (wait for completion). Failed reviews (infrastructure failure) and done reviews do not block. The workflow is:
 
 1. Commit triggers a post-commit hook → daemon queues a review
-2. When you attempt to push or merge, the hook checks `roborev list`
-3. If blocked: `roborev fix` or `roborev refine`, then retry the push/merge
+2. When you attempt to push or merge, the hook queries `roborev list --json` and checks for `"status": "running"`
+3. If blocked: wait for reviews to finish, or check status with `roborev list`
 
 ## Per-Project Config
 
@@ -129,5 +196,7 @@ The post-commit hook sends jobs to the daemon. If the daemon is not running, rev
 ## Anti-patterns
 
 - Ignoring blocker-level findings — these represent hard invariant violations
+- Auto-resolving findings in interactive mode — every finding needs explicit user approval, even trivial ones
+- Presenting bare option lists without reasoning — always reflect on the finding and recommend the architecturally correct action
 - Running `roborev init` in a repo that already has `.roborev.toml` — use `install-hook` instead
 - Manually editing review results — use `roborev address` or `roborev comment` to interact with findings

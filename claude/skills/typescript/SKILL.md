@@ -7,7 +7,7 @@ description: |
   Use when: configuring TypeScript strictness, writing tests, optimizing bundles,
   reviewing security, or setting up build tooling.
 version: 2.0.0
-date: 2026-02-23
+date: 2026-02-28
 user-invocable: true
 ---
 
@@ -51,6 +51,44 @@ const config: Config = { theme: "dark", retries: 3 };
 const config = { theme: "dark", retries: 3 } as const satisfies Config;
 // config.theme is "dark", not string
 ```
+
+### Route type safety
+
+Type loaders and actions with framework-provided generics. Never use `any` for loader data or form data:
+
+```typescript
+// Typed loader — useLoaderData infers the return type
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const resources = await apiClient.getResources();
+  return { resources }; // useLoaderData<typeof loader> infers { resources: Resource[] }
+}
+
+// Typed action result — intent identifies which form submitted
+type ActionResult = { intent: string; error?: string; success?: boolean };
+
+function isActionResult(data: unknown): data is ActionResult {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+  if (typeof d.intent !== "string") return false;
+  if ("error" in d && typeof d.error !== "string") return false;
+  if ("success" in d && typeof d.success !== "boolean") return false;
+  return true;
+}
+
+// Type-safe FormData extraction
+function parseFormData(formData: FormData) {
+  return {
+    name: String(formData.get("name") ?? ""),
+    value: String(formData.get("value") ?? ""),
+    kind: String(formData.get("kind") ?? ""),
+  };
+}
+```
+
+- `useLoaderData<typeof loader>()` infers return type — no manual type annotation needed
+- `useActionData<typeof action>()` returns `unknown` in React Router v7 — validate with a type guard
+- Extract FormData parsing into named functions — keeps actions focused on business logic
+- Never use `as` casts on `formData.get()` — always `String()` with fallback
 
 ### Branded types for domain identifiers
 
@@ -265,8 +303,8 @@ Avoid `'unsafe-inline'` for scripts — use nonces or hashes.
 
 For cookie-authenticated, state-changing requests:
 - Require an unguessable anti-CSRF token tied to the user/session and validate it on every non-idempotent request (e.g., send via a custom header or request body).
-- Use `SameSite=Lax` or `SameSite=Strict` cookies as an additional hardening layer, not as your only CSRF defense.
-- You may rely on `SameSite` alone only for requests that are not authenticated via cookies (e.g., pure bearer-token APIs) or are strictly read-only.
+- Use `SameSite=Lax` cookies as the correct default — `Strict` breaks OAuth redirects and cross-origin navigations without adding meaningful security over Lax + CSRF tokens. See `/web-security` for full rationale.
+- `SameSite` is a hardening layer, not your only CSRF defense — always pair with anti-CSRF tokens for cookie-authenticated state-changing requests.
 
 See API Design skill section 10 for auth patterns.
 

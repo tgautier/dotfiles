@@ -98,7 +98,7 @@ Useful for discovery and initial orientation. Never rely on as sole authority.
 ### Context match
 
 - **Production scale vs hobby project:** A pattern that works for a personal blog may fail at 10k RPS. Match the source's deployment context to yours.
-- **Team size:** Patterns designed for 500-engineer organizations may be over-engineered for a 3-person team.
+- **Team size:** Patterns designed for 500-engineer organizations may have different trade-offs for a 3-person team — but smaller teams still need correct, robust implementations. Team size affects *what* you build, not *how well* you build it.
 - **Language/ecosystem:** A pattern idiomatic in Go (explicit error returns) should not be cargo-culted into Rust (Result types) or TypeScript (exceptions).
 
 ### Conflict resolution
@@ -159,12 +159,12 @@ Prefer patterns that handle failure gracefully, degrade predictably, and have be
 - **Recovery characteristics** — does it fail fast, fail safe, or fail silently? Fail-fast with clear diagnostics is preferred.
 - **Observability** — can you tell what went wrong from logs and metrics alone, without attaching a debugger?
 
-### Elegance and simplicity
+### Elegance and coherence
 
-The best solution is the simplest one that fully solves the problem. Evaluate:
+The best solution is the one that fully and properly solves the problem with nothing extraneous and nothing missing. Evaluate:
 
 - **Idiomatic to the language/framework** — not translated from another ecosystem. Go error handling should not look like Java exceptions. Rust should use `?` and `Result`, not boolean flags.
-- **Minimal moving parts** — fewer allocations, fewer indirections, fewer configuration knobs. Three lines of clear code beats a clever one-liner or a premature abstraction.
+- **No unnecessary moving parts** — fewer allocations, fewer indirections, fewer configuration knobs. But "fewer" never means "skip what's needed." Three lines of clear code beats a clever one-liner, but don't remove structure that protects correctness.
 - **Conceptual clarity** — can a new team member understand the pattern without a 30-minute explanation? If not, the complexity must be justified by the problem's inherent complexity.
 - **Composability** — does the pattern compose well with the rest of the system, or does it require special plumbing everywhere it's used?
 

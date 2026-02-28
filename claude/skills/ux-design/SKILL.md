@@ -8,7 +8,7 @@ description: |
   Use when: building design systems, implementing complex form flows,
   adding animation, designing data visualizations, or auditing accessibility.
 version: 1.0.0
-date: 2026-02-23
+date: 2026-02-28
 user-invocable: true
 ---
 
@@ -238,94 +238,100 @@ A component is well-designed if it can be:
 
 ## 5. Form UX
 
-### Zod as single source of truth
+### Server-validated forms
 
-Define validation schemas once, infer types:
+The server is the single source of validation truth. Client-side validation is progressive enhancement only.
 
-```typescript
-import { z } from "zod";
+**Validation layers (in order of authority):**
 
-const createResourceSchema = z.object({
-  name: z.string().min(1, "Required").max(255),
-  email: z.string().email("Invalid email"),
-  quantity: z.number().int().positive("Must be positive"),
-});
-
-type CreateResource = z.infer<typeof createResourceSchema>;
-```
-
-### React Hook Form + Zod
+1. **HTML5 attributes** — `required`, `pattern`, `min`, `max`, `maxLength`, `type="email"`. Browser-native, works without JS, instant feedback
+2. **Server validation** — Zod or equivalent runs inside the route action. Returns field-level errors via `Response.json({ fieldErrors })`
+3. **Database constraints** — `CHECK`, `NOT NULL`, `UNIQUE`. Last line of defense
 
 ```tsx
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+// Action validates and returns field errors
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const result = schema.safeParse(Object.fromEntries(formData));
+  if (!result.success) {
+    return Response.json(
+      { fieldErrors: result.error.flatten().fieldErrors },
+      { status: 400 },
+    );
+  }
+  await saveResource(result.data);
+  return Response.json({ success: true });
+}
+```
 
-function CreateResourceForm() {
-  const form = useForm<CreateResource>({
-    resolver: zodResolver(createResourceSchema),
-    defaultValues: { name: "", email: "", quantity: 1 },
-  });
+```tsx
+// Runtime type guard — useActionData returns unknown in RRv7
+function hasFieldErrors(data: unknown): data is { fieldErrors: Record<string, string[]> } {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return typeof d.fieldErrors === "object" && d.fieldErrors !== null && !Array.isArray(d.fieldErrors);
+}
 
-  return <form onSubmit={form.handleSubmit(onSubmit)}>{/* fields */}</form>;
+// Component displays server errors via useActionData
+function ResourceForm() {
+  const actionData = useActionData<typeof action>();
+  const errors = hasFieldErrors(actionData) ? actionData.fieldErrors : undefined;
+  return (
+    <Form method="post">
+      <div>
+        <label htmlFor="email">Email</label>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          aria-invalid={!!errors?.email}
+          aria-describedby={errors?.email ? "email-error" : undefined}
+        />
+        {errors?.email && (
+          <p id="email-error" role="alert" className="text-sm text-red-600 mt-1">
+            {errors.email[0]}
+          </p>
+        )}
+      </div>
+      <button type="submit">Save</button>
+    </Form>
+  );
 }
 ```
 
 ### Cross-field validation
 
+Use Zod `.refine()` on the server. Return the error on the relevant field's path:
+
 ```typescript
 const dateRangeSchema = z.object({
-  startDate: z.date(),
-  endDate: z.date(),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
 }).refine(
   (data) => data.endDate > data.startDate,
   { message: "End date must be after start date", path: ["endDate"] },
 );
 ```
 
-### Server-side validation is non-negotiable
-
-Client-side validation is a UX convenience. The API must always validate independently. Never trust client-submitted data. When the server returns validation errors, map them back to form fields using `setError`.
-
-### Validation timing
-
-| Strategy | When | UX tradeoff |
-| --- | --- | --- |
-| `onBlur` | Default for most fields | Low noise, feedback after user finishes |
-| `onChange` | After first error shown | Re-validate immediately so user sees fix |
-| `onSubmit` | Expensive checks (uniqueness) | Avoid per-keystroke API calls |
-| Debounced `onChange` | Username/email availability | 300ms debounce, inline spinner |
-
 ### Error placement
 
 - Display errors **below** the field, not above or in a summary at the top
 - Use `aria-describedby` to associate the error with the input
 - Use `role="alert"` on the error container
-- Never clear an error until the user corrects it
-
-```tsx
-<div>
-  <label htmlFor="email">Email</label>
-  <input
-    id="email"
-    aria-invalid={!!errors.email}
-    aria-describedby={errors.email ? "email-error" : undefined}
-    {...register("email")}
-  />
-  {errors.email && (
-    <p id="email-error" role="alert" className="text-sm text-red-600 mt-1">
-      {errors.email.message}
-    </p>
-  )}
-</div>
-```
+- Never clear a server error until the next form submission
 
 ### Multi-step forms
 
-For wizard-style forms with 3+ steps:
-- Validate each step independently before allowing the user to proceed
-- Allow backward navigation without losing data
+For wizard-style forms with 3+ steps, use server-managed progression:
+
+- Store current step in session or database — not in `useState`
+- Each step is a `<Form>` submission. The action validates and advances the step
+- The loader returns the current step and any previously submitted data
+- Works without JavaScript — each step is a full page transition
+- Allow backward navigation (loader serves previous step data with `defaultValue`)
 - Show a progress indicator (step 2 of 4)
-- Submit all data in a single API call at the end, not per-step
+- Submit all collected data in the final step's action
 
 ### Disabled vs read-only
 
@@ -335,10 +341,12 @@ For wizard-style forms with 3+ steps:
 
 ### Auto-save patterns
 
-- Debounce saves (500ms minimum)
-- Show subtle "Saving..." / "Saved" indicator — never a blocking spinner
+Use `useFetcher` for non-blocking server saves:
+
+- `useFetcher.Form` with `method="post"` on blur or after a debounce
+- Show subtle "Saving..." / "Saved" indicator via `fetcher.state`
+- No manual `fetch()` calls — the fetcher handles serialization and error states
 - Handle conflicts: if the server rejects a stale save, show a merge/overwrite choice
-- Use `onBlur` as the primary save trigger for inline editing
 
 ---
 
@@ -660,6 +668,9 @@ Every chart needs three states: loading (skeleton), empty (illustration + CTA), 
 | Hardcoded light/dark colors | Breaks theming | CSS custom property tokens |
 | Client-side only validation | Security risk | Always validate on server |
 | Pixel font sizes | Breaks user zoom | Use `rem` exclusively |
+| **SPA-era: React Hook Form for all forms** | Unnecessary client state, fights server actions | Server validation in action + `useActionData` |
+| **SPA-era: Client-side multi-step wizard** | Progress lost on refresh, no deep links | Server-managed steps via loader/action |
+| **SPA-era: `onBlur` + `fetch` for auto-save** | Manual fetch, no framework integration | `useFetcher.Form` with `method="post"` |
 
 ---
 

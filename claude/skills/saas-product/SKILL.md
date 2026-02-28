@@ -7,7 +7,7 @@ description: |
   Use when: designing new SaaS features, creating dashboards, planning onboarding flows,
   or reviewing product-level UX decisions.
 version: 1.0.0
-date: 2026-02-23
+date: 2026-02-28
 user-invocable: true
 ---
 
@@ -64,19 +64,37 @@ Define what "activated" means before building onboarding:
 **Setup wizard** — for products requiring initial configuration:
 
 ```tsx
-function SetupWizard() {
-  const [step, setStep] = useState(0);
-  const steps = [
-    { title: "Connect account", component: ConnectAccountStep },
-    { title: "Import data", component: ImportDataStep },
-    { title: "Set preferences", component: PreferencesStep },
-  ];
+// Loader returns current step from session/DB
+export async function loader({ request }: LoaderFunctionArgs) {
+  const progress = await getOnboardingProgress(request);
+  return { step: progress.currentStep, steps: progress.steps };
+}
 
+// Action validates current step, saves, and advances
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  if (formData.get("_intent") === "skip") return redirect("/app");
+  const nextStep = await saveStepAndAdvance(formData);
+  if (nextStep === "complete") return redirect("/app");
+  return redirect(`/onboarding/step/${nextStep}`);
+}
+
+// Component renders the current step as a form
+function SetupWizard() {
+  const { step, steps } = useLoaderData<typeof loader>();
   return (
     <div>
       <StepIndicator steps={steps} current={step} />
-      <CurrentStep onNext={() => setStep(step + 1)} />
-      <SkipLink onClick={skipToApp}>Skip setup — I'll do this later</SkipLink>
+      <Form method="post">
+        <CurrentStepFields step={step} />
+        <Button type="submit">Continue</Button>
+      </Form>
+      <Form method="post">
+        <input type="hidden" name="_intent" value="skip" />
+        <button type="submit" className="text-sm text-muted-foreground">
+          Skip setup — I'll do this later
+        </button>
+      </Form>
     </div>
   );
 }
@@ -84,7 +102,7 @@ function SetupWizard() {
 
 Rules:
 - Always allow skipping — never force completion of all steps
-- Save progress — if the user leaves, resume where they stopped
+- Progress is saved automatically — each step is an action submission persisted server-side
 - Max 3-5 steps — more than that and users abandon
 - Show progress clearly (step 2 of 4)
 
@@ -140,17 +158,21 @@ function EmptyState({ icon, title, description, action }: EmptyStateProps) {
       <div className="mb-4 text-muted-foreground">{icon}</div>
       <h3 className="text-lg font-semibold">{title}</h3>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
-      {action && <Button className="mt-4" onClick={action.onClick}>{action.label}</Button>}
+      {action && (
+        <Button className="mt-4" asChild>
+          <Link to={action.href}>{action.label}</Link>
+        </Button>
+      )}
     </div>
   );
 }
 
-// Usage
+// Usage — CTA navigates to a route, not an onClick handler
 <EmptyState
   icon={<WalletIcon size={48} />}
   title="No assets yet"
   description="Add your first asset to start tracking your portfolio performance."
-  action={{ label: "Add Asset", onClick: openAddAssetDialog }}
+  action={{ href: "/assets/new", label: "Add Asset" }}
 />
 ```
 
@@ -264,22 +286,38 @@ function AssetListSkeleton() {
 
 ### Optimistic UI
 
-For mutations where failure is rare, update the UI immediately and revert on error:
+For mutations where failure is rare, show the expected result immediately. In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data. Render pending items separately from the data list — the optimistic item is transient UI state, not data. The server assigns the real ID via loader revalidation:
 
 ```tsx
-const [optimisticAssets, addOptimistic] = useOptimistic(
-  assets,
-  (current, newAsset: Asset) => [...current, newAsset],
-);
+function TodoList({ items }: { items: Todo[] }) {
+  const fetcher = useFetcher();
 
-async function handleCreate(data: CreateAssetInput) {
-  addOptimistic({ ...data, id: crypto.randomUUID() });
-  const result = await createAsset(data);
-  if (!result.ok) {
-    showToast("Failed to create asset. Please try again.", "error");
-  }
+  return (
+    <>
+      <ul>
+        {items.map(item => (
+          <li key={item.id}>{item.name}</li>
+        ))}
+        {fetcher.formData && (
+          <li className="opacity-50">
+            {String(fetcher.formData.get("name") ?? "")}
+          </li>
+        )}
+      </ul>
+      <fetcher.Form method="post">
+        <input type="hidden" name="_intent" value="create" />
+        <input name="name" required />
+        <Button type="submit">Add</Button>
+      </fetcher.Form>
+    </>
+  );
 }
 ```
+
+- `fetcher.formData` is non-null while the submission is in flight — derive the optimistic item directly from it
+- When the action completes, loaders revalidate, `items` updates with the real data, and `fetcher.formData` resets to null
+- On failure, loaders still revalidate with unchanged data — the optimistic item disappears because `fetcher.formData` is null
+- No `useOptimistic`, no `onSubmit`, no `startTransition` — React Router's data layer handles the lifecycle
 
 ### Streaming SSR
 
@@ -287,6 +325,13 @@ For pages with mixed fast/slow data sources:
 - Fast data (navigation, layout) renders immediately in the shell
 - Slow data (analytics, external APIs) streams in via Suspense boundaries
 - Each Suspense boundary shows its own skeleton while loading
+
+### Server-first loading principle
+
+With route loaders, data is available when the page renders — no loading spinners for initial data. Reserve skeleton screens for:
+- Streaming SSR (slow data sources behind Suspense boundaries)
+- Fetcher-driven updates (non-navigation mutations in progress)
+- Client-only components that need a mount guard
 
 ---
 
@@ -416,17 +461,24 @@ function FeatureLimitPrompt({ feature, limit, current }: LimitPromptProps) {
 When a feature is gated, show the user what they're missing and how to get it:
 
 ```tsx
-function GatedFeature({ feature, children }: GatedFeatureProps) {
-  const { hasAccess, requiredPlan } = useFeatureAccess(feature);
+// Check access in the loader — never send gated data to the client
+export async function loader({ request }: LoaderFunctionArgs) {
+  const user = await requireAuth(request);
+  const access = await checkFeatureAccess(user, "advanced-analytics");
+  if (!access.granted) {
+    return { gated: true, requiredPlan: access.requiredPlan };
+  }
+  const data = await loadAnalytics();
+  return { gated: false, data };
+}
 
-  if (hasAccess) return <>{children}</>;
-
-  return (
-    <div className="relative">
-      <div className="pointer-events-none opacity-40 blur-[1px]">{children}</div>
-      <UpgradeOverlay feature={feature} requiredPlan={requiredPlan} />
-    </div>
-  );
+// Component renders based on loader data
+function AnalyticsPage() {
+  const loaderData = useLoaderData<typeof loader>();
+  if (loaderData.gated) {
+    return <UpgradeOverlay requiredPlan={loaderData.requiredPlan} />;
+  }
+  return <AnalyticsDashboard data={loaderData.data} />;
 }
 ```
 
@@ -456,17 +508,43 @@ Rules:
 Destructive settings must be visually distinct and require confirmation:
 
 ```tsx
+// Action — server-side validation (client-side pattern is bypassable)
+export async function action({ request }: ActionFunctionArgs) {
+  const user = await requireAuth(request);
+  const formData = await request.formData();
+  if (formData.get("_intent") === "delete-account") {
+    const confirmation = String(formData.get("confirmation") ?? "");
+    if (confirmation !== "delete my account") {
+      return Response.json(
+        { error: "Confirmation phrase does not match", intent: "delete-account" },
+        { status: 400 },
+      );
+    }
+    await api.deleteAccount(user.id);
+    return redirect("/goodbye");
+  }
+}
+
+// Component
 function DangerZone() {
   return (
     <Card className="border-red-200 bg-red-50">
       <h3 className="text-red-900">Danger Zone</h3>
       <div className="space-y-4">
-        <DangerAction
-          title="Delete account"
-          description="Permanently delete your account and all data. This cannot be undone."
-          confirmText="delete my account"
-          onConfirm={deleteAccount}
-        />
+        <Form method="post">
+          <input type="hidden" name="_intent" value="delete-account" />
+          <p className="text-sm">Permanently delete your account and all data. This cannot be undone.</p>
+          <label htmlFor="delete-confirmation" className="text-sm font-medium">
+            Type "delete my account" to confirm
+          </label>
+          <input
+            id="delete-confirmation"
+            name="confirmation"
+            required
+            pattern="delete my account"
+          />
+          <Button type="submit" variant="destructive">Delete account</Button>
+        </Form>
       </div>
     </Card>
   );
@@ -476,6 +554,7 @@ function DangerZone() {
 Rules:
 - Red border/background for the danger zone section
 - Require typing a confirmation phrase for irreversible actions
+- Server action validates the confirmation value — client-side `pattern` is a UX hint, not a security boundary
 - Show a clear description of what will be deleted/lost
 - Offer data export before account deletion
 
@@ -553,6 +632,9 @@ Some resources span tenants (billing admin, super admin views). Clearly distingu
 | Instant data deletion on downgrade | Users fear committing to plans | Grace period + read-only access |
 | Activity feed without filters | Noise drowns signal for active orgs | Filter by actor, action, resource, date |
 | No tenant indicator in UI | Users accidentally modify wrong org | Always show current org + easy switching |
+| **SPA-era: client-side wizard state** | Progress lost on refresh, no deep links, no back button | Server-managed steps via loader/action |
+| **SPA-era: `onClick` handlers for mutations** | No progressive enhancement, no revalidation | `<Form method="post">` with intent pattern |
+| **SPA-era: client-side feature gating** | Gated data still sent to client, security risk | Check access in loader, never send gated data |
 
 ---
 

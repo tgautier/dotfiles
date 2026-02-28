@@ -7,7 +7,7 @@ description: |
   Use when: configuring TypeScript strictness, writing tests, optimizing bundles,
   reviewing security, or setting up build tooling.
 version: 2.0.0
-date: 2026-02-23
+date: 2026-02-28
 user-invocable: true
 ---
 
@@ -51,6 +51,43 @@ const config: Config = { theme: "dark", retries: 3 };
 const config = { theme: "dark", retries: 3 } as const satisfies Config;
 // config.theme is "dark", not string
 ```
+
+### Route type safety
+
+Type loaders and actions with framework-provided generics. Never use `any` for loader data or form data:
+
+```typescript
+// Typed loader — useLoaderData infers the return type
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const resources = await apiClient.getResources();
+  return { resources }; // useLoaderData<typeof loader> infers { resources: Resource[] }
+}
+
+// Typed action result — discriminated by intent
+type ActionResult = { error?: string; success?: boolean; intent?: string };
+
+function isActionResult(data: unknown): data is ActionResult {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+  if ("error" in d && typeof d.error !== "string") return false;
+  if ("success" in d && typeof d.success !== "boolean") return false;
+  return true;
+}
+
+// Type-safe FormData extraction
+function parseFormData(formData: FormData) {
+  return {
+    name: String(formData.get("name") ?? ""),
+    value: String(formData.get("value") ?? ""),
+    kind: String(formData.get("kind") ?? ""),
+  };
+}
+```
+
+- `useLoaderData<typeof loader>()` infers return type — no manual type annotation needed
+- `useActionData<typeof action>()` returns `unknown` in React Router v7 — validate with a type guard
+- Extract FormData parsing into named functions — keeps actions focused on business logic
+- Never use `as` casts on `formData.get()` — always `String()` with fallback
 
 ### Branded types for domain identifiers
 

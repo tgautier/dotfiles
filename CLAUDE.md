@@ -24,7 +24,7 @@ just ci
 # Update everything (brew, mas, mise, rust)
 just update
 
-# Enable pre-commit hook
+# Enable pre-commit hook and install native tools
 just setup
 ```
 

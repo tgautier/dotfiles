@@ -24,7 +24,7 @@ just ci
 # Update everything (brew, mas, mise, rust)
 just update
 
-# Enable pre-commit hook
+# Enable pre-commit hook and install native tools
 just setup
 ```
 
@@ -63,7 +63,7 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 - `just ci` — runs all checks (shell, markdown, Brewfile, mise)
 - `just lint-shell` — shellcheck on `bin/*` and zsh files
-- `just setup` — enables `.githooks/pre-commit`
+- `just setup` — enables `.githooks/pre-commit` and installs native tools (e.g., claude-code)
 
 ### tmux
 

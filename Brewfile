@@ -105,7 +105,8 @@ cask "1password-cli"
 cask "adobe-creative-cloud"
 cask "antigravity"
 cask "claude"
-cask "claude-code"
+## claude-code: use native installer instead (auto-updates, no deps)
+## curl -fsSL https://claude.ai/install.sh | bash
 cask "codex"
 cask "copilot-cli"
 cask "cursor"

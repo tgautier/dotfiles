@@ -84,7 +84,6 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 
 ## Principles
 
-- **Simplicity first** — make every change as simple as possible. The right amount of complexity is the minimum needed for the current task
 - **No laziness** — find root causes. No temporary fixes. No "this works for now" patches. Senior developer standards
 - **Never degrade quality incrementally** — every fix, every example, every documentation change must meet the same standard as the rest of the codebase. Renaming a section to match broken content instead of writing correct content is degradation. Adding a comment instead of a type guard is degradation. Each small shortcut compounds — the worst outcome is a slowly eroding stack that nobody notices until it's too late
 - **Stop early, re-plan, do it right** — if an approach isn't working, stop and re-plan. But "re-plan" means finding the correct approach, not downgrading to a lesser fix. Stopping is a signal to think harder, not to lower standards

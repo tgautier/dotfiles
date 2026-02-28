@@ -152,15 +152,15 @@ Every data-driven view must handle four empty conditions:
 ### First-use empty state pattern
 
 ```tsx
-function EmptyState({ icon, title, description, actionHref, actionLabel }: EmptyStateProps) {
+function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="mb-4 text-muted-foreground">{icon}</div>
       <h3 className="text-lg font-semibold">{title}</h3>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">{description}</p>
-      {actionHref && (
+      {action && (
         <Button className="mt-4" asChild>
-          <Link to={actionHref}>{actionLabel}</Link>
+          <Link to={action.href}>{action.label}</Link>
         </Button>
       )}
     </div>
@@ -172,8 +172,7 @@ function EmptyState({ icon, title, description, actionHref, actionLabel }: Empty
   icon={<WalletIcon size={48} />}
   title="No assets yet"
   description="Add your first asset to start tracking your portfolio performance."
-  actionHref="/assets/new"
-  actionLabel="Add Asset"
+  action={{ href: "/assets/new", label: "Add Asset" }}
 />
 ```
 
@@ -535,9 +534,12 @@ function DangerZone() {
         <Form method="post">
           <input type="hidden" name="_intent" value="delete-account" />
           <p className="text-sm">Permanently delete your account and all data. This cannot be undone.</p>
+          <label htmlFor="delete-confirmation" className="text-sm font-medium">
+            Type "delete my account" to confirm
+          </label>
           <input
+            id="delete-confirmation"
             name="confirmation"
-            placeholder='Type "delete my account" to confirm'
             required
             pattern="delete my account"
           />

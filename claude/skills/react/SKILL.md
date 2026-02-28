@@ -171,7 +171,7 @@ import { ErrorBoundary } from "react-error-boundary";
 
 <ErrorBoundary
   FallbackComponent={ErrorFallback}
-  onReset={() => window.location.reload()}
+  onReset={() => { /* revalidate loaders or navigate to same route */ }}
   resetKeys={[resourceId]}
 >
   <ResourceDetail />

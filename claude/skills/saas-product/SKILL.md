@@ -70,13 +70,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return { step: progress.currentStep, steps: progress.steps };
 }
 
-// Action validates current step and advances
+// Action validates current step, saves, and advances
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = String(formData.get("_intent"));
   if (intent === "skip") return redirect("/app");
-  await saveStepData(formData);
-  return Response.json({ success: true });
+  const nextStep = await saveStepAndAdvance(formData);
+  if (nextStep === "complete") return redirect("/app");
+  return redirect(`/onboarding/step/${nextStep}`);
 }
 
 // Component renders the current step as a form

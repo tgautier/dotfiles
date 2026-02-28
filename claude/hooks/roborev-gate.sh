@@ -21,15 +21,16 @@ case "$COMMAND" in
     ;;
 esac
 
-# Skip if roborev is not installed
+# Skip if roborev or jq is not installed
 command -v roborev >/dev/null 2>&1 || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
 
 # Skip if no .roborev.toml in current repo
 [ -f .roborev.toml ] || exit 0
 
 # Query roborev via JSON for structured status detection.
 # Verified: `roborev list --json` exits 0 with `[]` when no reviews exist.
-REVIEW_JSON=$(roborev list --json 2>&1) || {
+REVIEW_JSON=$(roborev list --json) || {
   echo "BLOCK: \`roborev list --json\` failed — cannot verify review status. Start the daemon with \`roborev daemon start\`." >&2
   exit 2
 }

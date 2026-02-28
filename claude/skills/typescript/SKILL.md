@@ -146,7 +146,17 @@ type Status = (typeof Status)[keyof typeof Status];
 1. **Unit tests (Vitest):** Pure functions, hooks, validation schemas. Fast feedback loop.
 2. **Component tests (Vitest + Testing Library):** User-facing behavior with `userEvent`.
 3. **Integration tests (Vitest + MSW):** Full component trees with mocked API responses.
-4. **E2E tests (Playwright):** 3-5 critical user flows only. Keep the suite small.
+4. **E2E tests (Playwright):** Critical user journeys — keep each spec focused on one journey.
+
+### Layer selection
+
+Universal principles for deciding which layer a test belongs in:
+
+- **Push tests down** — test at the lowest layer that gives confidence. Unit > component > integration > E2E. Higher layers are slower, flakier, and harder to debug
+- **No duplication across layers** — if E2E covers a behavior and a unit test proves the helper, don't add a middle-layer test that re-proves both. Fowler's rule: "higher-level test failure without lower-level failure signals a missing lower-level test"
+- **Static analysis is the foundation** — TypeScript strict mode + ESLint rules catch bugs that unit tests traditionally caught. The testing trophy's base layer
+- **E2E = journeys, not features** — test "user signs in, creates an item, sees the list update" not "name field validates correctly." Feature-level validation belongs in unit/component tests
+- **Integration tests are highest-ROI** — they balance confidence (real dependencies) with speed (no browser). Both the testing trophy (Dodds) and Google testing research confirm this
 
 ### Test user behavior, not implementation
 

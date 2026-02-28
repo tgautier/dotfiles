@@ -10,7 +10,7 @@ Dotfiles repo: shell config, Claude Code config (rules, skills, hooks), and Home
 HARD INVARIANTS — flag violations as blockers:
 
 1. Secrets: never commit credentials, tokens, API keys, or secrets. This repo is public on GitHub.
-2. Shell compatibility: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content written via heredocs/echo. Rule and skill files must not contain `\!` — flag any occurrence as corruption.
+2. Shell compatibility: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content. Rule and skill .md files must not contain `\!` — flag any occurrence as corruption.
 3. One concern per file: each rule covers exactly one topic. If two unrelated topics exist, flag for split.
 4. 80-line signal: rules over 80 lines likely cover too much. Flag for review.
 5. Cross-references: if file A references file B, verify B exists. Broken cross-refs are blockers.

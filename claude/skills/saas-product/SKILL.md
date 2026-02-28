@@ -287,15 +287,23 @@ function AssetListSkeleton() {
 
 ### Optimistic UI
 
-For mutations where failure is rare, update the UI immediately and let React revert on error. Combine `useOptimistic` (React 19) with `useFetcher` (React Router v7):
+For mutations where failure is rare, show the expected result immediately. In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data:
 
 ```tsx
 function TodoList({ items }: { items: Todo[] }) {
   const fetcher = useFetcher();
-  const [optimisticItems, addOptimistic] = useOptimistic(
-    items,
-    (current, newItem: Todo) => [...current, newItem],
-  );
+
+  // Derive optimistic items from pending submission
+  const optimisticItems = fetcher.formData
+    ? [
+        ...items,
+        {
+          id: crypto.randomUUID(),
+          name: String(fetcher.formData.get("name") ?? ""),
+          pending: true,
+        },
+      ]
+    : items;
 
   return (
     <>
@@ -306,17 +314,7 @@ function TodoList({ items }: { items: Todo[] }) {
           </li>
         ))}
       </ul>
-      <fetcher.Form
-        method="post"
-        onSubmit={(e) => {
-          const formData = new FormData(e.currentTarget);
-          addOptimistic({
-            id: crypto.randomUUID(),
-            name: String(formData.get("name")),
-            pending: true,
-          });
-        }}
-      >
+      <fetcher.Form method="post">
         <input type="hidden" name="_intent" value="create" />
         <input name="name" required />
         <Button type="submit">Add</Button>
@@ -326,9 +324,10 @@ function TodoList({ items }: { items: Todo[] }) {
 }
 ```
 
-- `useOptimistic` adds the item to the list instantly with `pending: true` (shown at reduced opacity)
-- `useFetcher.Form` submits without navigation — the loader reruns on success, replacing the optimistic item with the real one
-- On action failure, React automatically reverts the optimistic state — no manual rollback needed
+- `fetcher.formData` is non-null while the submission is in flight — derive the optimistic item directly from it
+- When the action completes, loaders revalidate, `items` updates with the real data, and `fetcher.formData` resets to null
+- On failure, loaders still revalidate with unchanged data — the optimistic item disappears because `fetcher.formData` is null
+- No `useOptimistic`, no `onSubmit`, no `startTransition` — React Router's data layer handles the lifecycle
 
 ### Streaming SSR
 
@@ -519,6 +518,23 @@ Rules:
 Destructive settings must be visually distinct and require confirmation:
 
 ```tsx
+// Action — server-side validation (client-side pattern is bypassable)
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  if (formData.get("_intent") === "delete-account") {
+    const confirmation = String(formData.get("confirmation") ?? "");
+    if (confirmation !== "delete my account") {
+      return Response.json(
+        { error: "Confirmation phrase does not match", intent: "delete-account" },
+        { status: 400 },
+      );
+    }
+    await api.deleteAccount();
+    return redirect("/goodbye");
+  }
+}
+
+// Component
 function DangerZone() {
   return (
     <Card className="border-red-200 bg-red-50">
@@ -544,7 +560,7 @@ function DangerZone() {
 Rules:
 - Red border/background for the danger zone section
 - Require typing a confirmation phrase for irreversible actions
-- Server action must validate the confirmation value — client-side `pattern` is bypassable
+- Server action validates the confirmation value — client-side `pattern` is a UX hint, not a security boundary
 - Show a clear description of what will be deleted/lost
 - Offer data export before account deletion
 

@@ -63,15 +63,15 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return { resources }; // useLoaderData<typeof loader> infers { resources: Resource[] }
 }
 
-// Typed action result — discriminated by intent
-type ActionResult = { error?: string; success?: boolean; intent?: string };
+// Typed action result — intent identifies which form submitted
+type ActionResult = { intent: string; error?: string; success?: boolean };
 
 function isActionResult(data: unknown): data is ActionResult {
   if (typeof data !== "object" || data === null) return false;
   const d = data as Record<string, unknown>;
+  if (typeof d.intent !== "string") return false;
   if ("error" in d && typeof d.error !== "string") return false;
   if ("success" in d && typeof d.success !== "boolean") return false;
-  if ("intent" in d && typeof d.intent !== "string") return false;
   return true;
 }
 

@@ -21,16 +21,18 @@ For TypeScript strictness, testing, and build tooling, see `/typescript`. For co
 
 ## 1. React 19 Patterns
 
-### `useOptimistic` for perceived performance
+### Optimistic UI via `fetcher.formData`
 
-Apply optimistic updates on mutations — React reverts automatically on error:
+In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data. No `useOptimistic` needed (that's React 19's primitive for React Actions, not for React Router's data layer):
 
 ```tsx
-const [optimisticItems, addOptimistic] = useOptimistic(
-  items,
-  (current, newItem: Item) => [...current, newItem],
-);
+const fetcher = useFetcher();
+const optimisticItems = fetcher.formData
+  ? [...items, { id: crypto.randomUUID(), name: String(fetcher.formData.get("name")), pending: true }]
+  : items;
 ```
+
+`fetcher.formData` is non-null while the submission is in flight. When the action completes (success or error), loaders revalidate, the `items` prop updates, and `fetcher.formData` resets to null — the optimistic layer disappears automatically.
 
 ### `use()` hook
 
@@ -53,7 +55,9 @@ Loaders run on the server before render. They are the single source of server da
 
 ```tsx
 export async function loader({ request, params }: LoaderFunctionArgs) {
-  const resource = await api.getResource(params.id);
+  const id = params.id;
+  if (!id) throw new Response("Not Found", { status: 404 });
+  const resource = await api.getResource(id);
   return { resource };
 }
 
@@ -101,6 +105,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === "delete") {
     const id = String(formData.get("id") ?? "");
+    if (!id) return Response.json({ error: "Missing id", intent: "delete" }, { status: 400 });
     try {
       await api.deleteResource(id);
       return Response.json({ success: true, intent: "delete" });
@@ -116,7 +121,7 @@ export async function action({ request }: ActionFunctionArgs) {
 ### Action return shape
 
 ```typescript
-type ActionResult = { error?: string; success?: boolean; intent?: string };
+type ActionResult = { intent: string; error?: string; success?: boolean };
 ```
 
 - Always include `intent` so the UI can scope error display to the correct form

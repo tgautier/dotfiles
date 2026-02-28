@@ -266,8 +266,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
 ```tsx
 // Runtime type guard — useActionData returns unknown in RRv7
-function hasFieldErrors(data: unknown): data is ActionData & { fieldErrors: Record<string, string[]> } {
-  return typeof data === "object" && data !== null && "fieldErrors" in data;
+function hasFieldErrors(data: unknown): data is { fieldErrors: Record<string, string[]> } {
+  if (typeof data !== "object" || data === null) return false;
+  const d = data as Record<string, unknown>;
+  return typeof d.fieldErrors === "object" && d.fieldErrors !== null && !Array.isArray(d.fieldErrors);
 }
 
 // Component displays server errors via useActionData

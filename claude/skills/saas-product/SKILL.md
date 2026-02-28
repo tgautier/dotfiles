@@ -293,12 +293,19 @@ For mutations where failure is rare, show the expected result immediately. In Re
 function TodoList({ items }: { items: Todo[] }) {
   const fetcher = useFetcher();
 
-  // Derive optimistic items from pending submission
+  // Stabilize optimistic ID across re-renders during submission
+  const pendingId = useRef<string | null>(null);
+  if (fetcher.formData) {
+    pendingId.current ??= crypto.randomUUID();
+  } else {
+    pendingId.current = null;
+  }
+
   const optimisticItems = fetcher.formData
     ? [
         ...items,
         {
-          id: crypto.randomUUID(),
+          id: pendingId.current!,
           name: String(fetcher.formData.get("name") ?? ""),
           pending: true,
         },
@@ -520,6 +527,7 @@ Destructive settings must be visually distinct and require confirmation:
 ```tsx
 // Action — server-side validation (client-side pattern is bypassable)
 export async function action({ request }: ActionFunctionArgs) {
+  const user = await requireAuth(request);
   const formData = await request.formData();
   if (formData.get("_intent") === "delete-account") {
     const confirmation = String(formData.get("confirmation") ?? "");
@@ -529,7 +537,7 @@ export async function action({ request }: ActionFunctionArgs) {
         { status: 400 },
       );
     }
-    await api.deleteAccount();
+    await api.deleteAccount(user.id);
     return redirect("/goodbye");
   }
 }

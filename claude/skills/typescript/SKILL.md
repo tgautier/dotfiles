@@ -303,8 +303,8 @@ Avoid `'unsafe-inline'` for scripts — use nonces or hashes.
 
 For cookie-authenticated, state-changing requests:
 - Require an unguessable anti-CSRF token tied to the user/session and validate it on every non-idempotent request (e.g., send via a custom header or request body).
-- Use `SameSite=Lax` or `SameSite=Strict` cookies as an additional hardening layer, not as your only CSRF defense.
-- You may rely on `SameSite` alone only for requests that are not authenticated via cookies (e.g., pure bearer-token APIs) or are strictly read-only.
+- Use `SameSite=Lax` cookies as the correct default — `Strict` breaks OAuth redirects and cross-origin navigations without adding meaningful security over Lax + CSRF tokens. See `/web-security` for full rationale.
+- `SameSite` is a hardening layer, not your only CSRF defense — always pair with anti-CSRF tokens for cookie-authenticated state-changing requests.
 
 See API Design skill section 10 for auth patterns.
 

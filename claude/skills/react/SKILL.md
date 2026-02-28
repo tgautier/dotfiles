@@ -27,12 +27,18 @@ In React Router v7, derive optimistic state from `fetcher.formData` — the pend
 
 ```tsx
 const fetcher = useFetcher();
+const pendingId = useRef<string | null>(null);
+if (fetcher.formData) {
+  pendingId.current ??= crypto.randomUUID();
+} else {
+  pendingId.current = null;
+}
 const optimisticItems = fetcher.formData
-  ? [...items, { id: crypto.randomUUID(), name: String(fetcher.formData.get("name")), pending: true }]
+  ? [...items, { id: pendingId.current!, name: String(fetcher.formData.get("name") ?? ""), pending: true }]
   : items;
 ```
 
-`fetcher.formData` is non-null while the submission is in flight. When the action completes (success or error), loaders revalidate, the `items` prop updates, and `fetcher.formData` resets to null — the optimistic layer disappears automatically.
+The `useRef` stabilizes the optimistic item's key across re-renders — without it, `crypto.randomUUID()` generates a new ID on every render while the submission is in flight, causing React to unmount/remount the optimistic item. When `fetcher.formData` resets to null (action complete, loaders revalidate), the ref resets and the optimistic layer disappears automatically.
 
 ### `use()` hook
 

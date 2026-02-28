@@ -8,8 +8,12 @@
 
 set -euo pipefail
 
-# Extract the command from Bash tool input
-COMMAND=$(echo "${TOOL_INPUT:-}" | jq -r '.command // empty' 2>/dev/null)
+# Skip early if dependencies are missing
+command -v jq >/dev/null 2>&1 || exit 0
+command -v roborev >/dev/null 2>&1 || exit 0
+
+# Extract the command from Bash tool input (|| true: invalid/missing JSON → empty command → exit 0)
+COMMAND=$(echo "${TOOL_INPUT:-}" | jq -r '.command // empty' 2>/dev/null) || true
 [ -z "$COMMAND" ] && exit 0
 
 # Only gate push and merge commands
@@ -20,10 +24,6 @@ case "$COMMAND" in
     exit 0
     ;;
 esac
-
-# Skip if roborev or jq is not installed
-command -v roborev >/dev/null 2>&1 || exit 0
-command -v jq >/dev/null 2>&1 || exit 0
 
 # Skip if no .roborev.toml in current repo
 [ -f .roborev.toml ] || exit 0

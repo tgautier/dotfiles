@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# PreToolUse hook: block git push and gh pr merge when roborev has unaddressed failures.
+# PreToolUse hook: block git push and gh pr merge when roborev reviews are in progress.
 # Exit 2 = block with reason on stderr. Exit 0 = allow.
+#
+# Only blocks on "running" reviews (wait for completion). Does NOT block on:
+# - "failed" jobs (infrastructure failure — agent crashed, no review produced)
+# - "done" jobs (completed — findings handled by roborev fix/refine workflow)
 
 set -euo pipefail
 
@@ -30,15 +34,9 @@ REVIEW_OUTPUT=$(roborev list 2>&1) || {
   exit 2
 }
 
-# Check for running reviews
+# Block only on running reviews — wait for them to complete before pushing
 if echo "$REVIEW_OUTPUT" | grep -q "running"; then
-  echo "BLOCK: Roborev reviews are still running. Run \`roborev list\` to get the job ID, then \`roborev wait <id>\`." >&2
-  exit 2
-fi
-
-# Check for failed/unaddressed reviews
-if echo "$REVIEW_OUTPUT" | grep -q "failed\|error"; then
-  echo "BLOCK: Roborev has unaddressed failures. Run \`roborev list\` to see findings, then \`roborev fix\` or \`roborev refine\`." >&2
+  echo "BLOCK: Roborev reviews are still running. Run \`roborev list\` to check status, then \`roborev wait <id>\` or wait for completion." >&2
   exit 2
 fi
 

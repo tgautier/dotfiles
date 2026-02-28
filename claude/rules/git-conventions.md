@@ -24,7 +24,7 @@
 
 - Never push directly to `main` or `master`
 - **Multi-agent review before pushing** — run `roborev review --branch` with each configured agent (e.g., copilot, codex, gemini) before the first push. Read all findings, fix verified issues, commit fixes. See `/roborev` for the full workflow
-- **Roborev gate** — enforced by a PreToolUse hook on `git push` and `gh pr merge`. The hook blocks when reviews are running or have unaddressed failures. If blocked, fix findings (`roborev fix` or `roborev refine`) before retrying
+- **Roborev gate** — enforced by a PreToolUse hook on `git push` and `gh pr merge`. The hook blocks when reviews are still running (wait for completion). Failed reviews (infrastructure failure) and done reviews do not block. If blocked, wait for reviews to finish or check status with `roborev list`
 - Fetch latest before pushing: `git fetch origin`
 - Rebase onto main if needed — check with `git merge-base --is-ancestor origin/main HEAD` (exit 0 = clean)
   - If rebase hits conflicts: abort, inform the user of the conflicting files, and stop
@@ -54,7 +54,7 @@
 Before merging any PR, **all** of these must be true:
 
 - Zero unresolved review threads
-- **Roborev gate** passes — enforced by PreToolUse hook (blocks `gh pr merge` with unaddressed findings)
+- **Roborev gate** passes — enforced by PreToolUse hook (blocks `gh pr merge` while reviews are running)
 - All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state

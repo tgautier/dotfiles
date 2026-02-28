@@ -27,16 +27,21 @@ command -v roborev >/dev/null 2>&1 || exit 0
 # Skip if no .roborev.toml in current repo
 [ -f .roborev.toml ] || exit 0
 
-# Capture roborev output once; block if roborev itself fails.
-# Verified: `roborev list` exits 0 when no reviews exist — non-zero means genuine failure.
-REVIEW_OUTPUT=$(roborev list 2>&1) || {
-  echo "BLOCK: \`roborev list\` failed — cannot verify review status. Start the daemon with \`roborev daemon start\`." >&2
+# Query roborev via JSON for structured status detection.
+# Verified: `roborev list --json` exits 0 with `[]` when no reviews exist.
+REVIEW_JSON=$(roborev list --json 2>&1) || {
+  echo "BLOCK: \`roborev list --json\` failed — cannot verify review status. Start the daemon with \`roborev daemon start\`." >&2
   exit 2
 }
 
-# Block only on running reviews — wait for them to complete before pushing
-if echo "$REVIEW_OUTPUT" | grep -q "running"; then
-  echo "BLOCK: Roborev reviews are still running. Run \`roborev list\` to check status, then \`roborev wait <id>\` or wait for completion." >&2
+# Count running reviews via jq — structured check avoids false positives from text grep
+RUNNING_COUNT=$(echo "$REVIEW_JSON" | jq '[.[] | select(.status == "running")] | length' 2>/dev/null) || {
+  echo "BLOCK: Failed to parse roborev JSON output." >&2
+  exit 2
+}
+
+if [ "$RUNNING_COUNT" -gt 0 ]; then
+  echo "BLOCK: $RUNNING_COUNT roborev review(s) still running. Run \`roborev list\` to check status, then \`roborev wait <id>\` or wait for completion." >&2
   exit 2
 fi
 

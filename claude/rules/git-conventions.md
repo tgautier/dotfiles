@@ -23,10 +23,7 @@
 ## Pushing
 
 - Never push directly to `main` or `master`
-- If roborev is installed, check review status before pushing: `roborev list`
-  - If any reviews failed, fix them: `roborev fix` or `roborev refine`
-  - Only push after all branch reviews pass (zero unaddressed failures)
-  - If roborev is not installed or the daemon is not running, skip this gate
+- **Roborev gate** — enforced by a PreToolUse hook on `git push` and `gh pr merge`. The hook blocks when reviews are running or have unaddressed failures. If blocked, fix findings (`roborev fix` or `roborev refine`) before retrying
 - Fetch latest before pushing: `git fetch origin`
 - Rebase onto main if needed — check with `git merge-base --is-ancestor origin/main HEAD` (exit 0 = clean)
   - If rebase hits conflicts: abort, inform the user of the conflicting files, and stop
@@ -56,6 +53,7 @@
 Before merging any PR, **all** of these must be true:
 
 - Zero unresolved review threads
+- **Roborev gate** passes — enforced by PreToolUse hook (blocks `gh pr merge` with unaddressed findings)
 - All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state

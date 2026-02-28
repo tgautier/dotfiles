@@ -2,10 +2,10 @@
 name: roborev
 description: |
   Automated code review management with roborev daemon and CLI.
-  Covers: review status, fixing findings, pre-push workflow, daemon management, per-project config.
+  Covers: review modes (interactive/auto), fixing findings, pre-push workflow, daemon management, per-project config.
   Use when: checking reviews, fixing findings, managing review status, or before pushing.
-version: 1.0.0
-date: 2026-02-26
+version: 1.1.0
+date: 2026-02-28
 user-invocable: true
 ---
 
@@ -15,9 +15,45 @@ Roborev is a daemon-based automated code review tool. It runs post-commit hooks 
 
 ## When to Use
 
-- Before pushing — check that all branch reviews pass
 - After roborev flags issues — read findings, fix them, verify
-- When the push workflow in `git-conventions` references roborev
+- When the PreToolUse hook blocks a push or merge due to unaddressed findings
+- For manual review commands (dirty review, branch review, specific commit)
+
+## Review Modes
+
+### Interactive mode (default)
+
+Invoked with `/roborev` or `/roborev interactive`. Walks through each finding with the user.
+
+1. Run `roborev show` to get the latest review
+2. If no findings → report clean and stop
+3. For each finding (severity order: blocker → medium → low):
+   - Present: severity, file, location, reviewer's description
+   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip**
+   - **Fix** → implement the change, move to next finding
+   - **Dismiss** → note the user's reason, no code change
+   - **Discuss** → investigate (read code, verify claims, check docs), report back, re-ask
+   - **Skip** → defer, revisit after remaining findings
+4. After all findings processed, commit fixes (if any), wait for re-review
+5. Repeat until clean or user says stop
+6. Summarize: what was fixed, what was dismissed (with reasons)
+
+### Auto mode
+
+Invoked with `/roborev auto`. Fixes everything without asking — but verifies first.
+
+1. Run `roborev show` to get the latest review
+2. If no findings → report clean and stop
+3. Verify each claim before fixing (reviewer can be wrong — check exit codes, API behavior, docs)
+4. Fix all verified findings, commit, wait for re-review, repeat until clean
+5. If a claim is wrong, report it as dismissed with rationale
+
+### Behavioral rules (both modes)
+
+- **Never auto-dismiss** — only the user (interactive) or verified-wrong claims (auto) can dismiss
+- **Verify before fixing** — check the reviewer's technical claims before implementing
+- **Severity-first** — blockers before mediums before lows
+- **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
 
 ## Commands
 
@@ -59,14 +95,13 @@ roborev review --dirty      # Review uncommitted changes
 roborev review --since HEAD~3  # Review last 3 commits
 ```
 
-## Pre-Push Workflow
+## Push and Merge Enforcement
 
-1. `roborev list` — check for unaddressed failures
-2. If failures exist: `roborev fix` or `roborev refine`
-3. Verify fixes pass: `roborev list` again
-4. Only push when all reviews pass (zero unaddressed failures)
+A global PreToolUse hook blocks `git push` and `gh pr merge` when roborev has running or failed reviews. The workflow is:
 
-This integrates with the pushing section in `git-conventions` — roborev review status replaces the old manual self-review step.
+1. Commit triggers a post-commit hook → daemon queues a review
+2. When you attempt to push or merge, the hook checks `roborev list`
+3. If blocked: `roborev fix` or `roborev refine`, then retry the push/merge
 
 ## Per-Project Config
 
@@ -93,7 +128,6 @@ The post-commit hook sends jobs to the daemon. If the daemon is not running, rev
 
 ## Anti-patterns
 
-- Pushing without checking review status — always `roborev list` first
 - Ignoring blocker-level findings — these represent hard invariant violations
 - Running `roborev init` in a repo that already has `.roborev.toml` — use `install-hook` instead
 - Manually editing review results — use `roborev address` or `roborev comment` to interact with findings

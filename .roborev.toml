@@ -1,0 +1,32 @@
+agent = "copilot"
+backup_agent = "gemini"
+review_reasoning = "thorough"
+
+excluded_branches = ["main"]
+
+review_guidelines = """
+Dotfiles repo: shell config, Claude Code config (rules, skills, hooks), and Homebrew config.
+
+HARD INVARIANTS — flag violations as blockers:
+
+1. Secrets: never commit credentials, tokens, API keys, or secrets. This repo is public on GitHub.
+2. Shell compatibility: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content. Rule and skill .md files must not contain `\!` — flag any occurrence as corruption.
+3. One concern per file: each rule covers exactly one topic. If two unrelated topics exist, flag for split.
+4. 80-line signal: rules over 80 lines likely cover too much. Flag for review.
+5. Cross-references: if file A references file B, verify B exists. Broken cross-refs are blockers.
+6. Hook exit codes: PreToolUse hooks must use exit 2 (block with reason) or exit 0 (allow). Never exit 1 for intentional blocks.
+7. No project-specific references: global rules and skills must never reference project-local paths (.claude/rules/, specific source paths). Use generic language like "check the project's CLAUDE.md".
+
+SCOPE CONTEXT — understand before flagging:
+
+- Two-tier config: rules in claude/rules/ (global, always loaded), skills in claude/skills/ (on-demand via /name).
+- rcup symlinks: files in this repo are symlinked to ~/.claude/ by rcup. The repo structure mirrors the home directory.
+- Skill frontmatter: SKILL.md files have YAML frontmatter (name, description, version, date, user-invocable). This is required, not boilerplate.
+- Hook scripts: claude/hooks/ contains shell scripts invoked by Claude Code settings.json. They receive $TOOL_INPUT as JSON.
+
+DO NOT FLAG:
+
+- YAML frontmatter in SKILL.md files — it is required metadata
+- Files over 200 lines in claude/skills/ — skills are allowed to be longer than rules
+- Shell scripts using jq for JSON parsing — jq is expected to be available on macOS/Linux
+"""

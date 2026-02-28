@@ -249,25 +249,28 @@ The server is the single source of validation truth. Client-side validation is p
 3. **Database constraints** — `CHECK`, `NOT NULL`, `UNIQUE`. Last line of defense
 
 ```tsx
+// Define the action's response shape — shared between action and component
+type ActionData = { fieldErrors?: Record<string, string[]>; success?: boolean };
+
 // Action validates and returns field errors
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const result = schema.safeParse(Object.fromEntries(formData));
   if (!result.success) {
     return Response.json(
-      { fieldErrors: result.error.flatten().fieldErrors },
+      { fieldErrors: result.error.flatten().fieldErrors } satisfies ActionData,
       { status: 400 },
     );
   }
   await saveResource(result.data);
-  return Response.json({ success: true });
+  return Response.json({ success: true } satisfies ActionData);
 }
 ```
 
 ```tsx
 // Component displays server errors via useActionData
 function ResourceForm() {
-  const actionData = useActionData<typeof action>();
+  const actionData = useActionData<ActionData>();
   return (
     <Form method="post">
       <div>

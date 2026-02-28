@@ -248,9 +248,9 @@ Server-side destruction is mandatory — expiring the cookie alone is insufficie
 2. Clear session cookie (`Set-Cookie` with `Max-Age=0`)
 3. Clear any related tokens (refresh tokens, CSRF tokens)
 
-### Session anomaly detection (optional)
+### Session anomaly detection
 
-Monitor session attributes for theft detection — use as step-up auth trigger, not hard binding. Mobile networks, VPNs, and IPv6 cause frequent IP/fingerprint changes that will lock out legitimate users if enforced strictly.
+Monitor session attributes for theft detection — use as step-up auth trigger, not hard binding. Mobile networks, VPNs, and IPv6 cause frequent IP/fingerprint changes that will lock out legitimate users if enforced strictly. The enforcement mode is flexible; the monitoring itself is not.
 
 - Client IP address (detect IP change → force re-auth)
 - User-Agent string (detect browser change)

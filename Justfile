@@ -5,9 +5,10 @@ zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,
 # Run all CI checks
 ci: lint-shell lint-markdown lint-brewfile lint-mise
 
-# Enable the pre-commit hook for this repo
+# Enable the pre-commit hook and install native tools
 setup:
     git config --local core.hooksPath .githooks
+    command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
 
 # Lint shell scripts with ShellCheck
 lint-shell:

@@ -32,3 +32,5 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 - Renaming or relabeling to hide a gap instead of filling it (e.g., renaming a section vs writing proper content)
 - Using type assertions (`as`, generics-as-cast) when a runtime type guard is the correct solution
 - Adding a comment or annotation as a substitute for actual validation or implementation
+- Presenting review findings as bare option lists without reasoning about which action fits the architecture
+- Auto-resolving review findings without the user's explicit decision — Claude recommends, the user decides

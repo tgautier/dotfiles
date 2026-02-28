@@ -29,15 +29,18 @@ Invoked with `/roborev` or `/roborev interactive`. Walks through each finding wi
 1. Run `roborev show` to get the latest review
 2. If no findings → report clean and stop
 3. For each finding (severity order: blocker → medium → low):
-   - Present: severity, file, location, reviewer's description
-   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip**
+   - **Reflect first** — before presenting options, reason about the finding against the project's architecture and design philosophy. Read the relevant code, check project rules, and determine which action best serves codebase coherence. Present your recommendation with rationale, not a bare option list
+   - Present: severity, file, location, reviewer's description, **your recommendation and why**
+   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip** — with your recommended option clearly marked
    - **Fix** → implement the change, move to next finding
    - **Dismiss** → note the user's reason, no code change
-   - **Discuss** → investigate (read code, verify claims, check docs), report back, re-ask
+   - **Discuss** → investigate deeper (read code, verify claims, check docs), report back, re-ask
    - **Skip** → defer, revisit after remaining findings
 4. After all findings processed, commit fixes (if any), wait for re-review
 5. Repeat until clean or user says stop
 6. Summarize: what was fixed, what was dismissed (with reasons)
+
+**Never auto-resolve in interactive mode.** Every finding requires the user's explicit decision. Claude recommends — the user decides. Never mark a finding as addressed, dismissed, or resolved without the user choosing that action through `AskUserQuestion`. This applies even when the recommendation is obvious — the user must confirm.
 
 ### Auto mode
 
@@ -51,6 +54,8 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 
 ### Behavioral rules (both modes)
 
+- **Reflect and recommend** — for every finding, reason about which action best fits the project's architecture before presenting options. Never present a bare option list without a recommendation and rationale
+- **Never auto-resolve in interactive mode** — every finding requires the user's explicit decision via `AskUserQuestion`. Claude recommends, the user decides. This is non-negotiable even for obvious fixes
 - **Never auto-dismiss** — only the user (interactive) or verified-wrong claims (auto) can dismiss
 - **Verify before fixing** — check the reviewer's technical claims before implementing
 - **Severity-first** — blockers before mediums before lows
@@ -82,14 +87,17 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
 2. **Wait** — poll `roborev list` until all jobs show `done`. Do not read partial results — wait for every agent to finish so you can cross-reference findings. If a job shows `failed`, skip it immediately. If a job stays `running` for more than 5 minutes, it may be stuck — skip it and proceed with the agents that completed
 3. **Collect** — read all findings from all agents (`roborev show <job-id>` for each). Merge into a single list, deduplicating findings that multiple agents flagged on the same code
 4. **Sort by severity** — order the consolidated list: blocker → medium → low. Within the same severity, group by file path for context
-5. **Present one by one** — for each finding (highest severity first):
-   - Show: severity, file, location, which agent(s) flagged it, description
-   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip**
+5. **Reflect and recommend** — for each finding (highest severity first):
+   - Read the relevant code and check project rules before presenting the finding
+   - Reason about which action best serves the project's architecture and design philosophy
+   - Show: severity, file, location, which agent(s) flagged it, description, **your recommendation and why**
+   - Ask via `AskUserQuestion`: **Fix** / **Dismiss** / **Discuss** / **Skip** — with your recommended option marked
    - **Fix** → implement the change, move to next
-   - **Dismiss** → note the reason, move to next
-   - **Discuss** → investigate the claim (read code, check docs), report back, re-ask
+   - **Dismiss** → note the user's reason, move to next
+   - **Discuss** → investigate the claim deeper, report back, re-ask
    - **Skip** → defer, revisit after remaining findings
    - Multi-agent consensus increases confidence: if 2+ agents flag the same issue, recommend **Fix**
+   - Never resolve any finding without the user's explicit choice — see interactive mode rules
 6. **Commit** — batch all fixes into a single commit (`fix: address review findings`)
 7. **Re-review** — re-trigger multi-agent reviews if fixes were substantial (logic changes, not typos)
 8. **Push** — when all agents are clean or remaining findings are dismissed with rationale
@@ -188,5 +196,7 @@ The post-commit hook sends jobs to the daemon. If the daemon is not running, rev
 ## Anti-patterns
 
 - Ignoring blocker-level findings — these represent hard invariant violations
+- Auto-resolving findings in interactive mode — every finding needs explicit user approval, even trivial ones
+- Presenting bare option lists without reasoning — always reflect on the finding and recommend the architecturally correct action
 - Running `roborev init` in a repo that already has `.roborev.toml` — use `install-hook` instead
 - Manually editing review results — use `roborev address` or `roborev comment` to interact with findings

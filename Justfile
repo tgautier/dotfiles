@@ -8,6 +8,7 @@ ci: lint-shell lint-markdown lint-brewfile lint-mise
 # Enable the pre-commit hook and install native tools
 setup:
     git config --local core.hooksPath .githooks
+    command -v roborev >/dev/null 2>&1 && roborev install-hook || true
     command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
 
 # Lint shell scripts with ShellCheck

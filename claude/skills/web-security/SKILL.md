@@ -85,8 +85,8 @@ Based on OWASP cheat sheets (2024), Google BeyondCorp, Stripe security patterns,
    - Simple but effective — cross-origin `<form>` and `<img>` cannot set custom headers
 
 4. **SameSite cookies** (necessary but insufficient alone)
-   - `SameSite=Lax` minimum — blocks cross-site POST submissions
-   - `SameSite=Strict` — blocks all cross-site requests (breaks inbound links that need auth)
+   - `SameSite=Lax` — the correct default for web apps. Blocks cross-site POST while preserving top-level GET navigations (OAuth callbacks, inbound links). Pair with CSRF tokens for full protection
+   - `SameSite=Strict` — blocks all cross-site cookie sending. Use only for apps with no OAuth, no external redirects, and no inbound authenticated links. Not "more secure" than Lax + CSRF tokens — just more restrictive
    - **Not sufficient alone:** subdomain attacks bypass SameSite, method override can convert GET→POST
 
 5. **Origin / Referer verification** (secondary check)
@@ -200,7 +200,7 @@ __Host-SESSION=<value>; Path=/; Secure; HttpOnly; SameSite=Lax
 |-----------|-------|-----|
 | `Secure` | (flag) | HTTPS only — prevents network sniffing |
 | `HttpOnly` | (flag) | No JavaScript access — mitigates XSS token theft |
-| `SameSite` | `Lax` (default) or `Strict` | CSRF mitigation — `Lax` is safe default; use `Strict` only when no OAuth/external redirect flows exist (see §2) |
+| `SameSite` | `Lax` | CSRF mitigation — `Lax` is the correct default for web apps with OAuth or external links. `Strict` is a niche choice for closed apps with no external auth flows (see §2) |
 | `Path` | `/` | Scope to entire site |
 
 ### Session cookies
@@ -250,11 +250,15 @@ Server-side destruction is mandatory — expiring the cookie alone is insufficie
 
 ### Session anomaly detection
 
-Monitor session attributes for theft detection — use as step-up auth trigger, not hard binding. Mobile networks, VPNs, and IPv6 cause frequent IP/fingerprint changes that will lock out legitimate users if enforced strictly. The enforcement mode is flexible; the monitoring itself is not.
+Session theft is invisible without anomaly detection — a stolen session cookie works silently until it expires. For apps handling financial data, PII, or privileged operations, detecting anomalies is how you catch compromised sessions before damage is done.
+
+Monitor these attributes and trigger step-up authentication (not hard lockout) when they change mid-session:
 
 - Client IP address (detect IP change → force re-auth)
-- User-Agent string (detect browser change)
-- TLS certificate (mutual TLS environments)
+- User-Agent string (detect browser change → force re-auth)
+- TLS client certificate (mutual TLS environments)
+
+**Why step-up, not hard binding:** mobile networks, VPNs, and IPv6 privacy extensions cause legitimate IP changes. Hard binding locks out real users. Step-up auth (re-enter password, second factor) confirms identity without blocking access.
 
 ### Re-authentication triggers
 

@@ -56,6 +56,7 @@
 Before merging any PR, **all** of these must be true:
 
 - Zero unresolved review threads
+- Roborev reviews pass — if roborev is installed and the daemon is running, `roborev list` must show no unaddressed failures on the branch. Fix findings before merging, not after
 - All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state

@@ -53,7 +53,7 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 - **Never auto-dismiss** — only the user (interactive) or verified-wrong claims (auto) can dismiss
 - **Verify before fixing** — check the reviewer's technical claims before implementing
 - **Severity-first** — blockers before mediums before lows
-- **One commit per review round** — batch all fixes from one review into a single commit
+- **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
 
 ## Commands
 

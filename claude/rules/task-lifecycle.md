@@ -44,6 +44,7 @@ For iterating on plans before implementation, see the annotation cycle in `/code
 ## Implement
 
 - **Scope to what was asked** — do not build features, integrations, or configuration the user did not request. If you think something adjacent would be valuable, suggest it and wait for approval. "Add a tmux conf" does not mean "add iTerm2 keybindings"
+- **Always the proper fix** — when you identify the clean solution, implement it. Never describe the right approach and then implement the easier one. "That changes more than needed" is not a valid reason to choose an inferior fix. Every shortcut quietly lowers the bar — the cumulative effect is a degraded codebase
 - **Just-first**: if the project has a `Justfile`, always use `just` recipes instead of raw tool commands (`yarn`, `cargo`, `npx`, `docker compose`). Load the `/just` skill when editing or reviewing the Justfile
 - Mark each task complete as you go — never stop mid-implementation with tasks unchecked
 - Run verification (typecheck, lint, tests) **after every edit**, not batched at the end. If a test fails, fix it before moving on
@@ -59,7 +60,7 @@ Before presenting work as done:
 - **Prove it works** — run tests, show output, demonstrate the fix. Never mark a task complete on faith
 - **Run all verification commands** in the plan, not just the ones you expect to pass
 - **Staff engineer bar** — "Would a staff engineer approve this?" If the answer is hesitant, improve it before presenting
-- **Demand elegance (non-trivial changes only)** — pause and ask "is there a more elegant way?" If a fix feels hacky: "Knowing everything I know now, what's the clean solution?" Skip this for simple, obvious fixes
+- **Demand elegance (non-trivial changes only)** — pause and ask "is there a more elegant way?" If a fix feels hacky: "Knowing everything I know now, what's the clean solution?" Then implement that clean solution — never settle for the hacky one after identifying the better approach. Skip this for simple, obvious fixes
 - **Diff against intent** — does the change do exactly what was asked? No more, no less?
 - **CLAUDE.md drift check** — if the PR adds new files, config, rules, or docs, verify CLAUDE.md still reflects reality. New config files need architecture entries, new rules need the rules index, new docs need the documentation section. Update CLAUDE.md in the same PR — not as a follow-up
 
@@ -85,8 +86,9 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 
 - **Simplicity first** — make every change as simple as possible. The right amount of complexity is the minimum needed for the current task
 - **No laziness** — find root causes. No temporary fixes. No "this works for now" patches. Senior developer standards
-- **Minimal impact** — changes should only touch what's necessary. Avoid introducing bugs by changing code outside the task scope
-- **Stop early, not late** — if something goes sideways, STOP and re-plan immediately. Don't push through hoping it will work out
+- **Never degrade quality incrementally** — every fix, every example, every documentation change must meet the same standard as the rest of the codebase. Renaming a section to match broken content instead of writing correct content is degradation. Adding a comment instead of a type guard is degradation. Each small shortcut compounds — the worst outcome is a slowly eroding stack that nobody notices until it's too late
+- **Minimal scope, maximum quality** — don't change code outside the task scope, but within scope, always implement the proper solution. "Minimal impact" governs *which* code you touch, never *how well* you write it
+- **Stop early, re-plan, do it right** — if an approach isn't working, stop and re-plan. But "re-plan" means finding the correct approach, not downgrading to a lesser fix. Stopping is a signal to think harder, not to lower standards
 
 ## Anti-patterns
 
@@ -96,3 +98,7 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 - Incrementally patching a bad approach instead of reverting and re-planning
 - Running raw `yarn test`, `cargo test`, `docker compose up` when a `just` recipe exists for the same operation
 - Building adjacent features the user didn't ask for (e.g., adding keybindings when asked for a config file)
+- Identifying the correct fix but implementing an easier alternative ("changes more than needed")
+- Renaming or relabeling to hide a gap instead of filling it (e.g., renaming a section vs writing proper content)
+- Using type assertions (`as`, generics-as-cast) when a runtime type guard is the correct solution
+- Adding a comment or annotation as a substitute for actual validation or implementation

@@ -249,28 +249,31 @@ The server is the single source of validation truth. Client-side validation is p
 3. **Database constraints** — `CHECK`, `NOT NULL`, `UNIQUE`. Last line of defense
 
 ```tsx
-// Define the action's response shape — shared between action and component
-type ActionData = { fieldErrors?: Record<string, string[]>; success?: boolean };
-
 // Action validates and returns field errors
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const result = schema.safeParse(Object.fromEntries(formData));
   if (!result.success) {
     return Response.json(
-      { fieldErrors: result.error.flatten().fieldErrors } satisfies ActionData,
+      { fieldErrors: result.error.flatten().fieldErrors },
       { status: 400 },
     );
   }
   await saveResource(result.data);
-  return Response.json({ success: true } satisfies ActionData);
+  return Response.json({ success: true });
 }
 ```
 
 ```tsx
+// Runtime type guard — useActionData returns unknown in RRv7
+function hasFieldErrors(data: unknown): data is ActionData & { fieldErrors: Record<string, string[]> } {
+  return typeof data === "object" && data !== null && "fieldErrors" in data;
+}
+
 // Component displays server errors via useActionData
 function ResourceForm() {
-  const actionData = useActionData<ActionData>();
+  const actionData = useActionData<typeof action>();
+  const errors = hasFieldErrors(actionData) ? actionData.fieldErrors : undefined;
   return (
     <Form method="post">
       <div>
@@ -280,12 +283,12 @@ function ResourceForm() {
           name="email"
           type="email"
           required
-          aria-invalid={!!actionData?.fieldErrors?.email}
-          aria-describedby={actionData?.fieldErrors?.email ? "email-error" : undefined}
+          aria-invalid={!!errors?.email}
+          aria-describedby={errors?.email ? "email-error" : undefined}
         />
-        {actionData?.fieldErrors?.email && (
+        {errors?.email && (
           <p id="email-error" role="alert" className="text-sm text-red-600 mt-1">
-            {actionData.fieldErrors.email[0]}
+            {errors.email[0]}
           </p>
         )}
       </div>

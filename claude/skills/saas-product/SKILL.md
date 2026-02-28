@@ -287,20 +287,48 @@ function AssetListSkeleton() {
 
 ### Optimistic UI
 
-For mutations where failure is rare, update the UI immediately and revert on error:
+For mutations where failure is rare, update the UI immediately and let React revert on error. Combine `useOptimistic` (React 19) with `useFetcher` (React Router v7):
 
 ```tsx
-// With useFetcher — optimistic update without full-page navigation
-const fetcher = useFetcher();
+function TodoList({ items }: { items: Todo[] }) {
+  const fetcher = useFetcher();
+  const [optimisticItems, addOptimistic] = useOptimistic(
+    items,
+    (current, newItem: Todo) => [...current, newItem],
+  );
 
-<fetcher.Form method="post">
-  <input type="hidden" name="_intent" value="create" />
-  {/* fields */}
-  <Button type="submit" disabled={fetcher.state === "submitting"}>
-    {fetcher.state === "submitting" ? "Creating..." : "Create"}
-  </Button>
-</fetcher.Form>
+  return (
+    <>
+      <ul>
+        {optimisticItems.map(item => (
+          <li key={item.id} className={item.pending ? "opacity-50" : ""}>
+            {item.name}
+          </li>
+        ))}
+      </ul>
+      <fetcher.Form
+        method="post"
+        onSubmit={(e) => {
+          const formData = new FormData(e.currentTarget);
+          addOptimistic({
+            id: crypto.randomUUID(),
+            name: String(formData.get("name")),
+            pending: true,
+          });
+        }}
+      >
+        <input type="hidden" name="_intent" value="create" />
+        <input name="name" required />
+        <Button type="submit">Add</Button>
+      </fetcher.Form>
+    </>
+  );
+}
 ```
+
+- `useOptimistic` adds the item to the list instantly with `pending: true` (shown at reduced opacity)
+- `useFetcher.Form` submits without navigation — the loader reruns on success, replacing the optimistic item with the real one
+- On action failure, React automatically reverts the optimistic state — no manual rollback needed
 
 ### Streaming SSR
 

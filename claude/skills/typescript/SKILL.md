@@ -71,6 +71,7 @@ function isActionResult(data: unknown): data is ActionResult {
   const d = data as Record<string, unknown>;
   if ("error" in d && typeof d.error !== "string") return false;
   if ("success" in d && typeof d.success !== "boolean") return false;
+  if ("intent" in d && typeof d.intent !== "string") return false;
   return true;
 }
 

@@ -79,7 +79,7 @@ Each command creates a separate job. Run all three before reading any — they e
 The default behavior is to wait for all agents, consolidate, and walk through findings interactively:
 
 1. **Trigger** — run `roborev review --branch --agent <name>` for each agent
-2. **Wait** — poll `roborev list` until all jobs show `done`. Do not read partial results — wait for every agent to finish so you can cross-reference findings. If a job stays `running` for more than 5 minutes, it may have failed — skip it and proceed with the agents that completed
+2. **Wait** — poll `roborev list` until all jobs show `done`. Do not read partial results — wait for every agent to finish so you can cross-reference findings. If a job shows `failed`, skip it immediately. If a job stays `running` for more than 5 minutes, it may be stuck — skip it and proceed with the agents that completed
 3. **Collect** — read all findings from all agents (`roborev show <job-id>` for each). Merge into a single list, deduplicating findings that multiple agents flagged on the same code
 4. **Sort by severity** — order the consolidated list: blocker → medium → low. Within the same severity, group by file path for context
 5. **Present one by one** — for each finding (highest severity first):
@@ -105,14 +105,14 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
 
 ### Available agents
 
-The agents available depend on your roborev configuration. Common agents:
+The `--agent` flag overrides the default agent from `.roborev.toml` for a single review. Common agents:
 
 - `copilot` — GitHub Copilot reviewer
 - `codex` — OpenAI Codex reviewer
 - `gemini` — Google Gemini reviewer
-- `claude-code` — Claude Code reviewer (often the default agent in `.roborev.toml`)
+- `claude-code` — Claude Code reviewer (often the default in `.roborev.toml`)
 
-Check available agents with `roborev config get agents` or see your `.roborev.toml`.
+The `.roborev.toml` only configures one `agent` (default) and one `backup_agent`. Multi-agent reviews use CLI `--agent` overrides, not toml configuration.
 
 ## Commands
 

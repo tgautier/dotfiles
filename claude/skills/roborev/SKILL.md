@@ -79,7 +79,7 @@ Each command creates a separate job. Run all three before reading any — they e
 The default behavior is to wait for all agents, consolidate, and walk through findings interactively:
 
 1. **Trigger** — run `roborev review --branch --agent <name>` for each agent
-2. **Wait** — poll `roborev list` until all jobs show `done`. Do not read partial results — wait for every agent to finish so you can cross-reference findings
+2. **Wait** — poll `roborev list` until all jobs show `done`. Do not read partial results — wait for every agent to finish so you can cross-reference findings. If a job stays `running` for more than 5 minutes, it may have failed — skip it and proceed with the agents that completed
 3. **Collect** — read all findings from all agents (`roborev show <job-id>` for each). Merge into a single list, deduplicating findings that multiple agents flagged on the same code
 4. **Sort by severity** — order the consolidated list: blocker → medium → low. Within the same severity, group by file path for context
 5. **Present one by one** — for each finding (highest severity first):

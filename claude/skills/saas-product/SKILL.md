@@ -73,8 +73,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 // Action validates current step, saves, and advances
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
-  const intent = String(formData.get("_intent"));
-  if (intent === "skip") return redirect("/app");
+  if (formData.get("_intent") === "skip") return redirect("/app");
   const nextStep = await saveStepAndAdvance(formData);
   if (nextStep === "complete") return redirect("/app");
   return redirect(`/onboarding/step/${nextStep}`);
@@ -517,6 +516,7 @@ function DangerZone() {
 Rules:
 - Red border/background for the danger zone section
 - Require typing a confirmation phrase for irreversible actions
+- Server action must validate the confirmation value — client-side `pattern` is bypassable
 - Show a clear description of what will be deleted/lost
 - Offer data export before account deletion
 

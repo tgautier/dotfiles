@@ -20,21 +20,10 @@
 - Keep the first line under 72 characters
 - Only commit when explicitly asked
 
-## Roborev gate
-
-**STOP.** Before every push and every merge, run `roborev list`. This is not optional.
-
-1. `roborev list` — check for unaddressed failures on the branch
-2. If reviews are still running: `roborev wait <job-id>` — do not push/merge until complete
-3. If any reviews failed: fix findings (`roborev fix` or `roborev refine`), commit, wait for the new review to pass
-4. Only proceed to push/merge after zero unaddressed failures
-
-If the repo has no `.roborev.toml` or the daemon is not running, confirm that explicitly (`ls .roborev.toml`, `roborev daemon status`) — don't silently skip.
-
 ## Pushing
 
 - Never push directly to `main` or `master`
-- **Roborev gate** — see above. Must pass before every push
+- **Roborev gate** — enforced by a PreToolUse hook on `git push` and `gh pr merge`. The hook blocks when reviews are running or have unaddressed failures. If blocked, fix findings (`roborev fix` or `roborev refine`) before retrying
 - Fetch latest before pushing: `git fetch origin`
 - Rebase onto main if needed — check with `git merge-base --is-ancestor origin/main HEAD` (exit 0 = clean)
   - If rebase hits conflicts: abort, inform the user of the conflicting files, and stop
@@ -64,7 +53,7 @@ If the repo has no `.roborev.toml` or the daemon is not running, confirm that ex
 Before merging any PR, **all** of these must be true:
 
 - Zero unresolved review threads
-- **Roborev gate** passes — see above. Must pass before every merge
+- **Roborev gate** passes — enforced by PreToolUse hook (blocks `gh pr merge` with unaddressed findings)
 - All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state

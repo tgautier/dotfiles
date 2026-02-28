@@ -15,9 +15,9 @@ Roborev is a daemon-based automated code review tool. It runs post-commit hooks 
 
 ## When to Use
 
-- Before pushing — check that all branch reviews pass
 - After roborev flags issues — read findings, fix them, verify
-- When the push workflow in `git-conventions` references roborev
+- When the PreToolUse hook blocks a push or merge due to unaddressed findings
+- For manual review commands (dirty review, branch review, specific commit)
 
 ## Commands
 
@@ -59,14 +59,13 @@ roborev review --dirty      # Review uncommitted changes
 roborev review --since HEAD~3  # Review last 3 commits
 ```
 
-## Pre-Push Workflow
+## Push and Merge Enforcement
 
-1. `roborev list` — check for unaddressed failures
-2. If failures exist: `roborev fix` or `roborev refine`
-3. Verify fixes pass: `roborev list` again
-4. Only push when all reviews pass (zero unaddressed failures)
+A global PreToolUse hook blocks `git push` and `gh pr merge` when roborev has running or failed reviews. The workflow is:
 
-This integrates with the pushing section in `git-conventions` — roborev review status replaces the old manual self-review step.
+1. Commit triggers a post-commit hook → daemon queues a review
+2. When you attempt to push or merge, the hook checks `roborev list`
+3. If blocked: `roborev fix` or `roborev refine`, then retry the push/merge
 
 ## Per-Project Config
 
@@ -93,7 +92,6 @@ The post-commit hook sends jobs to the daemon. If the daemon is not running, rev
 
 ## Anti-patterns
 
-- Pushing without checking review status — always `roborev list` first
 - Ignoring blocker-level findings — these represent hard invariant violations
 - Running `roborev init` in a repo that already has `.roborev.toml` — use `install-hook` instead
 - Manually editing review results — use `roborev address` or `roborev comment` to interact with findings

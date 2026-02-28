@@ -65,7 +65,7 @@ After every push to a branch with an open PR:
 
 ## 2. Merge Gates
 
-Verify all gates from `claude/rules/git-conventions.md` § Merge gates. Implementation details for checking:
+Verify all gates from `claude/rules/git-conventions.md` § Merge gates. The roborev gate is enforced by a PreToolUse hook (blocks `gh pr merge` automatically). Implementation details for the remaining gates:
 
 - **Unresolved threads** — `get_pull_request_comments` or GraphQL:
 

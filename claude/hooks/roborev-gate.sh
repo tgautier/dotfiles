@@ -2,7 +2,7 @@
 # PreToolUse hook: block git push and gh pr merge when roborev has unaddressed failures.
 # Exit 2 = block with reason on stderr. Exit 0 = allow.
 
-set -eo pipefail
+set -euo pipefail
 
 # Extract the command from Bash tool input
 COMMAND=$(echo "${TOOL_INPUT:-}" | jq -r '.command // empty' 2>/dev/null)
@@ -23,22 +23,21 @@ command -v roborev >/dev/null 2>&1 || exit 0
 # Skip if no .roborev.toml in current repo
 [ -f .roborev.toml ] || exit 0
 
-# Capture roborev output once; block if roborev itself fails
+# Capture roborev output once; block if roborev itself fails.
+# Verified: `roborev list` exits 0 when no reviews exist — non-zero means genuine failure.
 REVIEW_OUTPUT=$(roborev list 2>&1) || {
   echo "BLOCK: \`roborev list\` failed — cannot verify review status. Start the daemon with \`roborev daemon start\`." >&2
   exit 2
 }
 
 # Check for running reviews
-RUNNING=$(echo "$REVIEW_OUTPUT" | grep -c "running" || true)
-if [ "$RUNNING" -gt 0 ]; then
+if echo "$REVIEW_OUTPUT" | grep -q "running"; then
   echo "BLOCK: Roborev reviews are still running. Run \`roborev list\` to get the job ID, then \`roborev wait <id>\`." >&2
   exit 2
 fi
 
 # Check for failed/unaddressed reviews
-FAILED=$(echo "$REVIEW_OUTPUT" | grep -c "failed\|error" || true)
-if [ "$FAILED" -gt 0 ]; then
+if echo "$REVIEW_OUTPUT" | grep -q "failed\|error"; then
   echo "BLOCK: Roborev has unaddressed failures. Run \`roborev list\` to see findings, then \`roborev fix\` or \`roborev refine\`." >&2
   exit 2
 fi

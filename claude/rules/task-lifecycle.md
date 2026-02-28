@@ -60,7 +60,7 @@ Before presenting work as done:
 - **Prove it works** — run tests, show output, demonstrate the fix. Never mark a task complete on faith
 - **Run all verification commands** in the plan, not just the ones you expect to pass
 - **Staff engineer bar** — "Would a staff engineer approve this?" If the answer is hesitant, improve it before presenting
-- **Demand elegance (non-trivial changes only)** — pause and ask "is there a more elegant way?" If a fix feels hacky: "Knowing everything I know now, what's the clean solution?" Then implement that clean solution — never settle for the hacky one after identifying the better approach. Skip this for simple, obvious fixes
+- **Demand elegance** — pause and ask "is there a more elegant way?" If a fix feels hacky: "Knowing everything I know now, what's the clean solution?" Then implement that clean solution — never settle for the hacky one after identifying the better approach
 - **Diff against intent** — does the change do exactly what was asked? No more, no less?
 - **CLAUDE.md drift check** — if the PR adds new files, config, rules, or docs, verify CLAUDE.md still reflects reality. New config files need architecture entries, new rules need the rules index, new docs need the documentation section. Update CLAUDE.md in the same PR — not as a follow-up
 

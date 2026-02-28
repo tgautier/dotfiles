@@ -287,39 +287,23 @@ function AssetListSkeleton() {
 
 ### Optimistic UI
 
-For mutations where failure is rare, show the expected result immediately. In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data:
+For mutations where failure is rare, show the expected result immediately. In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data. Render pending items separately from the data list — the optimistic item is transient UI state, not data. The server assigns the real ID via loader revalidation:
 
 ```tsx
 function TodoList({ items }: { items: Todo[] }) {
   const fetcher = useFetcher();
 
-  // Stabilize optimistic ID across re-renders during submission
-  const pendingId = useRef<string | null>(null);
-  if (fetcher.formData) {
-    pendingId.current ??= crypto.randomUUID();
-  } else {
-    pendingId.current = null;
-  }
-
-  const optimisticItems = fetcher.formData
-    ? [
-        ...items,
-        {
-          id: pendingId.current!,
-          name: String(fetcher.formData.get("name") ?? ""),
-          pending: true,
-        },
-      ]
-    : items;
-
   return (
     <>
       <ul>
-        {optimisticItems.map(item => (
-          <li key={item.id} className={item.pending ? "opacity-50" : ""}>
-            {item.name}
-          </li>
+        {items.map(item => (
+          <li key={item.id}>{item.name}</li>
         ))}
+        {fetcher.formData && (
+          <li className="opacity-50">
+            {String(fetcher.formData.get("name") ?? "")}
+          </li>
+        )}
       </ul>
       <fetcher.Form method="post">
         <input type="hidden" name="_intent" value="create" />

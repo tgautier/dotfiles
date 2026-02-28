@@ -23,22 +23,35 @@ For TypeScript strictness, testing, and build tooling, see `/typescript`. For co
 
 ### Optimistic UI via `fetcher.formData`
 
-In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data. No `useOptimistic` needed (that's React 19's primitive for React Actions, not for React Router's data layer):
+In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data. No `useOptimistic` needed (that's React 19's primitive for React Actions, not for React Router's data layer).
+
+Render pending items separately from the data list — the optimistic item is transient UI state, not data. The server assigns the real ID via loader revalidation:
 
 ```tsx
 const fetcher = useFetcher();
-const pendingId = useRef<string | null>(null);
-if (fetcher.formData) {
-  pendingId.current ??= crypto.randomUUID();
-} else {
-  pendingId.current = null;
-}
-const optimisticItems = fetcher.formData
-  ? [...items, { id: pendingId.current!, name: String(fetcher.formData.get("name") ?? ""), pending: true }]
-  : items;
+
+return (
+  <>
+    <ul>
+      {items.map(item => (
+        <li key={item.id}>{item.name}</li>
+      ))}
+      {fetcher.formData && (
+        <li className="opacity-50">
+          {String(fetcher.formData.get("name") ?? "")}
+        </li>
+      )}
+    </ul>
+    <fetcher.Form method="post">
+      <input type="hidden" name="_intent" value="create" />
+      <input name="name" required />
+      <button type="submit">Add</button>
+    </fetcher.Form>
+  </>
+);
 ```
 
-The `useRef` stabilizes the optimistic item's key across re-renders — without it, `crypto.randomUUID()` generates a new ID on every render while the submission is in flight, causing React to unmount/remount the optimistic item. When `fetcher.formData` resets to null (action complete, loaders revalidate), the ref resets and the optimistic layer disappears automatically.
+`fetcher.formData` is non-null while the submission is in flight. When the action completes, loaders revalidate, the real item (with its server-assigned ID) appears in `items`, and `fetcher.formData` resets to null — the optimistic element disappears automatically. For multiple concurrent submissions, use `useFetchers()` to render all pending items.
 
 ### `use()` hook
 

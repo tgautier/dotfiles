@@ -397,6 +397,29 @@ OAuth 2.1 is a draft that consolidates secure OAuth 2.0 patterns. RFC 9700 is a 
 - `state` parameter must be one-time-use CSRF token bound to session
 - Authorization codes: single-use, expire in 10 minutes max
 
+### Application-level redirect validation (OWASP Unvalidated Redirects)
+
+OAuth redirect URIs are validated by the provider, but applications often build their own redirect flows (e.g., `returnTo` after login, post-action redirects). These are equally dangerous if unsanitized.
+
+**Rules:**
+- Every `Location` header derived from user input must be validated
+- Allow only relative paths starting with `/`
+- Reject protocol-relative URLs (`//evil.com`) and backslash-relative URLs (`/\evil.com` — some URL parsers normalize `\` to `/`, resolving it as `//evil.com`)
+- Reject absolute URLs (`https://...`), `javascript:` URIs, and `data:` URIs
+- Fallback to a safe default (`/`) when validation fails — never echo the invalid input
+
+**Defense-in-depth:** Sanitize at every trust boundary the value crosses:
+- At the entry point (where user input is first received)
+- At the storage point (before writing to session/cookie/DB)
+- At the exit point (before using as `Location` header)
+
+Redundant sanitization is cheap. A single missed boundary is an open redirect.
+
+**Anti-patterns:**
+- `Location: ${req.query.returnTo}` — raw user input in redirect header
+- Checking `startsWith("/")` without also checking `//` and `/\` — incomplete guard
+- Sanitizing only at entry, trusting session values at exit — session tampering bypasses the check
+
 ---
 
 ## 10. CORS Hardening

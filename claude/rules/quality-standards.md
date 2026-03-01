@@ -34,3 +34,5 @@ The goal is zero repeat mistakes. If the same correction happens twice, the rule
 - Adding a comment or annotation as a substitute for actual validation or implementation
 - Presenting review findings as bare option lists without reasoning about which action fits the architecture
 - Auto-resolving review findings without the user's explicit decision — Claude recommends, the user decides
+- Writing per-entry tests for a data mapping (switch/match) instead of refactoring to a table lookup
+- Testing a loader/handler to prove inline logic works instead of extracting the pure function

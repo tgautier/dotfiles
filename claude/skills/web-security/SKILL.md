@@ -536,6 +536,13 @@ Redundant sanitization is cheap. A single missed boundary is an open redirect.
 | Storage | Store outside web root, serve via controlled endpoint |
 | Malware | Scan with antivirus on upload |
 
+### Pipeline safety (parse, don't validate)
+
+- Each function in a sanitize→transform pipeline must be independently safe for any input
+- Don't rely on callers invoking pipeline steps in order — make each step idempotent for untrusted input
+- When validating against external formats (OAuth codes, HTTP headers), cite the actual spec grammar, not assumptions from observed values
+- Prototype pollution guard: in JS/TS, use `Object.hasOwn()` or `Map` for lookups, never bare `record[key] ?? fallback` — prototype keys like `constructor` or `__proto__` bypass the fallback
+
 > See **Rust skill** (`/rust` §12) for Diesel parameterized queries (SQL injection prevention).
 > See **TypeScript skill** (`/typescript` §11) for framework-level input handling.
 

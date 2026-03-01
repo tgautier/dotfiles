@@ -404,7 +404,7 @@ OAuth redirect URIs are validated by the provider, but applications often build 
 **Rules:**
 - Every `Location` header derived from user input must be validated
 - Allow only relative paths starting with `/`
-- Reject protocol-relative URLs (`//evil.com`) and backslash-relative URLs (`/\evil.com` — browsers normalize `\` to `/`)
+- Reject protocol-relative URLs (`//evil.com`) and backslash-relative URLs (`/\evil.com` — some URL parsers normalize `\` to `/`, resolving it as `//evil.com`)
 - Reject absolute URLs (`https://...`), `javascript:` URIs, and `data:` URIs
 - Fallback to a safe default (`/`) when validation fails — never echo the invalid input
 

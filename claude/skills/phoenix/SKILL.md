@@ -32,7 +32,7 @@ For API contract design and HTTP semantics, see `/api-design`. For domain modeli
   ```
 
 - Lists do not support index-based access (`list[i]`). Use `Enum.at/2`, pattern matching, or `hd/tl`
-- Never nest multiple modules in the same file — causes cyclic dependencies
+- One module per file — convention for readability and clean compilation order
 - Never use map access syntax (`struct[:field]`) on structs — use `struct.field` or higher-level APIs like `Ecto.Changeset.get_field/2`
 - Predicate functions: end with `?`, no `is_` prefix (reserve `is_` for guards)
 - Never use `String.to_atom/1` on user input — unbounded atom creation leaks memory
@@ -91,7 +91,7 @@ For API contract design and HTTP semantics, see `/api-design`. For domain modeli
 Streams are mandatory for collections — never assign raw lists:
 
 - Append: `stream(socket, :items, [new_item])`
-- Prepend: `stream(socket, :items, [new_item], at: -1)`
+- Prepend: `stream(socket, :items, [new_item], at: 0)`
 - Reset: `stream(socket, :items, new_items, reset: true)`
 - Delete: `stream_delete(socket, :items, item)`
 

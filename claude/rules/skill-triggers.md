@@ -36,6 +36,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/roborev` | Automated review management | "check reviews", "fix findings", "review status", "before push" |
 | `/github` | Creating or merging PRs | Per `git-conventions` — invoked to create new PRs (issue linking, format) and to merge (gates, cleanup). Post-push title/body updates use direct `gh pr edit` |
 | `/requirements` | Clarifying what to build before implementation | "what should this do", "requirements", "acceptance criteria", "EARS", "user stories" |
+| `/phoenix` | Phoenix/Elixir LiveView, Ecto, HEEx | "add a LiveView", "new migration", "Ecto query", "Phoenix route", "HEEx template" |
 
 ## Composite workflows
 
@@ -54,6 +55,8 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 | Performance optimization | `/typescript` | `/css-responsive` | "bundle analysis", "lighthouse", "CLS" |
 | Pre-push workflow | `/roborev` | `/github` (if no PR exists) | "push my changes", "ready to push" |
 | Complex domain feature | `/requirements` | `/domain-design`, `/code-planning` | "new entity", "new domain concept", "multi-entity feature" |
+| Full-stack Phoenix feature | `/phoenix` | `/api-design`, `/domain-design` | "add LiveView with Ecto", "new Phoenix feature", "LiveView + schema" |
+| Phoenix testing campaign | `/phoenix` | `/domain-design` | "write LiveView tests", "test Ecto queries" |
 
 For full-stack features: check the project's `CLAUDE.md` for an end-to-end feature skill (e.g., `/new-feature`) that orchestrates the pipeline order.
 

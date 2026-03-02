@@ -718,19 +718,7 @@ Don't split into modules until the Justfile is genuinely hard to navigate (~300+
 
 ## 18. Shell Compatibility
 
-### zsh and `!` in jq
-
-zsh history expansion corrupts `!` to `\!` even inside single quotes when commands pass through shell wrappers. This affects jq filters:
-
-```just
-# BROKEN — zsh corrupts != to \!=
-filter:
-    jq 'select(.id != 5)' data.json
-
-# CORRECT — works in all shells
-filter:
-    jq 'select((.id == 5) | not)' data.json
-```
+**zsh `!` corruption**: see global *shell* rule for full details. In jq filters, use `== ... | not` instead of `!=`.
 
 ### Cross-platform recipes
 
@@ -744,16 +732,6 @@ install-deps:
 [linux]
 install-deps:
     sudo apt-get install -y libpq-dev
-
-[windows]
-install-deps:
-    choco install postgresql
-```
-
-Or use conditional expressions:
-
-```just
-pg_lib := if os() == "macos" { `brew --prefix libpq` + "/lib" } else { "/usr/lib" }
 ```
 
 ---

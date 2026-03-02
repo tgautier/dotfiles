@@ -46,7 +46,7 @@ paths:
 
 Reference other config files with relative paths from the project root:
 
-- Rules → `.claude/rules/test-isolation.md` (project-local) or `claude/rules/git-conventions.md` (global)
+- Rules → `.claude/rules/testing.md` (project-local) or `claude/rules/git-conventions.md` (global)
 - Skills → `/skill-name` (invoke syntax)
 - Project docs → `CLAUDE.md`
 

@@ -18,5 +18,8 @@ else
   compinit
 fi
 
+# Add mise to PATH (needed by non-interactive shells, e.g. VSCode extensions)
+[[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
+
 # Initialize Rust/Cargo environment (if available)
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"

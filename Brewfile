@@ -116,6 +116,7 @@ cask "figma"
 cask "firefox"
 cask "ghostty"
 cask "google-chrome"
+cask "google-drive"
 cask "iterm2"
 cask "ledger-wallet"
 cask "linear-linear"
@@ -144,9 +145,11 @@ cask "font-source-code-pro"
 
 # Mac App Store Applications
 mas "1Password for Safari", id: 1569813296
-mas "Keynote", id: 409183694
+mas "Final Cut Pro", id: 424389933
+mas "Keynote", id: 361285480
 mas "Notion Web Clipper", id: 1559269364
-mas "Numbers", id: 409203825
-mas "Pages", id: 409201541
+mas "Numbers", id: 361304891
+mas "Pages", id: 361309726
+mas "Pixelmator Pro", id: 6746662575
 mas "Reeder 5", id: 1529448980
 mas "Xcode", id: 497799835

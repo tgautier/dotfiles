@@ -4,7 +4,7 @@ python_venv_auto_create = true
 trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
-deno = "2.7.1"
+deno = "2.7.2"
 elixir = "1.19.5-otp-28"
 erlang = "28.3.3"
 go = "1.26.0"
@@ -12,5 +12,5 @@ helm = "4.1.1"
 node = "25"
 python = "3.14.3"
 ruby = "4.0.1"
-yarn = "4.12.0"
+yarn = "4.13.0"
 yq = "latest"

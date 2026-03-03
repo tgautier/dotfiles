@@ -36,6 +36,8 @@ If a single commit addresses multiple concerns, each concern should have its own
 
 ### Create a PR
 
+For issue and PR authoring conventions (title format, description structure, naming consistency) see `/project-management`.
+
 - **MCP**: `create_pull_request` with `owner`, `repo`, `head` (branch), `base` (main), `title`, `body`
 - **Fallback**:
 

@@ -35,6 +35,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/documentation` | Doc audit, writing, or restructuring | "audit docs", "update docs", "docs are stale", "revamp documentation" |
 | `/roborev` | Automated review management | "check reviews", "fix findings", "review status", "before push" |
 | `/github` | Creating or merging PRs | Per `git-conventions` — invoked to create new PRs (issue linking, format) and to merge (gates, cleanup). Post-push title/body updates use direct `gh pr edit` |
+| `/project-management` | Writing issues or PR descriptions | "create an issue", "write a PR description", "file a bug", "plan work items" |
 | `/requirements` | Clarifying what to build before implementation | "what should this do", "requirements", "acceptance criteria", "EARS", "user stories" |
 | `/phoenix` | Phoenix/Elixir LiveView, Ecto, HEEx | "add a LiveView", "new migration", "Ecto query", "Phoenix route", "HEEx template" |
 

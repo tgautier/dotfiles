@@ -15,7 +15,7 @@ user-invocable: true
 
 Pre-implementation thinking tool for complex features. Produces disposable requirements artifacts — specs are thinking tools, not sources of truth. Once implemented, the code absorbs and replaces them.
 
-> **Scope boundary:** This skill defines *what* to build. For *how* to plan the implementation, see `/code-planning`. For domain modeling decisions, see `/domain-design` (section 10 pre-design checklist). For the end-to-end build pipeline, see `/new-feature`.
+> **Scope boundary:** This skill defines *what* to build. For *how* to plan the implementation, see `/code-planning`. For domain modeling decisions, see `/domain-design` (section 10 pre-design checklist). For the end-to-end build pipeline, check the project's `CLAUDE.md` for a feature pipeline skill.
 
 ---
 
@@ -140,5 +140,4 @@ List anything that needs a decision before implementation. Tag each with who sho
 
 - `/domain-design` (section 10) — pre-design checklist that validates domain modeling decisions
 - `/code-planning` — plan structure for the implementation phase
-- `/new-feature` — end-to-end pipeline checklist (invoke after requirements are clear)
-- Check the project's `CLAUDE.md` for pipeline rules governing derivation direction
+- Check the project's `CLAUDE.md` for an end-to-end pipeline skill and derivation rules

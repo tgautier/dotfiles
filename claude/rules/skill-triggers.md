@@ -54,7 +54,7 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 | Security hardening | `/web-security` | `/rust` or `/react` | "security audit", "pen test findings" |
 | Testing campaign | `/typescript` | `/react` or `/rust` | "add test coverage", "write E2E tests" |
 | Performance optimization | `/typescript` | `/css-responsive` | "bundle analysis", "lighthouse", "CLS" |
-| Pre-push workflow | `/roborev` | `/github` (if no PR exists), `/project-management` | "push my changes", "ready to push" |
+| Pre-push workflow | `/roborev` | `/github` (if no PR exists) | "push my changes", "ready to push" |
 | Complex domain feature | `/requirements` | `/domain-design`, `/code-planning` | "new entity", "new domain concept", "multi-entity feature" |
 | Full-stack Phoenix feature | `/phoenix` | `/api-design`, `/domain-design` | "add LiveView with Ecto", "new Phoenix feature", "LiveView + schema" |
 | Phoenix testing campaign | `/phoenix` | `/domain-design` | "write LiveView tests", "test Ecto queries" |

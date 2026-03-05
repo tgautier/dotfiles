@@ -44,7 +44,6 @@
 [core]
 	excludesfile = ~/.gitignore
 	pager = less -F -X
-	sshCommand = /mnt/c/Windows/System32/OpenSSH/ssh.exe
 
 [fetch]
 	prune = true

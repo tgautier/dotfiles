@@ -1,12 +1,11 @@
 [settings]
 not_found_auto_install = true
-python_venv_auto_create = true
 trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
-deno = "2.7.2"
+deno = "2.7.3"
 elixir = "1.19.5-otp-28"
-erlang = "28.3.3"
+erlang = "28.4"
 go = "1.26.0"
 helm = "4.1.1"
 node = "25"

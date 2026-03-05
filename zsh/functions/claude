@@ -7,7 +7,7 @@ if [[ "$PLATFORM" == "macos" ]] && command -v defaults &>/dev/null; then
   else
     CLAUDE_THEME="light-ansi"
   fi
-elif [[ -f /proc/sys/fs/binfmt_misc/WSLInterop || -n "$WSL_DISTRO_NAME" ]]; then
+elif [[ "$PLATFORM" == "wsl" ]]; then
   local reg_val
   reg_val="$(/mnt/c/Windows/System32/reg.exe query \
     'HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize' \

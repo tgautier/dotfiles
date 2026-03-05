@@ -86,12 +86,6 @@ Per `claude/rules/git-conventions.md` (commit conventions section):
 - Never mention Claude, AI, or LLM in commit messages
 - Only commit when explicitly asked
 
-## GitHub Integration
-
-GitHub PR workflows (creating, merging) use the GitHub MCP Server (`github`, configured in `~/.claude.json` user scope). The `/github` skill (`claude/skills/github/SKILL.md`) handles PR creation and merge gates. Post-push PR updates (title/body) are done directly via `gh pr edit` per `claude/rules/git-conventions.md`.
-
-Pre-push code reviews are handled locally by **roborev** (`/roborev` skill). The `git-conventions` rule gates pushes on roborev passing.
-
 ## Global Rules and Skills
 
 Global rules (`claude/rules/`) are symlinked from this repo to all projects:

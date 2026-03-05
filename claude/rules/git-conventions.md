@@ -32,9 +32,9 @@
   - Add `-u` if no upstream is set
   - If `--force-with-lease` rejects (remote has unknown commits): stop and inform the user
   - If push fails because the remote branch was deleted: re-push with `-u` to recreate it
-- After every push, if no PR exists for the branch, invoke the `/github` skill to create one (handles issue linking, test plan, PR format)
-- After every push to a branch with an open PR, update the PR title and body to reflect ALL commits on the branch vs main — use MCP `update_pull_request` or `gh pr edit`. Keep the PR format from the `/github` skill (summary bullets, test plan checklist, issue references)
-- For merging, invoke the `/github` skill (handles merge gates, squash merge, post-merge cleanup)
+- After every push, if no PR exists for the branch, create one with `gh pr create` (include issue refs, test plan, summary per `/project-management`)
+- After every push to a branch with an open PR, update the PR title and body to reflect ALL commits on the branch vs main — use `gh pr edit`. Keep the PR format (summary bullets, test plan checklist, issue references)
+- For merging, verify all merge gates (below), then `gh pr merge <number> --squash`
 
 ## Issue linking
 
@@ -47,7 +47,7 @@
 ## Merge strategy
 
 - Always squash merge — never use merge or rebase strategies
-- Post-merge cleanup is handled by the `/github` skill
+- Post-merge cleanup: switch to main, pull, delete the remote branch (`git push origin --delete <branch>`), delete local branch (`git branch -D <branch>`)
 
 ## Merge gates
 

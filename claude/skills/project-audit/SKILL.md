@@ -17,30 +17,29 @@ Methodology for periodic comprehensive project audits. Verifies that rules, skil
 | After significant architectural change | Drift detection — affected rules |
 | Before major release | Full audit |
 
-Automated structural checks run continuously via `just check` (includes `claude-check-accuracy`). This skill covers the AI-driven semantic audit that automation cannot perform.
+Automated structural checks run continuously via the project's check recipe (e.g., `just check`). This skill covers the AI-driven semantic audit that automation cannot perform.
 
 ## Two Layers
 
 ### Layer 1: Automated (CI-safe)
 
-These run in `just check` and catch structural drift deterministically:
+Check the project's `CLAUDE.md` for available recipes. Common automated checks:
 
-| Recipe | What it catches |
-|---|---|
-| `claude-check-rule-scopes` | Path-scoped rule globs that match no files |
-| `claude-check-escaping` | zsh `\!` corruption in rule/skill files |
-| `claude-check-refs` | Broken cross-references to rules or skills |
-| `claude-check-accuracy` | CLAUDE.md commands table listing nonexistent recipes; rule counts that don't match filesystem |
+- Path-scoped rule globs that match no files
+- zsh `\!` corruption in rule/skill files
+- Broken cross-references to rules or skills
+- CLAUDE.md accuracy — commands table listing nonexistent recipes, rule counts that don't match filesystem
+
+Run all automated checks first. Fix structural issues before starting the AI-driven audit.
 
 ### Layer 2: AI-driven (periodic)
 
 Semantic drift that no script can detect — requires reading code and comparing to rules:
 
-- Does the CQRS rule match how handlers actually use pools?
-- Do validation rules match the actual validation code?
-- Are skill recommendations current with dependency versions?
-- Does the CLAUDE.md request flow diagram match the actual middleware chain?
-- Is the testing trophy shape still accurate?
+- Do rules match how the code actually behaves?
+- Do skill recommendations match the project's current dependency versions?
+- Does CLAUDE.md accurately describe the project's architecture and workflows?
+- Are testing conventions still reflected in actual test patterns?
 
 ## Audit Dimensions
 
@@ -53,11 +52,9 @@ Rules and skills whose content no longer matches code reality.
 **Checklist:**
 - [ ] Each always-loaded rule — content matches code behavior
 - [ ] Each path-scoped rule — content matches code in scoped paths
-- [ ] CLAUDE.md request flow — matches actual auth/middleware chain
-- [ ] CLAUDE.md endpoint table — matches actual route registrations
-- [ ] CLAUDE.md service URLs — matches actual docker-compose ports
+- [ ] CLAUDE.md architecture description — matches actual project structure
+- [ ] CLAUDE.md commands table — matches actual available recipes
 - [ ] CLAUDE.md directory structure — matches actual filesystem
-- [ ] CLAUDE.md dangerous operations — all warnings still relevant
 
 ### 2. Tech Currency
 
@@ -66,12 +63,9 @@ Skills that reference outdated framework versions or deprecated patterns.
 **Method:** For each tech-specific skill, compare recommendations against the project's actual dependency versions and the framework's latest documentation.
 
 **Checklist:**
-- [ ] `/rust` — Axum, Diesel, utoipa versions match `Cargo.toml`
-- [ ] `/react` — React, React Router versions match `package.json`; patterns match current API
-- [ ] `/typescript` — TypeScript version; strict flags still optimal
-- [ ] `/css-responsive` — Tailwind version; utility patterns still valid
-- [ ] `/web-security` — OAuth/OIDC standards still current (RFC numbers, draft status)
-- [ ] `/observability` — OTEL SDK versions; browser SIG status
+- [ ] Each tech-specific skill — recommended patterns match installed versions
+- [ ] Security skills — referenced standards still current (RFC numbers, draft status)
+- [ ] Build/tooling skills — recommended flags and config still optimal
 
 ### 3. Cross-Reference Integrity
 
@@ -89,22 +83,21 @@ Broken links between config files that cause hallucinated guidance.
 
 ### Setup
 
-Launch parallel subagents for independent research. Recommended split:
+Launch parallel subagents for independent research. Split by project layer — check the project's `CLAUDE.md` for its architecture and layer boundaries. Common splits:
 
-1. **Rust API agent** — handlers, models, migrations, CQRS, validation, auth, tests
-2. **Frontend agent** — routes, components, utilities, tests, config, telemetry
-3. **Infrastructure agent** — Justfile, Docker, CI/CD, config files, hooks
-4. **Skills/rules agent** — all global skills, all rules, skill-triggers, cross-references
+- **Backend agent** — handlers, models, data access, auth, tests
+- **Frontend agent** — routes, components, utilities, tests, config
+- **Infrastructure agent** — build config, CI/CD, Docker, hooks
+- **Skills/rules agent** — all rules, all skills, skill-triggers, cross-references
 
 ### Codebase Quality
 
-Beyond drift, assess overall codebase health:
+Beyond drift, assess overall codebase health. Check the project's `CLAUDE.md` for specific quality concerns and dangerous operations. Common areas:
 
-- [ ] **API** — error handling, per-user scoping, BigDecimal preservation, security headers
-- [ ] **Frontend** — SSR safety, error boundaries, accessibility, responsive patterns
-- [ ] **Tests** — coverage gaps, correct layer selection, DB isolation
-- [ ] **Infrastructure** — Docker health checks, image pinning, CI integrity
-- [ ] **Dependencies** — outdated packages, security advisories (`just dep-audit`)
+- [ ] **Error handling** — consistent patterns, no swallowed errors
+- [ ] **Security** — auth, input validation, dependency advisories
+- [ ] **Tests** — coverage gaps, correct layer selection, isolation
+- [ ] **Infrastructure** — CI integrity, dependency pinning, health checks
 
 ### Output
 
@@ -115,19 +108,9 @@ After completing the audit, produce:
 3. **Memory update** — save audit date, key findings, and known minor issues to project memory
 4. **Rule/skill updates** — fix any drift discovered during the audit
 
-## Cadence
-
-| Frequency | What to run |
-|---|---|
-| Every commit | `just check` (automated structural checks) |
-| Every PR | `just pre-commit` (structural checks + tests) |
-| Monthly | `just audit` (structural checks + dependency vulnerabilities) |
-| Quarterly | `/project-audit` (full AI-driven semantic audit) |
-| After major upgrade | `/project-audit` scoped to affected dimensions |
-
 ## Anti-patterns
 
-- Running the AI audit without first running automated checks (`just check`)
+- Running the AI audit without first running automated checks
 - Auditing without creating issues — findings decay if not tracked
 - Fixing drift in the code but not updating the rule (or vice versa)
 - Skipping the memory update — next audit loses context from this one

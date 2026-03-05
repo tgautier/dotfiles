@@ -40,6 +40,7 @@ case $PLATFORM in
   wsl)
     # WSL-specific: Use Windows host for X11
     export DISPLAY=$(grep nameserver /etc/resolv.conf | awk '{print $2}'):0
+    export GIT_SSH_COMMAND="/mnt/c/Windows/System32/OpenSSH/ssh.exe"
     export SSH_AUTH_SOCK=~/.1password/agent.sock
     export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile.linux
     ;;

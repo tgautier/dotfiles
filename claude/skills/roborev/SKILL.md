@@ -59,6 +59,7 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 - **Never auto-dismiss** — only the user (interactive) or verified-wrong claims (auto) can dismiss
 - **Verify before fixing** — check the reviewer's technical claims before implementing
 - **Severity-first** — blockers before mediums before lows
+- **High/blocker findings default to Fix** — never recommend Dismiss for high-severity or blocker findings. "Already mitigated by convention" is not a fix — if the proper fix exists and is reasonable, recommend it. Existing bad patterns in the codebase are not permission to continue them. The only valid reason to recommend Dismiss on a high-severity finding is if the reviewer's claim is factually wrong (verified, not assumed)
 - **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
 
 ## Multi-Agent Reviews
@@ -196,7 +197,9 @@ The post-commit hook sends jobs to the daemon. If the daemon is not running, rev
 ## Anti-patterns
 
 - Ignoring blocker-level findings — these represent hard invariant violations
+- Recommending Dismiss on high-severity findings because "it's mitigated by convention" — conventions are bypassed, proper fixes are not
 - Auto-resolving findings in interactive mode — every finding needs explicit user approval, even trivial ones
 - Presenting bare option lists without reasoning — always reflect on the finding and recommend the architecturally correct action
+- Treating existing bad patterns as justification — "the old code did it too" is not a reason to dismiss
 - Running `roborev init` in a repo that already has `.roborev.toml` — use `install-hook` instead
 - Manually editing review results — use `roborev address` or `roborev comment` to interact with findings

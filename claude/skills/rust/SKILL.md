@@ -2,12 +2,12 @@
 name: rust
 description: |
   Industrial-grade Rust development skill for Axum + Diesel + utoipa APIs.
-  Covers: handler design, error handling, validation, Diesel models & migrations,
+  Covers: naming conventions, handler design, error handling, validation, Diesel models & migrations,
   Tower middleware, observability, testing, security, performance, API design, resilience,
   transactions, and dependency management.
   Use when: writing handlers, models, migrations, tests, or reviewing Rust code quality.
-version: 3.0.0
-date: 2026-02-21
+version: 3.1.0
+date: 2026-03-05
 user-invocable: true
 ---
 
@@ -34,7 +34,89 @@ Set these at the top of your crate root (`main.rs` or `lib.rs`):
 
 ---
 
-## 2. Handler Design
+## 2. Naming Conventions
+
+Based on the [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/naming.html) (C-CASE through C-FEATURE).
+
+### Casing (RFC 430 — compiler-enforced)
+
+| Item | Convention | Example |
+|---|---|---|
+| Types, traits, enum variants | `UpperCamelCase` | `AssetKind`, `IntoResponse` |
+| Functions, methods, variables | `snake_case` | `list_assets`, `pool_size` |
+| Constants, statics | `SCREAMING_SNAKE_CASE` | `MAX_POOL_SIZE` |
+| Modules, crates | `snake_case` | `handlers`, `models` |
+| Lifetimes | Short lowercase | `'a`, `'de`, `'conn` |
+| Type parameters | Concise `UpperCamelCase` | `T`, `E`, `S` |
+
+### Acronyms and abbreviations
+
+Acronyms count as one word — capitalize only the first letter in CamelCase:
+
+- `Uuid` not `UUID`, `Stdin` not `StdIn`, `HttpClient` not `HTTPClient`
+- In `snake_case`, fully lowercase: `is_xid_start`, `uuid`
+- Crate names: never `-rs` or `-rust` suffix/prefix
+
+### Variable naming clarity
+
+Single-letter names are acceptable only in narrow scopes where the type makes intent obvious:
+
+| Context | Acceptable | Prefer instead |
+|---|---|---|
+| Closure param (`\|x\| x + 1`) | `x`, `v`, `k` | — |
+| Iterator binding, type obvious | `item`, `entry` | not `i` for complex items |
+| Block-scoped (< 5 lines) | Short if immediately consumed | — |
+| Function-scoped (> 5 lines) | `parsed`, `config_path`, `record` | not `v`, `p`, `n` |
+| Exported / public API | Always descriptive | any abbreviation |
+
+**Universally understood abbreviations** (always OK): `db`, `auth`, `config`/`cfg`, `ctx`, `err`, `msg`, `req`, `res`.
+
+**Avoid in function-scoped bindings**: `srv` (→ `server`), `tel` (→ `telemetry`), `fmt` (→ `log_format` or `formatter`), `val` (→ `value` or descriptive name).
+
+### Conversion methods (C-CONV)
+
+| Prefix | Cost | Ownership | Example |
+|---|---|---|---|
+| `as_` | Free | `&self → &T` | `as_str()`, `as_bytes()` |
+| `to_` | Expensive | `&self → T` | `to_string()`, `to_vec()` |
+| `into_` | Variable | `self → T` (consumes) | `into_inner()`, `into_iter()` |
+
+Mutability qualifier goes before the noun: `as_mut_slice()` not `as_slice_mut()`.
+
+### Getter naming (C-GETTER)
+
+Omit the `get_` prefix — use bare method names:
+
+```rust
+// CORRECT
+fn first(&self) -> &T { ... }
+fn first_mut(&mut self) -> &mut T { ... }
+
+// WRONG
+fn get_first(&self) -> &T { ... }
+```
+
+Use `get` only for indexed/keyed access: `HashMap::get(&key)`, `Vec::get(index)`.
+
+### Iterator methods (C-ITER)
+
+For homogeneous collections of `T`:
+
+| Method | Returns | Yields |
+|---|---|---|
+| `iter()` | `Iter<'_, T>` | `&T` |
+| `iter_mut()` | `IterMut<'_, T>` | `&mut T` |
+| `into_iter()` | `IntoIter<T>` | `T` |
+
+### Feature naming (C-FEATURE)
+
+- No placeholder words: `std` not `use-std` or `with-std`
+- Features must be additive — never `no-std` (use `default-features = false`)
+- Align feature names with optional dependency names
+
+---
+
+## 3. Handler Design
 
 Every handler is a public async function returning `Result<T, ApiError>`.
 
@@ -93,7 +175,7 @@ Override Axum's default rejection responses (which return plain text) with a cus
 
 ---
 
-## 3. Error Handling
+## 4. Error Handling
 
 ### Error enum with thiserror
 
@@ -167,7 +249,7 @@ impl IntoResponse for ApiError {
 
 ---
 
-## 4. Input Validation
+## 5. Input Validation
 
 ### Extractor-based validation (preferred)
 
@@ -232,7 +314,7 @@ let offset = params.offset.max(0);
 
 ---
 
-## 5. Diesel Models & Type Safety
+## 6. Diesel Models & Type Safety
 
 Follow **model-first development**: Rust structs are the source of truth for the API contract.
 
@@ -299,7 +381,7 @@ pub amount: BigDecimal,
 
 ---
 
-## 6. Domain Types & Newtype Pattern
+## 7. Domain Types & Newtype Pattern
 
 > For when to use newtypes vs plain types, aggregate boundaries, and value object identification, see the **Domain Design skill** (`/domain-design` §3-4).
 
@@ -434,7 +516,7 @@ Newtypes need Diesel trait impls to work in queries. Three approaches, simplest 
 
 ---
 
-## 7. Transactions & Batch Operations
+## 8. Transactions & Batch Operations
 
 ### Transactions
 
@@ -492,7 +574,7 @@ Do aggregations at the database level (`SUM`, `COUNT`, `GROUP BY`), not in appli
 
 ---
 
-## 8. Schema Migrations
+## 9. Schema Migrations
 
 Diesel migrations are the database schema source of truth.
 
@@ -517,7 +599,7 @@ Diesel migrations are the database schema source of truth.
 
 ---
 
-## 9. Tower Middleware & Server Hardening
+## 10. Tower Middleware & Server Hardening
 
 > For security header requirements, CORS policies, and CSP configuration,
 > see the **Web Security skill** (`/web-security`).
@@ -631,7 +713,7 @@ async fn shutdown_signal() {
 
 ---
 
-## 10. Observability
+## 11. Observability
 
 > For language-agnostic observability methodology (naming conventions, sampling strategies,
 > cardinality discipline, health check contracts, anti-patterns), see the **Observability skill** (`/observability`).
@@ -639,7 +721,7 @@ async fn shutdown_signal() {
 
 ### Handler instrumentation
 
-`#[tracing::instrument]` is mandatory on every public handler (see section 2).
+`#[tracing::instrument]` is mandatory on every public handler (see section 3).
 
 **Inside handlers** — add spans for expensive operations:
 ```rust
@@ -689,7 +771,7 @@ Sampler::ParentBased(Box::new(Sampler::TraceIdRatioBased(0.1)))  // 10%
 
 ---
 
-## 11. Testing
+## 12. Testing
 
 ### Parameterized tests with `rstest`
 
@@ -789,7 +871,7 @@ async fn test_list_resources_returns_200() {
 
 ---
 
-## 12. Security & Dependency Hygiene
+## 13. Security & Dependency Hygiene
 
 > For cross-cutting web security principles (OWASP, input validation, supply chain strategy), see the **Web Security skill** (`/web-security`).
 
@@ -843,12 +925,12 @@ Diesel's query builder parameterizes all queries. When `diesel::dsl::sql()` is n
 ### Response safety
 
 - Never expose internal error details (SQL, stack traces, connection strings)
-- Set appropriate CORS origins (section 9)
-- Add security headers (section 9)
+- Set appropriate CORS origins (section 10)
+- Add security headers (section 10)
 
 ---
 
-## 13. Performance
+## 14. Performance
 
 ### Database
 
@@ -867,7 +949,7 @@ Start conservative and tune from metrics:
 
 ### Response compression
 
-See section 9 — `CompressionLayer` reduces JSON bandwidth 60-80% for free.
+See section 10 — `CompressionLayer` reduces JSON bandwidth 60-80% for free.
 
 ### Allocator
 
@@ -891,7 +973,7 @@ Cloudflare and Discord both report measurable memory reduction and more predicta
 
 ---
 
-## 14. API Design Patterns
+## 15. API Design Patterns
 
 See API Design skill for contract definitions (idempotency, pagination, ETags, versioning). This section covers Rust implementation.
 
@@ -945,7 +1027,7 @@ Use nested `Router` for version grouping: `Router::new().nest("/v1", v1_routes).
 
 ---
 
-## 15. Resilience Patterns
+## 16. Resilience Patterns
 
 See API Design skill section 15 for resilience concepts. Rust crate recommendations and implementation patterns:
 
@@ -991,7 +1073,7 @@ match fetch_live_data(&state).await {
 
 ---
 
-## 16. Clippy, Lints & Deprecated Patterns
+## 17. Clippy, Lints & Deprecated Patterns
 
 ### Clippy configuration
 
@@ -1025,7 +1107,7 @@ Set `rust-version` in `Cargo.toml` to a recent stable version. Update quarterly.
 
 ---
 
-## 17. Pre-Commit Checklist
+## 18. Pre-Commit Checklist
 
 Before committing Rust changes, verify:
 

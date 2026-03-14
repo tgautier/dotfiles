@@ -3,7 +3,7 @@ font-family = Fira Code
 font-size = 13
 
 # Theme — auto light/dark switching
-theme = light:Builtin Solarized Light,dark:Builtin Solarized Dark
+theme = light:solarized-light,dark:solarized-dark
 
 # Window
 window-height = 35

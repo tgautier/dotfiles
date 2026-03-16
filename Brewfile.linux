@@ -25,7 +25,6 @@ brew "flyctl"
 brew "gemini-cli"
 brew "gh"
 brew "git"
-brew "google-cloud-cli"
 brew "glab"
 brew "gnupg"
 brew "hivemind"
@@ -76,5 +75,6 @@ brew "zsh-completions"
 # - Claude Code: curl -fsSL https://claude.ai/install.sh | bash
 # - 1Password: https://1password.com/downloads/linux/
 # - Docker: apt install docker.io
+# - gcloud CLI: https://cloud.google.com/sdk/docs/install#linux
 # - Ghostty: https://ghostty.org/docs/install/binary
 # - VS Code: https://code.visualstudio.com/docs/setup/linux

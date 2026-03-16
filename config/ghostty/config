@@ -6,7 +6,7 @@ font-feature = -dlig
 font-feature = -calt
 
 # Theme — auto light/dark switching
-theme = light:solarized-light,dark:solarized-dark
+theme = light:iTerm2 Solarized Light,dark:iTerm2 Solarized Dark
 
 # Window
 window-height = 50

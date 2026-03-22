@@ -2,12 +2,13 @@
 # PreToolUse hook: block git push and gh pr merge when roborev reviews are missing or in progress.
 # Exit 2 = block with reason on stderr. Exit 0 = allow.
 #
-# Allows through ONLY:
-# - "done" jobs (completed — findings handled by roborev fix/refine workflow)
-# - "failed" jobs (infrastructure failure — agent crashed, no review produced)
-# - "timeout" jobs (agent timed out — not actionable)
+# Roborev statuses: queued, running, done, failed.
 #
-# Blocks on everything else: missing reviews, running, pending, queued, etc.
+# Allows through ONLY when:
+# - At least one review is "done" (real review coverage required)
+# - All remaining reviews are "done" or "failed"
+#
+# Blocks on: missing reviews, zero "done" reviews, running, queued, etc.
 
 set -euo pipefail
 
@@ -70,17 +71,28 @@ if [ "$BRANCH_COUNT" -eq 0 ]; then
   exit 2
 fi
 
-# Check every review on this branch — only "done", "failed", and "timeout" are acceptable.
-# "failed" and "timeout" are infrastructure failures (agent crashed, network issue) — not
-# actionable, so they don't block. Everything else (running, pending, queued, etc.) blocks.
-BLOCKING=$(echo "$BRANCH_REVIEWS" | jq '[.[] | select(.status == "done" or .status == "failed" or .status == "timeout" | not)] | length' 2>/dev/null) || {
+# Check every review on this branch — only "done" and "failed" are terminal.
+# "failed" = infrastructure failure (agent crashed, no review produced) — not actionable.
+# Everything else (running, queued) blocks.
+BLOCKING=$(echo "$BRANCH_REVIEWS" | jq '[.[] | select(.status == "done" or .status == "failed" | not)] | length' 2>/dev/null) || {
   echo "BLOCK: Failed to parse roborev JSON output." >&2
   exit 2
 }
 
 if [ "$BLOCKING" -gt 0 ]; then
-  STATUSES=$(echo "$BRANCH_REVIEWS" | jq -r '[.[] | select(.status == "done" or .status == "failed" or .status == "timeout" | not) | "\(.agent): \(.status)"] | join(", ")' 2>/dev/null) || true
+  STATUSES=$(echo "$BRANCH_REVIEWS" | jq -r '[.[] | select(.status == "done" or .status == "failed" | not) | "\(.agent): \(.status)"] | join(", ")' 2>/dev/null) || true
   echo "BLOCK: $BLOCKING roborev review(s) not complete: $STATUSES. Run \`roborev list\` to check status." >&2
+  exit 2
+fi
+
+# At least one review must have completed successfully — all failed means zero coverage
+DONE_COUNT=$(echo "$BRANCH_REVIEWS" | jq '[.[] | select(.status == "done")] | length' 2>/dev/null) || {
+  echo "BLOCK: Failed to parse roborev JSON output." >&2
+  exit 2
+}
+
+if [ "$DONE_COUNT" -eq 0 ]; then
+  echo "BLOCK: All roborev reviews failed — no actual review coverage. Re-run with \`roborev review --branch\`." >&2
   exit 2
 fi
 

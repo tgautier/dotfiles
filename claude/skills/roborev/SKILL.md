@@ -2,7 +2,7 @@
 name: roborev
 description: |
   Automated code review management with roborev daemon and CLI.
-  Covers: multi-agent reviews (copilot, codex, gemini), review modes (interactive/auto),
+  Covers: multi-agent reviews (claude, copilot, codex), review modes (interactive/auto),
   fixing findings, pre-push workflow, daemon management, per-project config.
   Use when: checking reviews, fixing findings, managing review status, or before pushing.
 version: 1.2.0
@@ -66,16 +66,16 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 
 ### Why multiple agents
 
-Different AI reviewers catch different things. Copilot focuses on correctness and security, Codex on architecture and patterns, Gemini on edge cases and testing gaps. Running all three gives broad coverage with minimal overlap.
+Different AI reviewers catch different things. Claude focuses on architecture and design coherence, Copilot on correctness and security, Codex on patterns and edge cases. Running all three gives broad coverage with minimal overlap.
 
 ### Trigger reviews with multiple agents
 
 Use `--branch` to review all commits on the branch vs main, and `--agent` to specify the reviewer:
 
 ```sh
+roborev review --branch --agent claude-code
 roborev review --branch --agent copilot
 roborev review --branch --agent codex
-roborev review --branch --agent gemini
 ```
 
 Each command creates a separate job. Run all three before reading any — they execute concurrently in the daemon.
@@ -116,10 +116,9 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
 
 The `--agent` flag overrides the default agent from `.roborev.toml` for a single review. Common agents:
 
+- `claude-code` — Claude Code reviewer
 - `copilot` — GitHub Copilot reviewer
 - `codex` — OpenAI Codex reviewer
-- `gemini` — Google Gemini reviewer
-- `claude-code` — Claude Code reviewer (often the default in `.roborev.toml`)
 
 The `.roborev.toml` only configures one `agent` (default) and one `backup_agent`. Multi-agent reviews use CLI `--agent` overrides, not toml configuration.
 

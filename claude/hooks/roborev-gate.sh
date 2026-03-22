@@ -83,7 +83,7 @@ case "$COMMAND" in
     for arg in "${PUSH_ARGS[@]}"; do
       if $SKIP_NEXT; then SKIP_NEXT=false; continue; fi
       case "$arg" in
-        -o|--push-option|--receive-pack|--exec|--repo) SKIP_NEXT=true; continue ;;
+        -o|--push-option|--receive-pack|--exec) SKIP_NEXT=true; continue ;;
         -*) continue ;;
       esac
       POSITIONAL+=("$arg")

@@ -2,13 +2,12 @@
 # PreToolUse hook: block git push and gh pr merge when roborev reviews are missing or in progress.
 # Exit 2 = block with reason on stderr. Exit 0 = allow.
 #
-# Blocks on:
-# - No reviews for the current branch (must run `roborev review --branch` before first push)
-# - "running" reviews (wait for completion)
-#
-# Does NOT block on:
-# - "failed" jobs (infrastructure failure — agent crashed, no review produced)
+# Allows through ONLY:
 # - "done" jobs (completed — findings handled by roborev fix/refine workflow)
+# - "failed" jobs (infrastructure failure — agent crashed, no review produced)
+# - "timeout" jobs (agent timed out — not actionable)
+#
+# Blocks on everything else: missing reviews, running, pending, queued, etc.
 
 set -euo pipefail
 
@@ -39,18 +38,7 @@ REVIEW_JSON=$(roborev list --json) || {
   exit 2
 }
 
-# Count running reviews via jq — structured check avoids false positives from text grep
-RUNNING_COUNT=$(echo "$REVIEW_JSON" | jq '[.[] | select(.status == "running")] | length' 2>/dev/null) || {
-  echo "BLOCK: Failed to parse roborev JSON output." >&2
-  exit 2
-}
-
-if [ "$RUNNING_COUNT" -gt 0 ]; then
-  echo "BLOCK: $RUNNING_COUNT roborev review(s) still running. Run \`roborev list\` to check status, then \`roborev wait <id>\` or wait for completion." >&2
-  exit 2
-fi
-
-# Block if current branch has no reviews at all (first push without roborev)
+# Determine current branch — skip gate for detached HEAD and excluded branches
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
 [ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate
 
@@ -65,13 +53,34 @@ for branch in $EXCLUDED; do
   [ "$CURRENT_BRANCH" = "$branch" ] && exit 0
 done
 
-BRANCH_REVIEWS=$(echo "$REVIEW_JSON" | jq --arg b "$CURRENT_BRANCH" '[.[] | select(.branch == $b)] | length' 2>/dev/null) || {
-  echo "BLOCK: Failed to parse roborev JSON output for branch check." >&2
+# Filter to reviews for the current branch
+BRANCH_REVIEWS=$(echo "$REVIEW_JSON" | jq --arg b "$CURRENT_BRANCH" '[.[] | select(.branch == $b)]' 2>/dev/null) || {
+  echo "BLOCK: Failed to parse roborev JSON output." >&2
   exit 2
 }
 
-if [ "$BRANCH_REVIEWS" -eq 0 ]; then
+BRANCH_COUNT=$(echo "$BRANCH_REVIEWS" | jq 'length' 2>/dev/null) || {
+  echo "BLOCK: Failed to parse roborev JSON output." >&2
+  exit 2
+}
+
+# Block if current branch has no reviews at all (first push without roborev)
+if [ "$BRANCH_COUNT" -eq 0 ]; then
   echo "BLOCK: No roborev reviews found for branch '$CURRENT_BRANCH'. Run \`roborev review --branch\` before pushing." >&2
+  exit 2
+fi
+
+# Check every review on this branch — only "done", "failed", and "timeout" are acceptable.
+# "failed" and "timeout" are infrastructure failures (agent crashed, network issue) — not
+# actionable, so they don't block. Everything else (running, pending, queued, etc.) blocks.
+BLOCKING=$(echo "$BRANCH_REVIEWS" | jq '[.[] | select(.status == "done" or .status == "failed" or .status == "timeout" | not)] | length' 2>/dev/null) || {
+  echo "BLOCK: Failed to parse roborev JSON output." >&2
+  exit 2
+}
+
+if [ "$BLOCKING" -gt 0 ]; then
+  STATUSES=$(echo "$BRANCH_REVIEWS" | jq -r '[.[] | select(.status == "done" or .status == "failed" or .status == "timeout" | not) | "\(.agent): \(.status)"] | join(", ")' 2>/dev/null) || true
+  echo "BLOCK: $BLOCKING roborev review(s) not complete: $STATUSES. Run \`roborev list\` to check status." >&2
   exit 2
 fi
 

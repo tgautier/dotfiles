@@ -14,15 +14,12 @@ jobs:
 
       - uses: extractions/setup-just@dd310ad5a97d8e7b41793f8ef055398d51ad4de6 # v2
 
+      - uses: jdx/mise-action@c37c93293d6b742fc901e1406b8f764f6fb19dac # v2
+
       - name: Install tools
         run: |
-          curl https://mise.run | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           sudo apt-get install -y shellcheck
           npm install -g markdownlint-cli2
-
-      - name: Install mise tools
-        run: mise install
 
       - name: Run all checks
         run: just ci

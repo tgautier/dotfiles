@@ -100,10 +100,10 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
    - **Skip** → defer, revisit after remaining findings
    - Multi-agent consensus increases confidence: if 2+ agents flag the same issue, recommend **Fix**
    - Never resolve any finding without the user's explicit choice — see interactive mode rules
-6. **Commit** — batch all fixes into a single commit (`fix: address review findings`)
-7. **Re-review** — re-trigger multi-agent reviews if fixes were substantial (logic changes, not typos)
-8. **Convergence check** — if a re-review produces only low/medium findings that fail closed, or if the same file has been through 3+ review rounds, flag this to the user as a convergence signal and ask whether to continue fixing, create issues for remaining findings, or stop. Never decide autonomously to exit the cycle
-9. **Push** — when all agents are clean or remaining findings are dismissed/tracked with rationale
+6. **Commit and review** — batch all fixes into a single commit (`fix: address review findings`), push, then trigger a new review cycle. Every push implies a review — never push without reviewing
+7. **Convergence check** — if a re-review produces only low/medium findings that fail closed, or if the same file has been through 3+ review rounds, flag this to the user as a convergence signal and ask whether to continue fixing, create issues for remaining findings, or stop. Never decide autonomously to exit the cycle
+8. **Deferring to issues** — when the user decides to defer a finding, create the issue but do not commit the unfixed code. Issues track work for a future PR, not permission to merge known problems. If all remaining findings are deferred, the current code is clean enough to push
+9. **Push** — when all agents are clean or remaining findings are deferred to issues with user approval
 
 ### Triage signals
 

@@ -44,27 +44,31 @@ REVIEW_JSON=$(roborev list --json) || {
 # For `git push`, use the current local branch.
 case "$COMMAND" in
   gh\ pr\ merge*)
-    # Extract PR number from command (e.g., "gh pr merge 146 --squash")
-    PR_NUMBER=$(echo "$COMMAND" | sed -n 's/gh pr merge *\([0-9]*\).*/\1/p')
-    if [ -n "$PR_NUMBER" ]; then
-      CURRENT_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null) || exit 0
+    # Extract the PR selector (number, URL, or branch) — first non-flag argument after "gh pr merge"
+    PR_SELECTOR=$(echo "$COMMAND" | sed 's/gh pr merge//' | tr ' ' '\n' | grep -v '^-' | grep -v '^$' | head -1)
+    if [ -n "$PR_SELECTOR" ]; then
+      # gh pr view handles numbers, URLs, and branch names natively
+      CURRENT_BRANCH=$(gh pr view "$PR_SELECTOR" --json headRefName --jq '.headRefName' 2>/dev/null) || {
+        echo "BLOCK: Could not resolve PR head branch from '$PR_SELECTOR'. Check \`gh auth status\`." >&2
+        exit 2
+      }
     else
-      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+      # No selector — gh pr merge uses the current branch's PR
+      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || {
+        echo "BLOCK: Could not determine current branch." >&2
+        exit 2
+      }
     fi
     ;;
   *)
     CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
     ;;
 esac
-[ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD or unresolvable — nothing to gate
+[ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate on push
 
 # Skip excluded branches (e.g., main) — read from .roborev.toml
-if command -v toml >/dev/null 2>&1; then
-  EXCLUDED=$(toml get .roborev.toml excluded_branches 2>/dev/null) || true
-else
-  # Fallback: parse simple TOML array with sed
-  EXCLUDED=$(sed -n 's/^excluded_branches *= *\[//p' .roborev.toml | tr -d '"]' | tr ',' '\n' | tr -d ' ') || true
-fi
+# Expects a single-line TOML array: excluded_branches = ["main", "wip"]
+EXCLUDED=$(sed -n 's/^excluded_branches *= *\[//p' .roborev.toml | tr -d '"]' | tr ',' '\n' | tr -d ' ') || true
 for branch in $EXCLUDED; do
   [ "$CURRENT_BRANCH" = "$branch" ] && exit 0
 done

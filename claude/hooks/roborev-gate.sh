@@ -5,10 +5,10 @@
 # Roborev statuses: queued, running, done, failed.
 #
 # Allows through ONLY when:
-# - At least one review is "done" (real review coverage required)
-# - All remaining reviews are "done" or "failed"
+# - All 3 configured agents (copilot, codex, claude-code) have "done" reviews
+# - No reviews are still "running" or "queued"
 #
-# Blocks on: missing reviews, zero "done" reviews, running, queued, etc.
+# Blocks on: missing reviews, any agent without a "done" review, running, queued.
 
 set -euo pipefail
 
@@ -170,14 +170,19 @@ if [ "$BLOCKING" -gt 0 ]; then
   exit 2
 fi
 
-# At least one review must have completed successfully — all failed means zero coverage
-DONE_COUNT=$(echo "$REVIEW_JSON" | jq '[.[] | select(.status == "done")] | length' 2>/dev/null) || {
-  echo "BLOCK: Failed to parse roborev JSON output." >&2
-  exit 2
-}
+# Require all 3 configured agents (copilot, codex, claude-code) to have "done" reviews.
+# A single agent passing is insufficient — each catches different issues.
+REQUIRED_AGENTS="copilot codex claude-code"
+MISSING_AGENTS=""
+for agent in $REQUIRED_AGENTS; do
+  AGENT_DONE=$(echo "$REVIEW_JSON" | jq --arg a "$agent" '[.[] | select(.agent == $a and .status == "done")] | length' 2>/dev/null || echo 0)
+  if [ "$AGENT_DONE" -eq 0 ]; then
+    MISSING_AGENTS="$MISSING_AGENTS $agent"
+  fi
+done
 
-if [ "$DONE_COUNT" -eq 0 ]; then
-  echo "BLOCK: All roborev reviews failed — no actual review coverage. Re-run with \`roborev review --branch\`." >&2
+if [ -n "$MISSING_AGENTS" ]; then
+  echo "BLOCK: Missing roborev reviews from:$MISSING_AGENTS. Run \`roborev review --branch --agent <agent>\` for each." >&2
   exit 2
 fi
 

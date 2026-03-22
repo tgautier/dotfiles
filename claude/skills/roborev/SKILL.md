@@ -101,7 +101,8 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
    - Never resolve any finding without the user's explicit choice — see interactive mode rules
 6. **Commit** — batch all fixes into a single commit (`fix: address review findings`)
 7. **Re-review** — re-trigger multi-agent reviews if fixes were substantial (logic changes, not typos)
-8. **Push** — when all agents are clean or remaining findings are dismissed with rationale
+8. **Converge or stop** — if a re-review produces only low/medium findings that fail closed (block incorrectly, not bypass), create issues for relevant ones and stop. Do not iterate beyond 3 review rounds on the same file — repeated fix/review cycles on the same code signal growing complexity, not convergence
+9. **Push** — when all agents are clean or remaining findings are dismissed/tracked with rationale
 
 ### Triage signals
 
@@ -111,6 +112,8 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
 | One agent flags, others silent | Medium | Verify the claim before fixing |
 | Agent reports zero issues | Clean | Move on — no further action needed |
 | Finding contradicts project rules | Low | Dismiss with reference to the rule |
+| Finding fails closed (blocks, no bypass) | Lower | UX issue, not security — fix or defer to issue |
+| Finding fails open (bypasses gate) | Higher | Security issue — must fix before merge |
 
 ### Available agents
 

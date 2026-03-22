@@ -54,7 +54,7 @@
 Before merging any PR — and when assessing whether a PR is mergeable — **all** of these must be true. Run the full checklist even for status questions like "is this ready?":
 
 - Zero unresolved review threads
-- **Roborev reviews complete** — run `roborev list` and verify all agents have `done` status for the current branch. If reviews are missing, trigger them. If reviews are running, wait. The PreToolUse hook enforces this at push/merge time, but you must also check proactively when reporting merge readiness
+- **Roborev reviews complete** — run `roborev list` and verify: at least one review is `done`, no reviews are `running` or `queued`, and `failed` reviews are acceptable only alongside a `done` review. If reviews are missing, trigger them. The PreToolUse hook enforces this at push/merge time, but you must also check proactively when reporting merge readiness
 - **Test plan complete** — read the PR body and verify every test plan item is checked (`[x]`). If any item is unchecked, run the verification yourself or ask the user. Never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state

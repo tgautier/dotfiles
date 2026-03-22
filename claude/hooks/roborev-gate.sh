@@ -5,10 +5,10 @@
 # Roborev statuses: queued, running, done, failed.
 #
 # Allows through ONLY when:
-# - At least one review is "done" (real review coverage required)
-# - All remaining reviews are "done" or "failed"
+# - All 3 configured agents (copilot, codex, claude-code) have "done" reviews
+# - No reviews are still "running" or "queued"
 #
-# Blocks on: missing reviews, zero "done" reviews, running, queued, etc.
+# Blocks on: missing reviews, any agent without a "done" review, running, queued.
 
 set -euo pipefail
 

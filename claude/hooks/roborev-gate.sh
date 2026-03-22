@@ -77,10 +77,16 @@ case "$COMMAND" in
     # Collect all non-flag positional arguments after stripping `git push`.
     # Read into an array to handle word splitting correctly.
     read -ra PUSH_ARGS <<< "$(echo "$COMMAND" | sed 's/^git push//')" || true
-    # Filter out flags
+    # Filter out flags and their values
     POSITIONAL=()
+    SKIP_NEXT=false
     for arg in "${PUSH_ARGS[@]}"; do
-      case "$arg" in -*) ;; *) POSITIONAL+=("$arg") ;; esac
+      if $SKIP_NEXT; then SKIP_NEXT=false; continue; fi
+      case "$arg" in
+        -o|--push-option|--receive-pack|--exec|--repo) SKIP_NEXT=true; continue ;;
+        -*) continue ;;
+      esac
+      POSITIONAL+=("$arg")
     done
 
     # Separate remote name from branch arguments
@@ -126,12 +132,9 @@ case "$COMMAND" in
 esac
 [ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate
 
-# Skip excluded branches (e.g., main) — yq preferred, sed fallback for single-line arrays
-if command -v yq >/dev/null 2>&1; then
-  EXCLUDED=$(yq -p toml '.excluded_branches[]' .roborev.toml 2>/dev/null) || true
-else
+# Skip excluded branches (e.g., main) — try yq first, fall back to sed on any failure
+EXCLUDED=$(yq -p toml '.excluded_branches[]' .roborev.toml 2>/dev/null) ||
   EXCLUDED=$(sed -n 's/^excluded_branches *= *\[//p' .roborev.toml | tr -d '"]' | tr ',' '\n' | tr -d ' ') || true
-fi
 for branch in $EXCLUDED; do
   [ "$CURRENT_BRANCH" = "$branch" ] && exit 0
 done

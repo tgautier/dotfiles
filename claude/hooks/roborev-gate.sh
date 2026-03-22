@@ -186,7 +186,7 @@ fi
 REQUIRED_AGENTS="copilot codex claude-code"
 MISSING_AGENTS=""
 for agent in $REQUIRED_AGENTS; do
-  AGENT_DONE=$(echo "$REVIEW_JSON" | jq --arg a "$agent" '[.[] | select(.agent == $a and .status == "done")] | length' 2>/dev/null) || 0
+  AGENT_DONE=$(echo "$REVIEW_JSON" | jq --arg a "$agent" '[.[] | select(.agent == $a and .status == "done")] | length' 2>/dev/null || echo 0)
   if [ "$AGENT_DONE" -eq 0 ]; then
     MISSING_AGENTS="$MISSING_AGENTS $agent"
   fi

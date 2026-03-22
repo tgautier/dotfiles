@@ -44,21 +44,15 @@ REVIEW_JSON=$(roborev list --json) || {
 # For `git push`, use the current local branch.
 case "$COMMAND" in
   gh\ pr\ merge*)
-    # Extract the PR selector (number, URL, or branch) — first non-flag argument after "gh pr merge"
-    PR_SELECTOR=$(echo "$COMMAND" | sed 's/gh pr merge//' | tr ' ' '\n' | grep -v '^-' | grep -v '^$' | head -1)
-    if [ -n "$PR_SELECTOR" ]; then
-      # gh pr view handles numbers, URLs, and branch names natively
-      CURRENT_BRANCH=$(gh pr view "$PR_SELECTOR" --json headRefName --jq '.headRefName' 2>/dev/null) || {
-        echo "BLOCK: Could not resolve PR head branch from '$PR_SELECTOR'. Check \`gh auth status\`." >&2
-        exit 2
-      }
-    else
-      # No selector — gh pr merge uses the current branch's PR
-      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || {
-        echo "BLOCK: Could not determine current branch." >&2
-        exit 2
-      }
-    fi
+    # Strip "gh pr merge" prefix, then extract args for gh pr view.
+    # gh pr view accepts the same selectors as gh pr merge (number, URL, branch)
+    # so we pass the full argument list and let gh resolve it.
+    MERGE_ARGS=$(echo "$COMMAND" | sed 's/^gh pr merge//')
+    # shellcheck disable=SC2086
+    CURRENT_BRANCH=$(gh pr view $MERGE_ARGS --json headRefName --jq '.headRefName' 2>/dev/null) || {
+      echo "BLOCK: Could not resolve PR head branch. Check \`gh auth status\`." >&2
+      exit 2
+    }
     ;;
   *)
     CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
@@ -93,13 +87,13 @@ fi
 # Check every review on this branch — only "done" and "failed" are terminal.
 # "failed" = infrastructure failure (agent crashed, no review produced) — not actionable.
 # Everything else (running, queued) blocks.
-BLOCKING=$(echo "$BRANCH_REVIEWS" | jq '[.[] | select(.status == "done" or .status == "failed" | not)] | length' 2>/dev/null) || {
+BLOCKING=$(echo "$BRANCH_REVIEWS" | jq '[.[] | select((.status == "done" or .status == "failed") | not)] | length' 2>/dev/null) || {
   echo "BLOCK: Failed to parse roborev JSON output." >&2
   exit 2
 }
 
 if [ "$BLOCKING" -gt 0 ]; then
-  STATUSES=$(echo "$BRANCH_REVIEWS" | jq -r '[.[] | select(.status == "done" or .status == "failed" | not) | "\(.agent): \(.status)"] | join(", ")' 2>/dev/null) || true
+  STATUSES=$(echo "$BRANCH_REVIEWS" | jq -r '[.[] | select((.status == "done" or .status == "failed") | not) | "\(.agent): \(.status)"] | join(", ")' 2>/dev/null) || true
   echo "BLOCK: $BLOCKING roborev review(s) not complete: $STATUSES. Run \`roborev list\` to check status." >&2
   exit 2
 fi

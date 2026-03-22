@@ -164,11 +164,17 @@ roborev review --since HEAD~3  # Review last 3 commits
 
 ## Push and Merge Enforcement
 
-A global PreToolUse hook blocks `git push` and `gh pr merge` when roborev has running reviews (wait for completion). Failed reviews (infrastructure failure) and done reviews do not block. The workflow is:
+A global PreToolUse hook blocks `git push` and `gh pr merge` when:
+
+- No reviews exist for the branch (must run `roborev review --branch` first)
+- Any review is still `running` or `queued`
+- All reviews `failed` (zero actual coverage — at least one must be `done`)
+
+The hook allows through only when at least one review is `done` and no reviews are still in progress. For `gh pr merge`, the hook resolves the PR's head branch (not the local branch) to avoid bypass when merging from `main`.
 
 1. Commit triggers a post-commit hook → daemon queues a review
-2. When you attempt to push or merge, the hook queries `roborev list --json` and checks for `"status": "running"`
-3. If blocked: wait for reviews to finish, or check status with `roborev list`
+2. When you attempt to push or merge, the hook queries `roborev list --json` and checks review statuses for the target branch
+3. If blocked: check status with `roborev list`, re-run reviews with `roborev review --branch`
 
 ## Per-Project Config
 

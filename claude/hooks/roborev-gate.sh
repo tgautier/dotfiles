@@ -39,9 +39,24 @@ REVIEW_JSON=$(roborev list --json) || {
   exit 2
 }
 
-# Determine current branch — skip gate for detached HEAD and excluded branches
-CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
-[ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate
+# Determine the branch to check.
+# For `gh pr merge`, resolve the PR's head branch — the command can be run from any local branch.
+# For `git push`, use the current local branch.
+case "$COMMAND" in
+  gh\ pr\ merge*)
+    # Extract PR number from command (e.g., "gh pr merge 146 --squash")
+    PR_NUMBER=$(echo "$COMMAND" | sed -n 's/gh pr merge *\([0-9]*\).*/\1/p')
+    if [ -n "$PR_NUMBER" ]; then
+      CURRENT_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null) || exit 0
+    else
+      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+    fi
+    ;;
+  *)
+    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+    ;;
+esac
+[ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD or unresolvable — nothing to gate
 
 # Skip excluded branches (e.g., main) — read from .roborev.toml
 if command -v toml >/dev/null 2>&1; then

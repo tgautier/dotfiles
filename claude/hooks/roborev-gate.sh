@@ -39,10 +39,23 @@ esac
 CURRENT_BRANCH=""
 case "$COMMAND" in
   gh\ pr\ merge*)
-    # Extract numeric PR number — immune to flag-value confusion.
-    # Our conventions use `gh pr merge <number> --squash`. Non-numeric selectors
-    # (URLs, branches) fall through to the no-selector path.
-    PR_NUMBER=$(echo "$COMMAND" | sed 's/^gh pr merge//' | grep -oE '[0-9]+' | head -1) || true
+    # Extract PR number from the first positional (non-flag) token.
+    # Our conventions use `gh pr merge <number> --squash`. Only purely numeric
+    # tokens are treated as PR numbers — branch names like `release/2026-q1`
+    # fall through to the no-selector path.
+    read -ra MERGE_ARGS <<< "$(echo "$COMMAND" | sed 's/^gh pr merge//')" || true
+    PR_NUMBER=""
+    SKIP_NEXT=false
+    for marg in "${MERGE_ARGS[@]}"; do
+      if $SKIP_NEXT; then SKIP_NEXT=false; continue; fi
+      case "$marg" in
+        -A|--author-email|-b|--body|-F|--body-file|-t|--subject) SKIP_NEXT=true; continue ;;
+        -*) continue ;;
+      esac
+      # First positional token — check if purely numeric
+      if echo "$marg" | grep -qE '^[0-9]+$'; then PR_NUMBER="$marg"; fi
+      break
+    done
     if [ -n "$PR_NUMBER" ]; then
       CURRENT_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null) || {
         echo "BLOCK: Could not resolve PR #$PR_NUMBER head branch. Check \`gh auth status\`." >&2
@@ -98,8 +111,11 @@ case "$COMMAND" in
     elif echo "$PUSH_TARGET" | grep -q ':'; then
       # src:dst refspec — use the destination (after colon), resolve HEAD
       DST=$(echo "$PUSH_TARGET" | sed 's/.*://')
-      [ "$DST" = "HEAD" ] && DST=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || true
-      CURRENT_BRANCH="$DST"
+      if [ "$DST" = "HEAD" ]; then
+        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+      else
+        CURRENT_BRANCH="$DST"
+      fi
     elif [ "$PUSH_TARGET" = "HEAD" ]; then
       # Resolve HEAD to actual branch name
       CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0

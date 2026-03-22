@@ -61,6 +61,7 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 - **Severity-first** — blockers before mediums before lows
 - **High/blocker findings default to Fix** — never recommend Dismiss for high-severity or blocker findings. "Already mitigated by convention" is not a fix — if the proper fix exists and is reasonable, recommend it. Existing bad patterns in the codebase are not permission to continue them. The only valid reason to recommend Dismiss on a high-severity finding is if the reviewer's claim is factually wrong (verified, not assumed)
 - **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
+- **Edits to review tooling require a decision** — if you modify the roborev skill, gate hook, or `.roborev.toml` during a review cycle, stop and ask the user: continue reviewing in this PR, or create an issue and handle it separately? Never assume the next step when the review process itself changed
 
 ## Multi-Agent Reviews
 

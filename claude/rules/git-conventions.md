@@ -23,8 +23,8 @@
 ## Pushing
 
 - Never push directly to `main` or `master`
-- **Multi-agent review before pushing** — run `roborev review --branch` with each configured agent (e.g., copilot, codex, gemini) before the first push. Read all findings, fix verified issues, commit fixes. See `/roborev` for the full workflow
-- **Roborev gate** — enforced by a PreToolUse hook on `git push` and `gh pr merge`. The hook blocks when reviews are still running (wait for completion). Failed reviews (infrastructure failure) and done reviews do not block. If blocked, wait for reviews to finish or check status with `roborev list`
+- **Every push requires a review cycle** — run `roborev review --branch` with each configured agent (e.g., claude-code, copilot, codex) after every commit that gets pushed. Review findings, fix or defer per user decision. This is not optional and not just for the first push — every push triggers a review. See `/roborev` for the full workflow
+- **Roborev gate** — enforced by a PreToolUse hook on `git push` and `gh pr merge`. The hook blocks when: reviews are missing for the branch, reviews are still running/queued, or all reviews failed (zero coverage). Only allows through when at least one review is `done`. If blocked, check status with `roborev list`
 - Fetch latest before pushing: `git fetch origin`
 - Rebase onto main if needed — check with `git merge-base --is-ancestor origin/main HEAD` (exit 0 = clean)
   - If rebase hits conflicts: abort, inform the user of the conflicting files, and stop
@@ -51,11 +51,11 @@
 
 ## Merge gates
 
-Before merging any PR, **all** of these must be true:
+Before merging any PR — and when assessing whether a PR is mergeable — **all** of these must be true. Run the full checklist even for status questions like "is this ready?":
 
 - Zero unresolved review threads
-- **Roborev gate** passes — enforced by PreToolUse hook (blocks `gh pr merge` while reviews are running)
-- All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
+- **Roborev reviews complete** — run `roborev list` and verify: at least one review is `done`, no reviews are `running` or `queued`, and `failed` reviews are acceptable only alongside a `done` review. If reviews are missing, trigger them. The PreToolUse hook enforces this at push/merge time, but you must also check proactively when reporting merge readiness
+- **Test plan complete** — read the PR body and verify every test plan item is checked (`[x]`). If any item is unchecked, run the verification yourself or ask the user. Never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state
 - All session todos completed — never merge with pending or in-progress task items

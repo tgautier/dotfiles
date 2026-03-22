@@ -1,5 +1,5 @@
 agent = "copilot"
-backup_agent = "gemini"
+backup_agent = "claude-code"
 review_reasoning = "thorough"
 
 excluded_branches = ["main"]

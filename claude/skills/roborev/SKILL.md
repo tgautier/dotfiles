@@ -2,7 +2,7 @@
 name: roborev
 description: |
   Automated code review management with roborev daemon and CLI.
-  Covers: multi-agent reviews (copilot, codex, gemini), review modes (interactive/auto),
+  Covers: multi-agent reviews (claude, copilot, codex), review modes (interactive/auto),
   fixing findings, pre-push workflow, daemon management, per-project config.
   Use when: checking reviews, fixing findings, managing review status, or before pushing.
 version: 1.2.0
@@ -61,21 +61,22 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 - **Severity-first** — blockers before mediums before lows
 - **High/blocker findings default to Fix** — never recommend Dismiss for high-severity or blocker findings. "Already mitigated by convention" is not a fix — if the proper fix exists and is reasonable, recommend it. Existing bad patterns in the codebase are not permission to continue them. The only valid reason to recommend Dismiss on a high-severity finding is if the reviewer's claim is factually wrong (verified, not assumed)
 - **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
+- **User controls the review cycle** — never autonomously decide to stop reviewing, exit the review cycle, or create issues instead of fixing. After each review round, present findings and ask the user: fix, dismiss, create issue, or stop? The user decides when the cycle ends and how deferred findings are handled
 
 ## Multi-Agent Reviews
 
 ### Why multiple agents
 
-Different AI reviewers catch different things. Copilot focuses on correctness and security, Codex on architecture and patterns, Gemini on edge cases and testing gaps. Running all three gives broad coverage with minimal overlap.
+Different AI reviewers catch different things. Claude focuses on architecture and design coherence, Copilot on correctness and security, Codex on patterns and edge cases. Running all three gives broad coverage with minimal overlap.
 
 ### Trigger reviews with multiple agents
 
 Use `--branch` to review all commits on the branch vs main, and `--agent` to specify the reviewer:
 
 ```sh
+roborev review --branch --agent claude-code
 roborev review --branch --agent copilot
 roborev review --branch --agent codex
-roborev review --branch --agent gemini
 ```
 
 Each command creates a separate job. Run all three before reading any — they execute concurrently in the daemon.
@@ -99,9 +100,10 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
    - **Skip** → defer, revisit after remaining findings
    - Multi-agent consensus increases confidence: if 2+ agents flag the same issue, recommend **Fix**
    - Never resolve any finding without the user's explicit choice — see interactive mode rules
-6. **Commit** — batch all fixes into a single commit (`fix: address review findings`)
-7. **Re-review** — re-trigger multi-agent reviews if fixes were substantial (logic changes, not typos)
-8. **Push** — when all agents are clean or remaining findings are dismissed with rationale
+6. **Commit and review** — batch all fixes into a single commit (`fix: address review findings`), push, then trigger a new review cycle. Every push implies a review — never push without reviewing
+7. **Convergence check** — if a re-review produces only low/medium findings that fail closed, or if the same file has been through 3+ review rounds, flag this to the user as a convergence signal and ask whether to continue fixing, create issues for remaining findings, or stop. Never decide autonomously to exit the cycle
+8. **Deferring to issues** — when the user decides to defer a finding, create the issue but do not commit the unfixed code. Issues track work for a future PR, not permission to merge known problems. If all remaining findings are deferred, the current code is clean enough to push
+9. **Push** — when all agents are clean or remaining findings are deferred to issues with user approval
 
 ### Triage signals
 
@@ -111,15 +113,16 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
 | One agent flags, others silent | Medium | Verify the claim before fixing |
 | Agent reports zero issues | Clean | Move on — no further action needed |
 | Finding contradicts project rules | Low | Dismiss with reference to the rule |
+| Finding fails closed (blocks, no bypass) | Lower | UX issue, not security — fix or defer to issue |
+| Finding fails open (bypasses gate) | Higher | Security issue — must fix before merge |
 
 ### Available agents
 
 The `--agent` flag overrides the default agent from `.roborev.toml` for a single review. Common agents:
 
+- `claude-code` — Claude Code reviewer
 - `copilot` — GitHub Copilot reviewer
 - `codex` — OpenAI Codex reviewer
-- `gemini` — Google Gemini reviewer
-- `claude-code` — Claude Code reviewer (often the default in `.roborev.toml`)
 
 The `.roborev.toml` only configures one `agent` (default) and one `backup_agent`. Multi-agent reviews use CLI `--agent` overrides, not toml configuration.
 
@@ -165,11 +168,17 @@ roborev review --since HEAD~3  # Review last 3 commits
 
 ## Push and Merge Enforcement
 
-A global PreToolUse hook blocks `git push` and `gh pr merge` when roborev has running reviews (wait for completion). Failed reviews (infrastructure failure) and done reviews do not block. The workflow is:
+A global PreToolUse hook blocks `git push` and `gh pr merge` when:
+
+- No reviews exist for the branch (must run `roborev review --branch` first)
+- Any review is still `running` or `queued`
+- All reviews `failed` (zero actual coverage — at least one must be `done`)
+
+The hook allows through only when at least one review is `done` and no reviews are still in progress. For `gh pr merge`, the hook resolves the PR's head branch (not the local branch) to avoid bypass when merging from `main`.
 
 1. Commit triggers a post-commit hook → daemon queues a review
-2. When you attempt to push or merge, the hook queries `roborev list --json` and checks for `"status": "running"`
-3. If blocked: wait for reviews to finish, or check status with `roborev list`
+2. When you attempt to push or merge, the hook queries `roborev list --json` and checks review statuses for the target branch
+3. If blocked: check status with `roborev list`, re-run reviews with `roborev review --branch`
 
 ## Per-Project Config
 

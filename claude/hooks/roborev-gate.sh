@@ -15,7 +15,6 @@ set -euo pipefail
 # Skip early if dependencies are missing
 command -v jq >/dev/null 2>&1 || exit 0
 command -v roborev >/dev/null 2>&1 || exit 0
-command -v yq >/dev/null 2>&1 || exit 0
 
 # Extract the command from Bash tool input (|| true: invalid/missing JSON → empty command → exit 0)
 COMMAND=$(echo "${TOOL_INPUT:-}" | jq -r '.command // empty' 2>/dev/null) || true
@@ -49,7 +48,7 @@ case "$COMMAND" in
     for marg in "${MERGE_ARGS[@]}"; do
       if $SKIP_NEXT; then SKIP_NEXT=false; continue; fi
       case "$marg" in
-        -A|--author-email|-b|--body|-F|--body-file|-t|--subject) SKIP_NEXT=true; continue ;;
+        -A|--author-email|-b|--body|-F|--body-file|-t|--subject|-R|--repo|--match-head-commit) SKIP_NEXT=true; continue ;;
         -*) continue ;;
       esac
       # First positional token — check if purely numeric
@@ -127,8 +126,12 @@ case "$COMMAND" in
 esac
 [ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate
 
-# Skip excluded branches (e.g., main) — parsed from .roborev.toml via yq
-EXCLUDED=$(yq -p toml '.excluded_branches[]' .roborev.toml 2>/dev/null) || true
+# Skip excluded branches (e.g., main) — yq preferred, sed fallback for single-line arrays
+if command -v yq >/dev/null 2>&1; then
+  EXCLUDED=$(yq -p toml '.excluded_branches[]' .roborev.toml 2>/dev/null) || true
+else
+  EXCLUDED=$(sed -n 's/^excluded_branches *= *\[//p' .roborev.toml | tr -d '"]' | tr ',' '\n' | tr -d ' ') || true
+fi
 for branch in $EXCLUDED; do
   [ "$CURRENT_BRANCH" = "$branch" ] && exit 0
 done

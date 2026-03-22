@@ -34,7 +34,8 @@ esac
 
 # Determine the branch to check.
 # For `gh pr merge`, resolve the PR's head branch — the command can be run from any local branch.
-# For `git push`, use the current local branch.
+# For `git push`, parse the refspec to find the target branch.
+CURRENT_BRANCH=""
 case "$COMMAND" in
   gh\ pr\ merge*)
     # Extract PR selector (number/URL/branch) — first non-flag token after "gh pr merge".
@@ -63,15 +64,25 @@ case "$COMMAND" in
     #        `git push origin HEAD:branch`, `git push -u origin branch`
     # Extract the last non-flag argument after stripping `git push`.
     PUSH_TARGET=$(echo "$COMMAND" | sed 's/^git push//' | tr ' ' '\n' | grep -vE '^-|^$' | tail -1) || true
-    if echo "$PUSH_TARGET" | grep -q ':'; then
-      # HEAD:branch or src:dst refspec — use the destination (after colon)
-      CURRENT_BRANCH=$(echo "$PUSH_TARGET" | sed 's/.*://')
-    elif [ -n "$PUSH_TARGET" ] && [ "$PUSH_TARGET" != "origin" ]; then
-      # Explicit branch name (not just the remote name)
-      CURRENT_BRANCH="$PUSH_TARGET"
-    else
-      # No refspec — pushing current branch
+    if [ -z "$PUSH_TARGET" ]; then
+      # No args — pushing current branch
       CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+    elif echo "$PUSH_TARGET" | grep -q '^:'; then
+      # Delete-by-refspec (:branch) — nothing to gate
+      exit 0
+    elif echo "$PUSH_TARGET" | grep -q ':'; then
+      # src:dst refspec — use the destination (after colon), resolve HEAD
+      DST=$(echo "$PUSH_TARGET" | sed 's/.*://')
+      CURRENT_BRANCH=$([ "$DST" = "HEAD" ] && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "$DST")
+    elif git remote 2>/dev/null | grep -qx "$PUSH_TARGET"; then
+      # Token is a remote name, not a branch — fall back to current branch
+      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+    elif [ "$PUSH_TARGET" = "HEAD" ]; then
+      # Resolve HEAD to actual branch name
+      CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+    else
+      # Explicit branch name
+      CURRENT_BRANCH="$PUSH_TARGET"
     fi
     ;;
 esac

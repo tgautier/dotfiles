@@ -170,17 +170,6 @@ if [ "$BLOCKING" -gt 0 ]; then
   exit 2
 fi
 
-# At least one review must have completed successfully — all failed means zero coverage
-DONE_COUNT=$(echo "$REVIEW_JSON" | jq '[.[] | select(.status == "done")] | length' 2>/dev/null) || {
-  echo "BLOCK: Failed to parse roborev JSON output." >&2
-  exit 2
-}
-
-if [ "$DONE_COUNT" -eq 0 ]; then
-  echo "BLOCK: All roborev reviews failed — no actual review coverage. Re-run with \`roborev review --branch\`." >&2
-  exit 2
-fi
-
 # Require all 3 configured agents (copilot, codex, claude-code) to have "done" reviews.
 # A single agent passing is insufficient — each catches different issues.
 REQUIRED_AGENTS="copilot codex claude-code"

@@ -52,7 +52,10 @@ fi
 
 # Block if current branch has no reviews at all (first push without roborev)
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
-BRANCH_REVIEWS=$(echo "$REVIEW_JSON" | jq --arg b "$CURRENT_BRANCH" '[.[] | select(.branch == $b)] | length' 2>/dev/null) || exit 0
+BRANCH_REVIEWS=$(echo "$REVIEW_JSON" | jq --arg b "$CURRENT_BRANCH" '[.[] | select(.branch == $b)] | length' 2>/dev/null) || {
+  echo "BLOCK: Failed to parse roborev JSON output for branch check." >&2
+  exit 2
+}
 
 if [ "$BRANCH_REVIEWS" -eq 0 ]; then
   echo "BLOCK: No roborev reviews found for branch '$CURRENT_BRANCH'. Run \`roborev review --branch\` before pushing." >&2

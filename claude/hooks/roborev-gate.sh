@@ -52,6 +52,19 @@ fi
 
 # Block if current branch has no reviews at all (first push without roborev)
 CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+[ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate
+
+# Skip excluded branches (e.g., main) — read from .roborev.toml
+if command -v toml >/dev/null 2>&1; then
+  EXCLUDED=$(toml get .roborev.toml excluded_branches 2>/dev/null) || true
+else
+  # Fallback: parse simple TOML array with sed
+  EXCLUDED=$(sed -n 's/^excluded_branches *= *\[//p' .roborev.toml | tr -d '"]' | tr ',' '\n' | tr -d ' ') || true
+fi
+for branch in $EXCLUDED; do
+  [ "$CURRENT_BRANCH" = "$branch" ] && exit 0
+done
+
 BRANCH_REVIEWS=$(echo "$REVIEW_JSON" | jq --arg b "$CURRENT_BRANCH" '[.[] | select(.branch == $b)] | length' 2>/dev/null) || {
   echo "BLOCK: Failed to parse roborev JSON output for branch check." >&2
   exit 2

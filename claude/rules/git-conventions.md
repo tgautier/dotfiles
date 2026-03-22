@@ -51,10 +51,10 @@
 
 ## Merge gates
 
-Before merging any PR, **all** of these must be true:
+Before merging any PR — and when assessing whether a PR is mergeable — **all** of these must be true. Run the full checklist even for status questions like "is this ready?":
 
 - Zero unresolved review threads
-- **Roborev gate** passes — enforced by PreToolUse hook (blocks `gh pr merge` while reviews are running)
+- **Roborev reviews complete** — run `roborev list` and verify all agents have `done` status for the current branch. If reviews are missing, trigger them. If reviews are running, wait. The PreToolUse hook enforces this at push/merge time, but you must also check proactively when reporting merge readiness
 - All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state

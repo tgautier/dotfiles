@@ -61,7 +61,7 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 - **Severity-first** — blockers before mediums before lows
 - **High/blocker findings default to Fix** — never recommend Dismiss for high-severity or blocker findings. "Already mitigated by convention" is not a fix — if the proper fix exists and is reasonable, recommend it. Existing bad patterns in the codebase are not permission to continue them. The only valid reason to recommend Dismiss on a high-severity finding is if the reviewer's claim is factually wrong (verified, not assumed)
 - **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
-- **Edits to review tooling require a decision** — if you modify the roborev skill, gate hook, or `.roborev.toml` during a review cycle, stop and ask the user: continue reviewing in this PR, or create an issue and handle it separately? Never assume the next step when the review process itself changed
+- **User controls the review cycle** — never autonomously decide to stop reviewing, exit the review cycle, or create issues instead of fixing. After each review round, present findings and ask the user: fix, dismiss, create issue, or stop? The user decides when the cycle ends and how deferred findings are handled
 
 ## Multi-Agent Reviews
 
@@ -102,7 +102,7 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
    - Never resolve any finding without the user's explicit choice — see interactive mode rules
 6. **Commit** — batch all fixes into a single commit (`fix: address review findings`)
 7. **Re-review** — re-trigger multi-agent reviews if fixes were substantial (logic changes, not typos)
-8. **Converge or stop** — if a re-review produces only low/medium findings that fail closed (block incorrectly, not bypass), create issues for relevant ones and stop. Do not iterate beyond 3 review rounds on the same file — repeated fix/review cycles on the same code signal growing complexity, not convergence
+8. **Convergence check** — if a re-review produces only low/medium findings that fail closed, or if the same file has been through 3+ review rounds, flag this to the user as a convergence signal and ask whether to continue fixing, create issues for remaining findings, or stop. Never decide autonomously to exit the cycle
 9. **Push** — when all agents are clean or remaining findings are dismissed/tracked with rationale
 
 ### Triage signals

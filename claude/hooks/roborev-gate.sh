@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
-# PreToolUse hook: block git push and gh pr merge when roborev reviews are in progress.
+# PreToolUse hook: block git push and gh pr merge when roborev reviews are missing or in progress.
 # Exit 2 = block with reason on stderr. Exit 0 = allow.
 #
-# Only blocks on "running" reviews (wait for completion). Does NOT block on:
+# Blocks on:
+# - No reviews for the current branch (must run `roborev review --branch` before first push)
+# - "running" reviews (wait for completion)
+#
+# Does NOT block on:
 # - "failed" jobs (infrastructure failure — agent crashed, no review produced)
 # - "done" jobs (completed — findings handled by roborev fix/refine workflow)
 
@@ -43,6 +47,15 @@ RUNNING_COUNT=$(echo "$REVIEW_JSON" | jq '[.[] | select(.status == "running")] |
 
 if [ "$RUNNING_COUNT" -gt 0 ]; then
   echo "BLOCK: $RUNNING_COUNT roborev review(s) still running. Run \`roborev list\` to check status, then \`roborev wait <id>\` or wait for completion." >&2
+  exit 2
+fi
+
+# Block if current branch has no reviews at all (first push without roborev)
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+BRANCH_REVIEWS=$(echo "$REVIEW_JSON" | jq --arg b "$CURRENT_BRANCH" '[.[] | select(.branch == $b)] | length' 2>/dev/null) || exit 0
+
+if [ "$BRANCH_REVIEWS" -eq 0 ]; then
+  echo "BLOCK: No roborev reviews found for branch '$CURRENT_BRANCH'. Run \`roborev review --branch\` before pushing." >&2
   exit 2
 fi
 

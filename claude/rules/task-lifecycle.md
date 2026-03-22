@@ -2,15 +2,13 @@
 
 How Claude approaches tasks, from intake to completion: assess → research → plan → implement → verify → done. Includes quality principles and context discipline.
 
-## Project grounding
+## Assess
 
 At the start of any task, read the project's `CLAUDE.md` for verification commands, constraints, and rule pointers.
 
-## Assess
-
 - **Trivial** (single-line fix, obvious typo) — just do it
 - **Non-trivial** (multi-file changes, new features, architectural decisions) — plan first
-- **Bug report or failing test** — fix autonomously: read the error, find root cause, implement, verify
+- **Bug report or failing test** — read the error, find root cause, implement, verify. If the fix isn't obvious after reading the code, stop and ask the user for direction
 
 Before starting, identify how you'll verify the work.
 
@@ -38,14 +36,14 @@ For plan quality methodology → `/code-planning`.
 - **Just-first**: if the project has a `Justfile`, always use `just` recipes instead of raw tool commands
 - Mark each task complete as you go
 - Run verification **after every edit**, not batched at the end
-- If an approach isn't working after one fix attempt, **revert and re-plan**
+- If an approach isn't working after one fix attempt, **stop and ask the user** — don't silently re-plan or improvise workarounds. Workaround escalation is a stop signal: if you're building infrastructure (new recipes, scripts, helper tools) to make your approach work, the approach is wrong. Say what failed and ask for direction
 - Compact at ~50% context usage — manual `/compact` preserves more than auto-truncation
 
 ## Verify
 
-- **Prove it works** — run tests, show output. Never mark a task complete on faith
+- **Prove it works** — run the project's test recipes (see CLAUDE.md verification table). Never improvise shell scripts, curl commands, or live-server spot checks when a test recipe exists
 - **Staff engineer bar** — "Would a staff engineer approve this?"
-- **Demand elegance** — "Is there a more elegant way?" If yes, implement it
+- **Demand elegance** — "Is there a more elegant way?" If yes, propose it to the user — don't refactor without approval
 - **Diff against intent** — does the change do exactly what was asked? No more, no less?
 - **CLAUDE.md drift check** — if the PR adds new files/config/rules, verify CLAUDE.md still reflects reality
 
@@ -58,21 +56,22 @@ For plan quality methodology → `/code-planning`.
 
 - **No laziness** — find root causes. No temporary fixes. Senior developer standards
 - **Never degrade quality incrementally** — every change must meet the same standard as the codebase
-- **Stop early, re-plan, do it right** — stopping is a signal to think harder, not to lower standards
+- **Correctness over progress** — when uncertain, stop and ask the user. Never improvise to keep moving. Stopping is a signal to think harder, not to lower standards
+- **No sunk-cost defense** — when questioned about code you wrote, run the coherence check (`claude/rules/coherence-check.md`) before answering
 
 ## Self-improvement
 
 After ANY correction from the user:
 
 1. Identify the pattern (wrong assumption, missed convention, skipped verification)
-2. Update memory (`MEMORY.md` or topic file) with the lesson
-3. If the mistake could recur across sessions, write or update a rule
+2. **Rule first, memory second** — if the mistake could recur across sessions, write or update a rule (enforced). Only use memory for project-specific context that doesn't generalize
+3. Check if an existing rule already covered this — if so, the problem is discipline, not missing rules. Add the specific anti-pattern to make it harder to ignore
 
 ## Anti-patterns
 
 - Writing code before reading the files you'll change
 - Speculative fixes without understanding root cause
-- Patching a bad approach instead of reverting and re-planning
+- Patching a bad approach instead of reverting and re-planning (multiple different symptoms = same root cause)
 - Running raw `yarn test`, `cargo test` when a `just` recipe exists
 - Building adjacent features the user didn't ask for
 - Identifying the correct fix but implementing the easier alternative
@@ -81,3 +80,5 @@ After ANY correction from the user:
 - Per-entry tests for a data mapping instead of table lookup refactoring
 - Reading every file in a directory before knowing which ones matter
 - Running exploratory searches in main context instead of a subagent
+- Improvising curl/shell verification when test recipes or integration tests exist
+- Defending your own code with technical arguments instead of checking codebase coherence

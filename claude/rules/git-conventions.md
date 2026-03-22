@@ -55,7 +55,7 @@ Before merging any PR, **all** of these must be true:
 
 - Zero unresolved review threads
 - **Roborev gate** passes — enforced by PreToolUse hook (blocks `gh pr merge` while reviews are running)
-- All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), remove it with an explanation or ask the user before merging
+- All test plan items checked — never merge with unchecked items. If an item cannot be verified (e.g., requires manual testing), ask the user before merging
 - CI passes — use `gh pr checks <number> --repo {owner}/{repo} --watch` to confirm
 - PR is still in `OPEN` state
 - All session todos completed — never merge with pending or in-progress task items

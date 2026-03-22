@@ -99,6 +99,7 @@ Global rules (`claude/rules/`) are symlinked from this repo to all projects:
 | `secrets.md` | Never commit credentials outside dotfiles-private |
 | `shell.md` | zsh `!` corruption, jq compatibility |
 | `claude-config.md` | Two-tier config system (rules vs skills) |
+| `coherence-check.md` | Sunk-cost defense prevention — evaluate own code objectively |
 
 Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name`. Routing is defined in `skill-triggers.md`.
 

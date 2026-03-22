@@ -53,11 +53,29 @@ case "$COMMAND" in
       }
     fi
     ;;
-  *)
-    CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+  git\ push*--delete*|git\ push*-d\ *)
+    # Branch deletion — nothing to gate
+    exit 0
+    ;;
+  git\ push*)
+    # Parse the push target branch from the refspec.
+    # Forms: `git push`, `git push origin`, `git push origin branch`,
+    #        `git push origin HEAD:branch`, `git push -u origin branch`
+    # Extract the last non-flag argument after stripping `git push`.
+    PUSH_TARGET=$(echo "$COMMAND" | sed 's/^git push//' | tr ' ' '\n' | grep -vE '^-|^$' | tail -1) || true
+    if echo "$PUSH_TARGET" | grep -q ':'; then
+      # HEAD:branch or src:dst refspec — use the destination (after colon)
+      CURRENT_BRANCH=$(echo "$PUSH_TARGET" | sed 's/.*://')
+    elif [ -n "$PUSH_TARGET" ] && [ "$PUSH_TARGET" != "origin" ]; then
+      # Explicit branch name (not just the remote name)
+      CURRENT_BRANCH="$PUSH_TARGET"
+    else
+      # No refspec — pushing current branch
+      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+    fi
     ;;
 esac
-[ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate on push
+[ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate
 
 # Skip excluded branches (e.g., main) — read from .roborev.toml
 # Expects a single-line TOML array: excluded_branches = ["main", "wip"]

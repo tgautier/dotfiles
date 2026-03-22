@@ -4,17 +4,17 @@ Cross-platform personal dotfiles for macOS, Linux, and WSL2, managed with rcm (T
 
 ## Config System
 
-Two-tier model for organizing Claude Code instructions:
+Two-tier model for organizing Claude Code instructions — **rules** (constraints) and **skills** (methodology):
 
-- **Rules** (`claude/rules/`): global, always loaded. Constraints and invariants that must hold across all projects. Symlinked from this repo to `~/.claude/rules/` by rcm.
+- **Global rules** (`claude/rules/`): symlinked to all projects via rcm. Loaded automatically — either always, or when `paths:` frontmatter matches the files being edited.
 - **Skills** (`claude/skills/<name>/SKILL.md`): on-demand, invoked via `/name`. Reusable methodology and checklists.
-- **Project-local rules** (`.claude/rules/`): specific to this repo, not symlinked elsewhere.
+- **Project-local rules** (`.claude/rules/`): specific to one repo, not symlinked. Same auto-loading behavior as global rules.
 
 ### Frontmatter conventions
 
 Skill files (`SKILL.md`) require YAML frontmatter with: `name`, `description`, `version` (semver, unquoted), `date`, `user-invocable` (boolean). This is required metadata, not boilerplate.
 
-Rules may include `paths:` frontmatter for auto-loading only when working on matching files. Rules without `paths:` apply globally.
+Rules may include `paths:` frontmatter for auto-loading only when working on matching files. Rules without `paths:` load on every task.
 
 ### Naming
 

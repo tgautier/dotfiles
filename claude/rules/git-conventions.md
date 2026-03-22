@@ -23,7 +23,7 @@
 ## Pushing
 
 - Never push directly to `main` or `master`
-- **Every push requires a review cycle** — run `roborev review --branch --agent <agent>` for each of: `copilot`, `codex`, `claude-code`. Review findings, fix or defer per user decision. This is not optional and not just for the first push — every push triggers a review. See `/roborev` for the full workflow
+- **Every push requires a review cycle** — run `roborev review --branch --agent <agent>` for each configured agent (check `.roborev.toml` and `/roborev` for the current agent list). Review findings, fix or defer per user decision. This is not optional and not just for the first push — every push triggers a review
 - **Roborev gate** — enforced by a PreToolUse hook on `git push` and `gh pr merge`. The hook blocks when: reviews are missing for the branch, reviews are still running/queued, or all reviews failed (zero coverage). Only allows through when at least one review is `done`. If blocked, check status with `roborev list`
 - Fetch latest before pushing: `git fetch origin`
 - Rebase onto main if needed — check with `git merge-base --is-ancestor origin/main HEAD` (exit 0 = clean)

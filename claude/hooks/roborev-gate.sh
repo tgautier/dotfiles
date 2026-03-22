@@ -15,6 +15,7 @@ set -euo pipefail
 # Skip early if dependencies are missing
 command -v jq >/dev/null 2>&1 || exit 0
 command -v roborev >/dev/null 2>&1 || exit 0
+command -v yq >/dev/null 2>&1 || exit 0
 
 # Extract the command from Bash tool input (|| true: invalid/missing JSON → empty command → exit 0)
 COMMAND=$(echo "${TOOL_INPUT:-}" | jq -r '.command // empty' 2>/dev/null) || true
@@ -38,16 +39,17 @@ esac
 CURRENT_BRANCH=""
 case "$COMMAND" in
   gh\ pr\ merge*)
-    # Extract PR selector (number/URL/branch) — first non-flag token after "gh pr merge".
-    # Flags (--squash, --delete-branch, etc.) are stripped; gh pr view only needs the selector.
-    PR_SELECTOR=$(echo "$COMMAND" | sed 's/^gh pr merge//' | tr ' ' '\n' | grep -vE '^-|^$' | head -1) || true
-    if [ -n "$PR_SELECTOR" ]; then
-      CURRENT_BRANCH=$(gh pr view "$PR_SELECTOR" --json headRefName --jq '.headRefName' 2>/dev/null) || {
-        echo "BLOCK: Could not resolve PR head branch from '$PR_SELECTOR'. Check \`gh auth status\`." >&2
+    # Extract numeric PR number — immune to flag-value confusion.
+    # Our conventions use `gh pr merge <number> --squash`. Non-numeric selectors
+    # (URLs, branches) fall through to the no-selector path.
+    PR_NUMBER=$(echo "$COMMAND" | sed 's/^gh pr merge//' | grep -oE '[0-9]+' | head -1) || true
+    if [ -n "$PR_NUMBER" ]; then
+      CURRENT_BRANCH=$(gh pr view "$PR_NUMBER" --json headRefName --jq '.headRefName' 2>/dev/null) || {
+        echo "BLOCK: Could not resolve PR #$PR_NUMBER head branch. Check \`gh auth status\`." >&2
         exit 2
       }
     else
-      # No selector — gh pr merge targets the current branch's PR
+      # No numeric selector — gh pr merge targets the current branch's PR
       CURRENT_BRANCH=$(gh pr view --json headRefName --jq '.headRefName' 2>/dev/null) || {
         echo "BLOCK: Could not resolve PR for current branch. Check \`gh auth status\`." >&2
         exit 2
@@ -60,12 +62,35 @@ case "$COMMAND" in
     ;;
   git\ push*)
     # Parse the push target branch from the refspec.
-    # Forms: `git push`, `git push origin`, `git push origin branch`,
-    #        `git push origin HEAD:branch`, `git push -u origin branch`
-    # Extract the last non-flag argument after stripping `git push`.
-    PUSH_TARGET=$(echo "$COMMAND" | sed 's/^git push//' | tr ' ' '\n' | grep -vE '^-|^$' | tail -1) || true
+    # Collect all non-flag positional arguments after stripping `git push`.
+    # Read into an array to handle word splitting correctly.
+    read -ra PUSH_ARGS <<< "$(echo "$COMMAND" | sed 's/^git push//')" || true
+    # Filter out flags
+    POSITIONAL=()
+    for arg in "${PUSH_ARGS[@]}"; do
+      case "$arg" in -*) ;; *) POSITIONAL+=("$arg") ;; esac
+    done
+
+    # Separate remote name from branch arguments
+    REMOTE=""
+    BRANCH_ARGS=()
+    for token in "${POSITIONAL[@]}"; do
+      if [ -z "$REMOTE" ] && git remote 2>/dev/null | grep -qx "$token"; then
+        REMOTE="$token"
+      else
+        BRANCH_ARGS+=("$token")
+      fi
+    done
+
+    # Block multi-refspec pushes
+    if [ "${#BRANCH_ARGS[@]}" -gt 1 ]; then
+      echo "BLOCK: Multi-refspec push not supported by roborev gate. Push one branch at a time." >&2
+      exit 2
+    fi
+
+    PUSH_TARGET="${BRANCH_ARGS[0]:-}"
     if [ -z "$PUSH_TARGET" ]; then
-      # No args — pushing current branch
+      # No branch arg — pushing current branch
       CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
     elif echo "$PUSH_TARGET" | grep -q '^:'; then
       # Delete-by-refspec (:branch) — nothing to gate
@@ -73,10 +98,8 @@ case "$COMMAND" in
     elif echo "$PUSH_TARGET" | grep -q ':'; then
       # src:dst refspec — use the destination (after colon), resolve HEAD
       DST=$(echo "$PUSH_TARGET" | sed 's/.*://')
-      CURRENT_BRANCH=$([ "$DST" = "HEAD" ] && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "$DST")
-    elif git remote 2>/dev/null | grep -qx "$PUSH_TARGET"; then
-      # Token is a remote name, not a branch — fall back to current branch
-      CURRENT_BRANCH=$(git branch --show-current 2>/dev/null) || exit 0
+      [ "$DST" = "HEAD" ] && DST=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || true
+      CURRENT_BRANCH="$DST"
     elif [ "$PUSH_TARGET" = "HEAD" ]; then
       # Resolve HEAD to actual branch name
       CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
@@ -88,9 +111,8 @@ case "$COMMAND" in
 esac
 [ -z "$CURRENT_BRANCH" ] && exit 0  # detached HEAD — nothing to gate
 
-# Skip excluded branches (e.g., main) — read from .roborev.toml
-# Expects a single-line TOML array: excluded_branches = ["main", "wip"]
-EXCLUDED=$(sed -n 's/^excluded_branches *= *\[//p' .roborev.toml | tr -d '"]' | tr ',' '\n' | tr -d ' ') || true
+# Skip excluded branches (e.g., main) — parsed from .roborev.toml via yq
+EXCLUDED=$(yq -p toml '.excluded_branches[]' .roborev.toml 2>/dev/null) || true
 for branch in $EXCLUDED; do
   [ "$CURRENT_BRANCH" = "$branch" ] && exit 0
 done

@@ -4,7 +4,7 @@ review_reasoning = "thorough"
 
 excluded_branches = ["main"]
 
-review_guidelines = """
+review_guidelines = '''
 Dotfiles repo: shell config, Claude Code config (rules, skills, hooks), and Homebrew config.
 
 HARD INVARIANTS — flag violations as blockers:
@@ -29,4 +29,4 @@ DO NOT FLAG:
 - YAML frontmatter in SKILL.md files — it is required metadata
 - Files over 200 lines in claude/skills/ — skills are allowed to be longer than rules
 - Shell scripts using jq for JSON parsing — jq is expected to be available on macOS/Linux
-"""
+'''

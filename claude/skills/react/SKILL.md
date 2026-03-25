@@ -361,8 +361,79 @@ These patterns belong to the SPA era where the client managed its own data. In a
 
 ---
 
+## 9. SSR Entry Points
+
+### React Router v7 entry point lifecycle
+
+React Router v7 SSR uses three coordinating files:
+
+- **`entry.server.tsx`** — called once per HTTP request. Receives the request, renders `<ServerRouter>` to a stream. This is where per-request providers wrap the render tree. Runs concurrently for parallel requests
+- **`entry.client.tsx`** — runs once in the browser. Hydrates the server-rendered HTML by calling `hydrateRoot` with `<HydratedRouter>`. Must mirror the server's provider tree exactly
+- **`root.tsx`** — the root route. Its loader provides shared data (locale, theme, config) that both entry points consume. The `Layout` export renders `<html>`, `<head>`, `<body>`
+
+### Provider symmetry pattern
+
+Every provider wrapping `<ServerRouter>` in `entry.server.tsx` must also wrap `<HydratedRouter>` in `entry.client.tsx`, in the same order. Violations cause hydration mismatches or missing context.
+
+```tsx
+// entry.server.tsx
+<ProviderA value={serverValueA}>
+  <ProviderB value={serverValueB}>
+    <ServerRouter context={reactRouterContext} url={request.url} />
+  </ProviderB>
+</ProviderA>
+
+// entry.client.tsx — same shape
+<ProviderA value={clientValueA}>
+  <ProviderB value={clientValueB}>
+    <HydratedRouter />
+  </ProviderB>
+</ProviderA>
+```
+
+### Third-party SSR integration recipe
+
+When integrating a library that needs per-request state in SSR (i18n, feature flags, A/B testing, styled-components):
+
+1. **Create a per-request instance** in `entry.server.tsx` — never reuse a module singleton
+2. **Wrap with the library's React provider** around `<ServerRouter>`
+3. **Mirror in `entry.client.tsx`** — create or initialize the client instance, wrap `<HydratedRouter>` with the same provider
+4. **Bridge data via `root.tsx`** — if the client needs server-determined values (e.g., detected locale), pass them through the root loader and serialize into the HTML (e.g., `<html lang={locale}>`)
+
+**The singleton trap:** many libraries default to a global instance (`i18next`, feature flag clients). In SSR, concurrent requests share the Node.js process. Writing to a global then awaiting before reading it back is a race condition. Always use a factory function or `createInstance()` pattern.
+
+### i18next reference implementation
+
+```tsx
+// entry.server.tsx — per-request instance
+const locale = getLocale(request);
+const i18n = await initI18nForRequest(locale);
+// ...
+<I18nextProvider i18n={i18n}>
+  <ServerRouter context={reactRouterContext} url={request.url} />
+</I18nextProvider>
+
+// entry.client.tsx — client instance (singleton is fine, one user per browser)
+const locale = document.documentElement.lang || "fr";
+const i18n = await initI18nClient(locale);
+// ...
+<I18nextProvider i18n={i18n}>
+  <HydratedRouter />
+</I18nextProvider>
+
+// root.tsx loader — bridges locale to HTML
+const locale = getLocale(request);
+return { locale };
+// Layout renders <html lang={locale}>
+```
+
+The server creates a fresh `i18next` instance per request via `createInstance()`. The client uses the global `i18next` singleton (safe — only one user per browser tab). Both wrap with `I18nextProvider` so `useTranslation()` reads from React context, not the global `setI18n()` fallback.
+
+---
+
 ## Cross-references
 
 - `/typescript` — TypeScript strictness, route type safety, testing (Vitest/Playwright), modules, build tooling
 - `/ux-design` — component API design, server-validated form UX, accessibility
 - `/css-responsive` — responsive rendering, Tailwind CSS patterns
+- Check the project's `CLAUDE.md` for SSR-specific rules (entry points, provider symmetry, no shared mutable state)

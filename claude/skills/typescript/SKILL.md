@@ -13,7 +13,7 @@ user-invocable: true
 
 # TypeScript Language & Build Tooling
 
-For React-specific patterns (hooks, state, data fetching, error boundaries), see the React skill (`/react`). For component design, form UX, and accessibility, see the UX Design skill (`/ux-design`). For CSS and responsive patterns, see the CSS & Responsive skill (`/css-responsive`).
+For React-specific patterns (hooks, state, composition), see the React skill (`/react`). For React Router loaders, actions, and data patterns, see the React Router skill (`/react-router`). For component design, form UX, and accessibility, see the UX Design skill (`/ux-design`). For CSS and responsive patterns, see the CSS & Responsive skill (`/css-responsive`).
 
 ---
 
@@ -29,8 +29,8 @@ For React-specific patterns (hooks, state, data fetching, error boundaries), see
     "exactOptionalPropertyTypes": true,
     "noPropertyAccessFromIndexSignature": true,
     "noFallthroughCasesInSwitch": true,
-    "verbatimModuleSyntax": true
-  }
+    "verbatimModuleSyntax": true,
+  },
 }
 ```
 
@@ -52,43 +52,6 @@ const config = { theme: "dark", retries: 3 } as const satisfies Config;
 // config.theme is "dark", not string
 ```
 
-### Route type safety
-
-Type loaders and actions with framework-provided generics. Never use `any` for loader data or form data:
-
-```typescript
-// Typed loader — useLoaderData infers the return type
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const resources = await apiClient.getResources();
-  return { resources }; // useLoaderData<typeof loader> infers { resources: Resource[] }
-}
-
-// Typed action result — intent identifies which form submitted
-type ActionResult = { intent: string; error?: string; success?: boolean };
-
-function isActionResult(data: unknown): data is ActionResult {
-  if (typeof data !== "object" || data === null) return false;
-  const d = data as Record<string, unknown>;
-  if (typeof d.intent !== "string") return false;
-  if ("error" in d && typeof d.error !== "string") return false;
-  if ("success" in d && typeof d.success !== "boolean") return false;
-  return true;
-}
-
-// Type-safe FormData extraction
-function parseFormData(formData: FormData) {
-  return {
-    name: String(formData.get("name") ?? ""),
-    value: String(formData.get("value") ?? ""),
-    kind: String(formData.get("kind") ?? ""),
-  };
-}
-```
-
-- `useLoaderData<typeof loader>()` infers return type — no manual type annotation needed
-- `useActionData<typeof action>()` returns `unknown` in React Router v7 — validate with a type guard
-- Extract FormData parsing into named functions — keeps actions focused on business logic
-- Never use `as` casts on `formData.get()` — always `String()` with fallback
 
 ### Branded types for domain identifiers
 
@@ -100,10 +63,16 @@ Prevent mixing semantically different values that share the same primitive type:
 type UserId = string & { readonly __brand: unique symbol };
 type OrderId = string & { readonly __brand: unique symbol };
 
-function createUserId(id: string): UserId { return id as UserId; }
-function createOrderId(id: string): OrderId { return id as OrderId; }
+function createUserId(id: string): UserId {
+  return id as UserId;
+}
+function createOrderId(id: string): OrderId {
+  return id as OrderId;
+}
 
-function getUser(id: UserId): User { /* ... */ }
+function getUser(id: UserId): User {
+  /* ... */
+}
 getUser(orderId); // compile error
 ```
 
@@ -130,7 +99,10 @@ No `data` on error, no `error` on success. Enables exhaustive `switch` narrowing
 
 ```typescript
 // WRONG
-enum Status { Active, Inactive }
+enum Status {
+  Active,
+  Inactive,
+}
 
 // CORRECT
 const Status = { Active: "active", Inactive: "inactive" } as const;
@@ -248,10 +220,11 @@ Mandatory for production applications:
 // vite.config.ts
 import { visualizer } from "rollup-plugin-visualizer";
 
-plugins: [visualizer({ open: true, gzipSize: true })]
+plugins: [visualizer({ open: true, gzipSize: true })];
 ```
 
 Set size budgets in CI:
+
 ```typescript
 build: {
   chunkSizeWarningLimit: 250, // KB — fail the build if exceeded
@@ -282,6 +255,7 @@ build: {
 React auto-escapes values in JSX curly braces. The risk vectors are:
 
 1. **`dangerouslySetInnerHTML`:** Always sanitize with DOMPurify. Encapsulate in a dedicated `<SafeHTML>` component:
+
 ```tsx
 import DOMPurify from "dompurify";
 
@@ -297,6 +271,7 @@ function SafeHTML({ html }: { html: string }) {
 ### Content Security Policy
 
 Set CSP headers on all responses:
+
 ```
 Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
 ```
@@ -312,6 +287,7 @@ Avoid `'unsafe-inline'` for scripts — use nonces or hashes.
 ### CSRF protection
 
 For cookie-authenticated, state-changing requests:
+
 - Require an unguessable anti-CSRF token tied to the user/session and validate it on every non-idempotent request (e.g., send via a custom header or request body).
 - Use `SameSite=Lax` cookies as the correct default — `Strict` breaks OAuth redirects and cross-origin navigations without adding meaningful security over Lax + CSRF tokens. See `/web-security` for full rationale.
 - `SameSite` is a hardening layer, not your only CSRF defense — always pair with anti-CSRF tokens for cookie-authenticated state-changing requests.
@@ -348,6 +324,7 @@ Type-aware rules catch issues that syntax linting misses: floating promises, uns
 ### Formatting
 
 ESLint is not a formatter — all formatting rules are deprecated. Use:
+
 - **Prettier** with `eslint-config-prettier` to disable conflicting rules
 - **Biome** as an alternative (10-25x faster, single binary)
 
@@ -403,9 +380,9 @@ Enable in `tsconfig.json` to ensure TypeScript preserves ES module syntax for bu
 // vite.config.ts
 export default defineConfig({
   build: {
-    chunkSizeWarningLimit: 250,  // KB budget
-    sourcemap: true,             // always for production debugging
-    target: "es2022",            // modern baseline
+    chunkSizeWarningLimit: 250, // KB budget
+    sourcemap: true, // always for production debugging
+    target: "es2022", // modern baseline
   },
 });
 ```
@@ -438,6 +415,7 @@ vitest run                       # All unit/component tests pass
 ```
 
 **Blocking issues — do not commit if any exist:**
+
 - TypeScript errors or `any` types without justification
 - ESLint warnings (zero-warning policy)
 - Failing tests
@@ -452,17 +430,17 @@ vitest run                       # All unit/component tests pass
 
 ## 9. Quick Reference
 
-| Task | Command | When |
-| --- | --- | --- |
-| Type check | `tsc --noEmit` | Before every commit |
-| Lint | `eslint .` | Before every commit |
-| Format check | `prettier --check .` | Before every commit |
-| Run unit tests | `vitest run` | After every change |
-| Run E2E tests | `playwright test` | Before PRs |
-| Bundle analysis | `npx vite-bundle-visualizer` | When adding dependencies |
-| Dep audit | `npm audit` / `yarn audit` | CI, on every PR |
-| Update deps | `npx npm-check-updates` | Monthly |
-| Check circular deps | `npx madge --circular src/` | Periodically |
+| Task                | Command                      | When                     |
+| ------------------- | ---------------------------- | ------------------------ |
+| Type check          | `tsc --noEmit`               | Before every commit      |
+| Lint                | `eslint .`                   | Before every commit      |
+| Format check        | `prettier --check .`         | Before every commit      |
+| Run unit tests      | `vitest run`                 | After every change       |
+| Run E2E tests       | `playwright test`            | Before PRs               |
+| Bundle analysis     | `npx vite-bundle-visualizer` | When adding dependencies |
+| Dep audit           | `npm audit` / `yarn audit`   | CI, on every PR          |
+| Update deps         | `npx npm-check-updates`      | Monthly                  |
+| Check circular deps | `npx madge --circular src/`  | Periodically             |
 
 ---
 

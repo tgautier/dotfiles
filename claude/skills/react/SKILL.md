@@ -6,8 +6,8 @@ description: |
   error handling, and testing methodology.
   Use when: writing React components, managing component state, handling errors,
   testing components, or designing component APIs.
-version: 2.0.0
-date: 2026-03-09
+version: 2.1.0
+date: 2026-03-25
 user-invocable: true
 ---
 

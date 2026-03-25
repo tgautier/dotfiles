@@ -23,7 +23,8 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/code-research` | Evaluating approaches or sources | "research", "compare options", "best practice" |
 | `/claude-authoring` | Writing or auditing Claude config | "audit rules", "write a rule", "config hygiene" |
 | `/rust` | Rust handlers, models, errors, config | "add a handler", "new model", "Rust error" |
-| `/react` | React components, hooks, routes, loaders | "add a component", "new route", "write a hook" |
+| `/react` | React components, hooks, composition | "add a component", "write a hook", "extract component" |
+| `/react-router` | Route data loading, mutations, SSR | "new route with data", "form mutation", "loader", "action" |
 | `/typescript` | Type safety, testing, build tooling | "write a test", "fix type error", "bundle size" |
 | `/css-responsive` | Responsive layout, Tailwind, touch | "mobile layout", "responsive", "touch targets" |
 | `/ux-design` | Design system, accessibility, form UX | "design tokens", "a11y audit", "form validation UX" |
@@ -45,9 +46,10 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 
 | Task shape | Primary | Also load | Trigger signals |
 | --- | --- | --- | --- |
-| Full-stack feature (API + page) | project feature skill | `/rust`, `/api-design`, `/react` | "add X feature", "new endpoint with UI" |
+| Full-stack feature (API + page) | project feature skill | `/rust`, `/api-design`, `/react-router`, `/react`, `/css-responsive` | "add X feature", "new endpoint with UI" |
 | API endpoint (no frontend) | `/rust` | `/api-design` | "add endpoint", "new handler" |
-| Frontend page with data | `/react` | `/css-responsive` | "new page", "add a route with data" |
+| Frontend page with data | `/react-router` | `/react`, `/css-responsive` | "new page", "add a route with data", "new page with loader" |
+| Form mutation | `/react-router` | `/ux-design` | "form submission", "mutation", "add an action" |
 | Database/schema change | `/domain-design` | `/rust` | "add a migration", "new column", "change schema" |
 | Design system work | `/ux-design` | `/css-responsive` | "update tokens", "theme", "component variants" |
 | Dashboard or analytics | `/saas-product` | `/react`, `/css-responsive` | "build dashboard", "add charts", "KPI cards" |

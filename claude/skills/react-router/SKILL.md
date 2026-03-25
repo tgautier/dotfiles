@@ -6,8 +6,8 @@ description: |
   type-safe loader/action data, and progressive enhancement.
   Use when: building server-first applications, handling route-level data fetching,
   processing form mutations, managing URL state, or implementing error handling.
-version: 1.0.0
-date: 2026-03-09
+version: 1.1.0
+date: 2026-03-25
 user-invocable: true
 ---
 
@@ -409,7 +409,155 @@ Never use these patterns in React Router v7 — they fight the framework:
 
 ---
 
-## 9. Quick Reference
+## 9. SSR Entry Points
+
+### React Router v7 entry point lifecycle
+
+React Router v7 SSR uses three coordinating files:
+
+- **`entry.server.tsx`** — called once per HTTP request. Receives the request, renders `<ServerRouter>` to a stream. This is where per-request providers wrap the render tree. Runs concurrently for parallel requests
+- **`entry.client.tsx`** — runs once in the browser. Hydrates the server-rendered HTML by calling `hydrateRoot` with `<HydratedRouter>`. Must mirror the server's provider tree exactly
+- **`root.tsx`** — the root route. Its loader provides shared data (locale, theme, config) that both entry points consume. The `Layout` export renders `<html>`, `<head>`, `<body>`
+
+### Provider symmetry pattern
+
+Every provider wrapping `<ServerRouter>` in `entry.server.tsx` must also wrap `<HydratedRouter>` in `entry.client.tsx`, in the same order. Violations cause hydration mismatches or missing context.
+
+```tsx
+// entry.server.tsx
+<ProviderA value={serverValueA}>
+  <ProviderB value={serverValueB}>
+    <ServerRouter context={reactRouterContext} url={request.url} />
+  </ProviderB>
+</ProviderA>
+
+// entry.client.tsx — same shape
+<ProviderA value={clientValueA}>
+  <ProviderB value={clientValueB}>
+    <HydratedRouter />
+  </ProviderB>
+</ProviderA>
+```
+
+### Third-party SSR integration recipe
+
+When integrating a library that needs per-request state in SSR (i18n, feature flags, A/B testing, styled-components):
+
+1. **Create a per-request instance** in `entry.server.tsx` — never reuse a module singleton
+2. **Wrap with the library's React provider** around `<ServerRouter>`
+3. **Mirror in `entry.client.tsx`** — create or initialize the client instance, wrap `<HydratedRouter>` with the same provider
+4. **Bridge data via `root.tsx`** — if the client needs server-determined values (e.g., detected locale), pass them through the root loader and serialize into the HTML (e.g., `<html lang={locale}>`)
+
+**The singleton trap:** many libraries default to a global instance (`i18next`, feature flag clients). In SSR, concurrent requests share the Node.js process. Writing to a global then awaiting before reading it back is a race condition. Always use a factory function or `createInstance()` pattern.
+
+### i18next reference implementation
+
+```tsx
+// entry.server.tsx — per-request instance
+const locale = getLocale(request);
+const i18n = await initI18nForRequest(locale);
+// ...
+<I18nextProvider i18n={i18n}>
+  <ServerRouter context={reactRouterContext} url={request.url} />
+</I18nextProvider>
+```
+
+---
+
+## 10. State Management in React Router
+
+### Decision framework: where does each kind of state live?
+
+React Router v7 has distinct locations for different state types. Choosing the wrong location couples components unnecessarily or creates synchronization bugs.
+
+| State type | Location | Hook | Lifetime | Synchronize with | Example |
+| --- | --- | --- | --- | --- | --- |
+| **Server data** | Loader return | `useLoaderData<typeof loader>()` | One request cycle | Automatic after actions | API responses, database queries |
+| **Action results** | Action return | `useActionData<typeof action>()` | Until next action | Manual, typically short-lived | Form errors, success messages |
+| **URL state** | `?key=value` in URL | `useSearchParams()` | Until user navigates or clears | Browser history, bookmarks | Filters, pagination, sort order, tab state |
+| **Transient UI state** | `useState()` in component | `useState()` | Component lifetime | Manual if needed | Collapsed/expanded sections, modal open/close, focus |
+| **Form input data** | DOM (uncontrolled) | `FormData` in action | Form submission | Server via action | Text inputs, select values, checkboxes |
+| **Client-only state** | Client context or Zustand | `useContext()` or selector | Browser session | Manual | Theme preference, logged-in user, notifications |
+
+### Anti-pattern: mixing state locations
+
+Never store server data in `useState` — it creates a synchronization problem:
+
+```tsx
+// ❌ WRONG — creates a sync bug
+function ResourceList() {
+  const loader = useLoaderData<typeof loader>();
+  const [items, setItems] = useState(loader.items); // why copy?
+  // Now you have two sources of truth
+  // Updating one doesn't update the other
+}
+
+// ✅ RIGHT — server data lives in loader
+function ResourceList() {
+  const { items } = useLoaderData<typeof loader>();
+  return items.map(item => <Item key={item.id} item={item} />);
+}
+```
+
+Never use Zustand or Redux for server data — loaders are the cache:
+
+```tsx
+// ❌ WRONG
+export async function loader() {
+  const items = await api.getItems();
+  store.setItems(items); // don't do this
+  return { items };
+}
+
+// ✅ RIGHT — loader data is the cache
+export async function loader() {
+  const items = await api.getItems();
+  return { items }; // access via useLoaderData
+}
+```
+
+### Combining multiple state sources
+
+Components often need data from multiple locations. Combine them cleanly:
+
+```tsx
+export default function ResourcePage() {
+  // Server data
+  const { resources } = useLoaderData<typeof loader>();
+
+  // URL filters
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterBy = searchParams.get("filter") ?? "all";
+
+  // Transient UI state
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Action feedback
+  const actionData = useActionData<typeof action>();
+
+  return (
+    <>
+      {actionData?.error && <ErrorMessage>{actionData.error}</ErrorMessage>}
+      <input
+        value={filterBy}
+        onChange={(e) => setSearchParams({ filter: e.target.value })}
+      />
+      <button onClick={() => setIsExpanded(!isExpanded)}>
+        {isExpanded ? "Hide" : "Show"} Details
+      </button>
+      {resources
+        .filter(r => filterBy === "all" || r.type === filterBy)
+        .map(resource => (
+          <ResourceItem key={resource.id} resource={resource} />
+        ))}
+    </>
+  );
+}
+```
+
+---
+
+## 11. Quick Reference
 
 | Task                       | Hook/API              | When                                    |
 | -------------------------- | --------------------- | --------------------------------------- |
@@ -429,6 +577,6 @@ Never use these patterns in React Router v7 — they fight the framework:
 
 ## Cross-references
 
-- `/react` — General React 19 patterns, hooks, state management, composition
+- `/react` — General React 19 patterns, hooks, component state management, composition, testing
 - `/typescript` — TypeScript strictness, testing, build tooling
 - `/ux-design` — Form UX, accessibility, component API design

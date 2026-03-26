@@ -2,63 +2,35 @@
 name: react
 description: |
   React 19 development patterns for production web applications.
-  Covers: React 19 features, data fetching, mutations, error handling, state management,
-  and API client integration patterns.
-  Use when: writing React components, hooks, route loaders/actions, managing state,
-  or integrating with API clients.
-version: 2.0.0
-date: 2026-02-28
+  Covers: React 19 features, hooks, component composition, state management,
+  error handling, and testing methodology.
+  Use when: writing React components, managing component state, handling errors,
+  testing components, or designing component APIs.
+version: 2.1.0
+date: 2026-03-25
 user-invocable: true
 ---
 
-# React Development
+# React 19 Development
 
-Server-first React patterns for production applications using React Router v7. Covers the framework layer — loaders, actions, mutations, state, error handling, and API client integration. All patterns assume server-side rendering with route loaders and actions — not SPA-era client-side data fetching.
+React 19 component patterns, hooks, and testing methodology for production applications. This covers the component and composition layer — component design, hooks, state management, error handling within components, and testing strategies.
 
-For TypeScript strictness, testing, and build tooling, see `/typescript`. For component design, form UX, and accessibility, see `/ux-design`. For CSS and responsive patterns, see `/css-responsive`.
+For React Router loaders, actions, mutations, and data patterns, see `/react-router`. For TypeScript strictness, testing, and build tooling, see `/typescript`. For component design, form UX, and accessibility, see `/ux-design`. For CSS and responsive patterns, see `/css-responsive`.
 
 ---
 
-## 1. React 19 Patterns
-
-### Optimistic UI via `fetcher.formData`
-
-In React Router v7, derive optimistic state from `fetcher.formData` — the pending submission data. No `useOptimistic` needed (that's React 19's primitive for React Actions, not for React Router's data layer).
-
-Render pending items separately from the data list — the optimistic item is transient UI state, not data. The server assigns the real ID via loader revalidation:
-
-```tsx
-const fetcher = useFetcher();
-
-return (
-  <>
-    <ul>
-      {items.map(item => (
-        <li key={item.id}>{item.name}</li>
-      ))}
-      {fetcher.formData && (
-        <li className="opacity-50">
-          {String(fetcher.formData.get("name") ?? "")}
-        </li>
-      )}
-    </ul>
-    <fetcher.Form method="post">
-      <input type="hidden" name="_intent" value="create" />
-      <input name="name" required />
-      <button type="submit">Add</button>
-    </fetcher.Form>
-  </>
-);
-```
-
-`fetcher.formData` is non-null while the submission is in flight. When the action completes, loaders revalidate, the real item (with its server-assigned ID) appears in `items`, and `fetcher.formData` resets to null — the optimistic element disappears automatically. For multiple concurrent submissions, use `useFetchers()` to render all pending items.
+## 1. React 19 Core Features
 
 ### `use()` hook
 
 Reads promises and context inside conditionals and loops (unlike other hooks):
 
 ```tsx
-function ResourceDetail({ resourcePromise }: { resourcePromise: Promise<Resource> }) {
+function ResourceDetail({
+  resourcePromise,
+}: {
+  resourcePromise: Promise<Resource>;
+}) {
   const resource = use(resourcePromise); // suspends until resolved
   return <h1>{resource.name}</h1>;
 }
@@ -66,220 +38,18 @@ function ResourceDetail({ resourcePromise }: { resourcePromise: Promise<Resource
 
 ---
 
-## 2. Data Fetching
-
-### Route loaders are the cache
-
-Loaders run on the server before render. They are the single source of server data — no SPA-era client-side caching layer is needed on top.
-
-```tsx
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const id = params.id;
-  if (!id) throw new Response("Not Found", { status: 404 });
-  const resource = await api.getResource(id);
-  return { resource };
-}
-
-export default function ResourcePage() {
-  const { resource } = useLoaderData<typeof loader>();
-  return <ResourceDetail resource={resource} />;
-}
-```
-
-### Key rules
-
-- **Loaders are the cache** — data is available when the page renders, no loading spinners for initial data
-- **Never copy server data into `useState`** — `useLoaderData` owns it
-- Loaders auto-rerun after successful actions — no manual cache invalidation
-- Use `parsePaginationParams()` or similar helpers for URL-driven data (filters, sort, pagination)
-- Throw `Response` on error to trigger the route's `ErrorBoundary`
-- Return plain objects for success — access via `useLoaderData<typeof loader>()`
-
----
-
-## 3. Mutations
-
-### `<Form>` for all mutations
-
-All mutations flow through route actions via `<Form method="post">` — never `onClick` + `fetch()`:
-
-```tsx
-<Form method="post">
-  <input type="hidden" name="_intent" value="create" />
-  <input name="name" defaultValue="" required />
-  <button type="submit">Create</button>
-</Form>
-```
-
-`Form` is from `react-router`, not HTML — it handles serialization and triggers loader revalidation after the action completes.
-
-### Intent pattern
-
-Multi-action routes use a hidden `_intent` field to discriminate:
-
-```typescript
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const intent = String(formData.get("_intent") ?? "create");
-
-  if (intent === "delete") {
-    const id = String(formData.get("id") ?? "");
-    if (!id) return Response.json({ error: "Missing id", intent: "delete" }, { status: 400 });
-    try {
-      await api.deleteResource(id);
-      return Response.json({ success: true, intent: "delete" });
-    } catch (error) {
-      const status = extractErrorStatus(error);
-      return Response.json({ error: "Failed to delete", intent: "delete" }, { status });
-    }
-  }
-  // handle create, update...
-}
-```
-
-### Action return shape
-
-```typescript
-type ActionResult = { intent: string; error?: string; success?: boolean };
-```
-
-- Always include `intent` so the UI can scope error display to the correct form
-- Use `Response.json()` for both success and error — never throw for expected errors
-- Access via `useActionData<typeof action>()` — validate with a type guard since it returns `unknown`
-
-### `useFetcher` for non-navigation mutations
-
-Use `useFetcher` when the mutation should not trigger a full-page navigation:
-
-```tsx
-const fetcher = useFetcher();
-<fetcher.Form method="post">
-  <input type="hidden" name="_intent" value="toggle" />
-  <button type="submit">Toggle</button>
-</fetcher.Form>
-```
-
-Use cases: inline toggles, background saves, actions in list items that should not scroll to top.
-
-### Submission state
-
-```tsx
-const navigation = useNavigation();
-const isSubmitting = navigation.state === "submitting";
-
-<button type="submit" disabled={isSubmitting}>
-  {isSubmitting ? "Saving..." : "Save"}
-</button>
-```
-
-For fetcher-driven mutations, use `fetcher.state` instead.
-
-### Form inputs
-
-- Use `defaultValue` for form fields (uncontrolled inputs) — the browser manages form state
-- Never use `useState` + `value` for fields that will be submitted via `<Form>`
-- Extract FormData parsing into named functions to keep actions focused
-
----
-
-## 4. Error Handling
-
-### Layered error boundaries
-
-1. **Root boundary:** Catches catastrophic errors, shows a full-page error screen
-2. **Route boundary:** Catches loader/action errors per route (framework-provided `ErrorBoundary` export)
-3. **Feature boundary:** Wraps individual widgets so a single failure doesn't take down the page
-
-```tsx
-import { ErrorBoundary } from "react-error-boundary";
-
-<ErrorBoundary
-  FallbackComponent={ErrorFallback}
-  onReset={() => { /* revalidate loaders or navigate to same route */ }}
-  resetKeys={[resourceId]}
->
-  <ResourceDetail />
-</ErrorBoundary>
-```
-
-### What error boundaries do NOT catch
-
-- Errors in event handlers (use try/catch)
-- Async errors outside React rendering (handle in promise chains)
-- Errors in the error boundary itself
-
-### Retry pattern
-
-Offer a "Try again" button that calls `resetErrorBoundary()`. For route-level errors, a page reload retriggers the loader.
-
-### Toast notifications
-
-Use for non-blocking errors (e.g., "Failed to save, retrying..."). Libraries: `sonner`, `react-hot-toast`. Never use toasts as the sole error indicator for form validation.
-
----
-
-## 5. State Management
-
-### Decision framework
-
-| State type | Tool | Example |
-| --- | --- | --- |
-| Server data | `useLoaderData` / `useActionData` | Fetched resources, lists, action results |
-| URL state | `useSearchParams` | Filters, pagination, search, sort |
-| Form data | Uncontrolled DOM inputs (`defaultValue`) | Input values in `<Form>` |
-| Transient UI | `useState` | Sheet open/close, delete confirm, mount guard |
-
-### Key rules
-
-- **No client-side data layer** — loaders and actions own all server data. SPA-era caching libraries (TanStack Query, SWR, Zustand for server state) are unnecessary and fight the framework
-- **Never copy server data into `useState`** — `useLoaderData` is the source of truth
-- **URL state is the most underused location** — filters, sort order, and pagination belong in the URL via `useSearchParams`
-- `useState` is for transient UI only: modal open/close, delete confirmation toggle, client-only-lib mount guards
-- Derive state during render with `useMemo` — never use `useEffect` to sync derived values
-
----
-
-## 6. API Client Patterns
-
-### Generated clients from OpenAPI
-
-Use generated clients (e.g., `@hey-api/openapi-ts`) for type-safe API calls:
-
-- Generates type-safe functions from OpenAPI spec
-- Called in loaders and actions only — never in components
-- Error handling: actions catch errors and return `Response.json({ error }, { status })`
-
-### Where to call the API client
-
-```typescript
-// CORRECT — in a loader (server-side)
-export async function loader({ request }: LoaderFunctionArgs) {
-  const data = await apiClient.getResources();
-  return { data };
-}
-
-// CORRECT — in an action (server-side)
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  await apiClient.createResource(parseFormData(formData));
-  return Response.json({ success: true });
-}
-```
-
-Never import or call the API client directly in React components. Components read data exclusively from `useLoaderData` and `useActionData`.
-
----
-
-## 7. Hooks & Composition
+## 2. Hooks & Composition
 
 ### When to extract a custom hook
 
 Extract a hook when:
+
 - Logic is shared between 2+ components
 - A component has complex state management that obscures its rendering intent
 - You need to test the logic independently from the UI
 
 Don't extract when:
+
 - The logic is used in only one component and is simple
 - The "hook" would just be a thin wrapper around a single `useState`
 
@@ -294,13 +64,12 @@ Don't extract when:
 Build complex hooks from simpler ones:
 
 ```tsx
-function useAssetFilters() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
-  const setFilter = useCallback((key: string, value: string) => {
-    setSearchParams(prev => { prev.set(key, value); return prev; });
-  }, [setSearchParams]);
-  return { filters, setFilter };
+function useAssetToggle(initialValue: boolean) {
+  const [isOpen, setIsOpen] = useState(initialValue);
+  const toggle = useCallback(() => setIsOpen((v) => !v), []);
+  const open = useCallback(() => setIsOpen(true), []);
+  const close = useCallback(() => setIsOpen(false), []);
+  return { isOpen, toggle, open, close };
 }
 ```
 
@@ -319,121 +88,86 @@ test("useToggle toggles value", () => {
 });
 ```
 
-Wrap hooks that need providers (Router) in a wrapper:
+Wrap hooks that need providers in a wrapper:
 
 ```tsx
 const wrapper = ({ children }: { children: ReactNode }) => (
-  <MemoryRouter>{children}</MemoryRouter>
+  <MyContextProvider>{children}</MyContextProvider>
 );
 
-const { result } = renderHook(() => useAssetFilters(), { wrapper });
+const { result } = renderHook(() => useMyHook(), { wrapper });
 ```
 
 ---
 
-## 8. Anti-Patterns
+## 3. Error Handling in Components
 
-### SPA-era patterns (never use with React Router v7)
+### Error boundaries for feature isolation
 
-These patterns belong to the SPA era where the client managed its own data. In a server-first architecture with loaders and actions, they add complexity, fight the framework, and break progressive enhancement.
+Error boundaries catch rendering errors and prevent entire page crashes:
 
-| SPA anti-pattern | Problem | Server-first alternative |
-| --- | --- | --- |
-| `useEffect` for data fetching | Waterfalls, race conditions, no SSR | Route loaders |
-| `onClick` + `fetch` for mutations | No progressive enhancement, no revalidation | `<Form method="post">` |
-| Client-side `fetch` in components | Bypasses loader caching, invisible to framework | Move to loader or action |
-| TanStack Query / SWR for route data | Duplicate cache layer, fights revalidation | `useLoaderData` is the cache |
-| `useState` for form fields | Extra state, out of sync with DOM | `defaultValue` + uncontrolled inputs |
-| `useReducer` for form state | Over-engineering what the DOM already does | `<Form>` + `FormData` |
-| Client-side form validation libraries | Duplicates server logic, false sense of security | HTML5 attributes + server validation in action |
-| `useEffect` to sync action results | Extra render cycle, stale values | `useActionData()` directly |
-| Zustand/Redux for server data | Wrong tool — these are for client-only state | Loaders own server data |
-| Throwing from actions for user errors | Triggers ErrorBoundary, loses form state | `Response.json({ error })` |
+```tsx
+import { ErrorBoundary } from "react-error-boundary";
 
-### General React anti-patterns
+<ErrorBoundary
+  FallbackComponent={ErrorFallback}
+  onReset={() => {
+    /* reset state or retry */
+  }}
+  resetKeys={[itemId]}
+>
+  <FeatureWidget />
+</ErrorBoundary>;
+```
 
-| Anti-pattern | Problem | Fix |
-| --- | --- | --- |
-| Prop drilling through 4+ levels | Fragile, hard to refactor | Context or composition |
-| `useLayoutEffect` without SSR guard | Server warning, runs as `useEffect` on server | `useEffect` or `useIsomorphicLayoutEffect` |
-| `useEffect` for derived state | Extra render cycle, stale values | Compute during render with `useMemo` |
-| Manual `useMemo`/`useCallback` everywhere | Noise, premature optimization | React Compiler handles memoization |
+### What error boundaries do NOT catch
+
+- Errors in event handlers (use try/catch)
+- Async errors outside React rendering (handle in promise chains)
+- Errors in the error boundary itself
+
+### Toast notifications
+
+Use for non-blocking errors (e.g., "Failed to save"). Libraries: `sonner`, `react-hot-toast`. Never use toasts as the sole error indicator for validation feedback.
 
 ---
 
-## 9. SSR Entry Points
+## 4. Component State Management
 
-### React Router v7 entry point lifecycle
+### Decision framework for state location
 
-React Router v7 SSR uses three coordinating files:
+| State type   | Location           | Example                              |
+| ------------ | ------------------ | ------------------------------------ |
+| Transient UI | `useState`         | Modal open/close, delete confirm     |
+| Derived      | `useMemo`          | Computed values, derived from props  |
+| Form data    | DOM inputs         | Uncontrolled inputs with defaultValue |
+| Shared UI    | Context + useState | Theme, notifications, user prefs     |
 
-- **`entry.server.tsx`** — called once per HTTP request. Receives the request, renders `<ServerRouter>` to a stream. This is where per-request providers wrap the render tree. Runs concurrently for parallel requests
-- **`entry.client.tsx`** — runs once in the browser. Hydrates the server-rendered HTML by calling `hydrateRoot` with `<HydratedRouter>`. Must mirror the server's provider tree exactly
-- **`root.tsx`** — the root route. Its loader provides shared data (locale, theme, config) that both entry points consume. The `Layout` export renders `<html>`, `<head>`, `<body>`
+### Key rules
 
-### Provider symmetry pattern
+- `useState` is for transient UI only — things that don't affect the render tree when lost
+- Never copy props into state — compute during render with `useMemo`
+- Keep state as close to where it's used as possible
+- Split large contexts into smaller, focused ones
+- Never use `useEffect` to sync derived values — compute them during render
 
-Every provider wrapping `<ServerRouter>` in `entry.server.tsx` must also wrap `<HydratedRouter>` in `entry.client.tsx`, in the same order. Violations cause hydration mismatches or missing context.
+---
 
-```tsx
-// entry.server.tsx
-<ProviderA value={serverValueA}>
-  <ProviderB value={serverValueB}>
-    <ServerRouter context={reactRouterContext} url={request.url} />
-  </ProviderB>
-</ProviderA>
+## 5. Anti-Patterns
 
-// entry.client.tsx — same shape
-<ProviderA value={clientValueA}>
-  <ProviderB value={clientValueB}>
-    <HydratedRouter />
-  </ProviderB>
-</ProviderA>
-```
-
-### Third-party SSR integration recipe
-
-When integrating a library that needs per-request state in SSR (i18n, feature flags, A/B testing, styled-components):
-
-1. **Create a per-request instance** in `entry.server.tsx` — never reuse a module singleton
-2. **Wrap with the library's React provider** around `<ServerRouter>`
-3. **Mirror in `entry.client.tsx`** — create or initialize the client instance, wrap `<HydratedRouter>` with the same provider
-4. **Bridge data via `root.tsx`** — if the client needs server-determined values (e.g., detected locale), pass them through the root loader and serialize into the HTML (e.g., `<html lang={locale}>`)
-
-**The singleton trap:** many libraries default to a global instance (`i18next`, feature flag clients). In SSR, concurrent requests share the Node.js process. Writing to a global then awaiting before reading it back is a race condition. Always use a factory function or `createInstance()` pattern.
-
-### i18next reference implementation
-
-```tsx
-// entry.server.tsx — per-request instance
-const locale = getLocale(request);
-const i18n = await initI18nForRequest(locale);
-// ...
-<I18nextProvider i18n={i18n}>
-  <ServerRouter context={reactRouterContext} url={request.url} />
-</I18nextProvider>
-
-// entry.client.tsx — client instance (singleton is fine, one user per browser)
-const locale = document.documentElement.lang || "fr";
-const i18n = await initI18nClient(locale);
-// ...
-<I18nextProvider i18n={i18n}>
-  <HydratedRouter />
-</I18nextProvider>
-
-// root.tsx loader — bridges locale to HTML
-const locale = getLocale(request);
-return { locale };
-// Layout renders <html lang={locale}>
-```
-
-The server creates a fresh `i18next` instance per request via `createInstance()`. The client uses the global `i18next` singleton (safe — only one user per browser tab). Both wrap with `I18nextProvider` so `useTranslation()` reads from React context, not the global `setI18n()` fallback.
+| Anti-pattern                              | Problem                                       | Fix                                        |
+| ----------------------------------------- | --------------------------------------------- | ------------------------------------------ |
+| Prop drilling through 4+ levels           | Fragile, hard to refactor                     | Context or composition                     |
+| `useLayoutEffect` without SSR guard       | Server warning, runs as `useEffect` on server | `useEffect` or `useIsomorphicLayoutEffect` |
+| `useEffect` for derived state             | Extra render cycle, stale values              | Compute during render with `useMemo`       |
+| Manual `useMemo`/`useCallback` everywhere | Noise, premature optimization                 | React Compiler handles memoization         |
+| `useState` for form field values          | Duplicate state, out of sync with DOM         | Uncontrolled inputs + `defaultValue`       |
 
 ---
 
 ## Cross-references
 
-- `/typescript` — TypeScript strictness, route type safety, testing (Vitest/Playwright), modules, build tooling
-- `/ux-design` — component API design, server-validated form UX, accessibility
+- `/react-router` — Data loading, mutations, routing, URL state management
+- `/typescript` — TypeScript strictness, testing (Vitest/Playwright), modules, build tooling
+- `/ux-design` — component API design, form UX, accessibility
 - `/css-responsive` — responsive rendering, Tailwind CSS patterns
-- Check the project's `CLAUDE.md` for SSR-specific rules (entry points, provider symmetry, no shared mutable state)

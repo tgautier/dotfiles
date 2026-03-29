@@ -1,0 +1,11 @@
+#!/bin/zsh
+# Obsidian CLI — proxies to the binary bundled in Obsidian.app (v1.12+)
+# Enable CLI in: Settings > General > Command line interface
+# macOS only — Obsidian CLI is distributed inside the .app bundle
+
+if [[ ! -x /Applications/Obsidian.app/Contents/MacOS/Obsidian ]]; then
+  echo "obsidian: Obsidian.app not found (macOS only)" >&2
+  exit 1
+fi
+
+exec /Applications/Obsidian.app/Contents/MacOS/Obsidian "$@"

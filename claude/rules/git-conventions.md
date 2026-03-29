@@ -61,6 +61,12 @@ Before merging any PR — and when assessing whether a PR is mergeable — **all
 - All session todos completed — never merge with pending or in-progress task items
 - PR body is up to date — check off verified test plan items (`[x]`), update summary/title if commits changed. Do this via `gh pr edit` **before** merging, not after
 
+## Dangerous flags
+
+- **Never use `git add -f` / `git add --force`** without explicit user approval — it bypasses `.gitignore` and silently commits generated files, secrets, or build artifacts. If `git add` rejects a file, the file is gitignored for a reason. Stop and ask
+- **Never use `--no-verify`** — pre-commit hooks are non-negotiable
+- **Never use `git reset --hard`** without explicit user approval — destroys uncommitted work
+
 ## Principles
 
 - Prevent problems, don't recover from them — design workflows so errors can't happen rather than adding complex recovery logic

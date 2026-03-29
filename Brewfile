@@ -61,7 +61,7 @@ brew "libtool"
 brew "libyaml"
 brew "linkerd"
 brew "markdownlint-cli2"
-# brew "mas"
+brew "mas"
 brew "minikube"
 brew "mkcert"
 brew "nats-server"
@@ -87,6 +87,7 @@ brew "rustup"
 brew "shellcheck"
 brew "sops"
 brew "sox"
+brew "sqlite"
 brew "step"
 brew "stern"
 brew "svn"
@@ -151,12 +152,10 @@ cask "font-fira-code"
 cask "font-source-code-pro"
 
 # Mac App Store Applications
-# mas "1Password for Safari", id: 1569813296
-# mas "Final Cut Pro", id: 424389933
-# mas "Keynote", id: 361285480
-# mas "Notion Web Clipper", id: 1559269364
-# mas "Numbers", id: 361304891
-# mas "Pages", id: 361309726
-# mas "Pixelmator Pro", id: 6746662575
-# mas "Reeder 5", id: 1529448980
-# mas "Xcode", id: 497799835
+mas "1Password for Safari", id: 1569813296
+mas "Keynote", id: 361285480
+mas "Notion Web Clipper", id: 1559269364
+mas "Numbers", id: 361304891
+mas "Pages", id: 361309726
+mas "Reeder 5", id: 1529448980
+mas "Xcode", id: 497799835

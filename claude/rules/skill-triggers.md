@@ -41,6 +41,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/phoenix` | Phoenix/Elixir LiveView, Ecto, HEEx | "add a LiveView", "new migration", "Ecto query", "Phoenix route", "HEEx template" |
 | `/flutter` | Flutter widgets, state, navigation, theming | "add a screen", "new widget", "Riverpod provider", "Flutter navigation", "dart model" |
 | `/project-audit` | Comprehensive project health audit | "full audit", "audit the project", "check for drift", "are our rules still accurate" |
+| `/changelog` | Changelog entries, review, or release | "update changelog", "draft changelog", "cut a release", "prepare release" |
 
 ## Composite workflows
 

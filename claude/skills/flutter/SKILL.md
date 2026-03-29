@@ -48,6 +48,15 @@ View rebuilds ← ViewModel notifies ← Repository emits new state
 
 State flows down, events flow up. Never the reverse.
 
+### Generated API clients
+
+When a project has an OpenAPI spec, generate the API client — never hand-write it:
+- Use a Dart-native generator (e.g., Tonik, swagger_parser) that produces clean Dart code
+- The generated client IS the Service layer — create Repositories that wrap it
+- Generated code goes in a `packages/` directory, treated as immutable
+- Wire into the project's `just gen` pipeline so it regenerates with the spec
+- Check the project's `CLAUDE.md` for the specific generator and pipeline commands
+
 ### Official design patterns
 
 - **Command pattern** — wraps ViewModel methods, handles running/complete/error states
@@ -176,6 +185,14 @@ class Budget with _$Budget {
 ```
 
 Generates: `copyWith`, `==`, `hashCode`, `toString`, JSON serialization, union types.
+
+### Generated vs hand-written models
+
+If the project generates models from an OpenAPI spec, use those directly.
+Only create hand-written Freezed models for:
+- Local-only domain objects (not in the API)
+- Drift database companions (mapping generated API models to local storage)
+- View-specific state objects
 
 ### Rules
 
@@ -402,3 +419,22 @@ Add to `.gitignore` or commit them — project choice, but be consistent. Commit
 | Repositories knowing each other | Circular deps, testing nightmare | Combine in ViewModel or use case |
 | Logic in Notifier constructor | Runs before provider is tracked | Initialize in `build()` |
 | `GetX` | Maintenance-mode, magic globals | Riverpod or BLoC |
+
+---
+
+## 13. Shared Resources
+
+### Translations
+
+When web and mobile share the same API, share translations too:
+- Web locale files (JSON/i18next) are the source of truth
+- Generate mobile ARB files from web JSON via a conversion script
+- Wire into the project's build pipeline so translations stay in sync
+- Never duplicate translation keys manually across platforms
+
+### API Clients
+
+When an OpenAPI spec exists:
+- Generate clients for ALL platforms from the same spec
+- The derivation chain flows: API code → OpenAPI spec → generated clients
+- Check the project's `generated-code` rule for the specific pipeline

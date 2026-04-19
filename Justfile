@@ -3,7 +3,14 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise
+ci: lint-shell lint-markdown lint-brewfile lint-mise lint-via-private
+
+# Delegate to the private repo's justfile for checks that must not be
+# defined here (keyword lists etc.). No-op when private repo is absent.
+lint-via-private:
+    if [ -f ~/Workspace/tgautier/dotfiles-private/justfile ]; then \
+        just -f ~/Workspace/tgautier/dotfiles-private/justfile lint-public-no-arr; \
+    fi
 
 # Enable the pre-commit hook and install native tools
 setup:

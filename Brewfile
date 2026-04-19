@@ -153,6 +153,7 @@ cask "font-source-code-pro"
 
 # Mac App Store Applications
 mas "1Password for Safari", id: 1569813296
+mas "Infuse", id: 1136220934
 mas "Keynote", id: 361285480
 mas "Notion Web Clipper", id: 1559269364
 mas "Numbers", id: 361304891

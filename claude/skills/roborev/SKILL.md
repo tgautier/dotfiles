@@ -5,8 +5,8 @@ description: |
   Covers: multi-agent reviews (claude, copilot, codex), review modes (interactive/auto),
   fixing findings, pre-push workflow, daemon management, per-project config.
   Use when: checking reviews, fixing findings, managing review status, or before pushing.
-version: 1.2.0
-date: 2026-02-28
+version: 1.3.0
+date: 2026-05-11
 user-invocable: true
 ---
 
@@ -62,6 +62,39 @@ Invoked with `/roborev auto`. Fixes everything without asking — but verifies f
 - **High/blocker findings default to Fix** — never recommend Dismiss for high-severity or blocker findings. "Already mitigated by convention" is not a fix — if the proper fix exists and is reasonable, recommend it. Existing bad patterns in the codebase are not permission to continue them. The only valid reason to recommend Dismiss on a high-severity finding is if the reviewer's claim is factually wrong (verified, not assumed)
 - **One commit per review round** — batch all fixes from one review into a single commit, using `fix:` conventional commit format (e.g., `fix: address roborev findings`)
 - **User controls the review cycle** — never autonomously decide to stop reviewing, exit the review cycle, or create issues instead of fixing. After each review round, present findings and ask the user: fix, dismiss, create issue, or stop? The user decides when the cycle ends and how deferred findings are handled
+- **Every non-fixed finding gets an audit trail** — see Finding Dispositions. "Deferred" or "dismissed" written only in the PR body is silent — it leaves no searchable, persistent record. Deferred findings must land in a GitHub issue; dismissed findings must land in a PR comment
+
+## Finding Dispositions
+
+Every finding ends in one of four states. **Fix**, **Defer**, and **Dismiss** are the three terminal states for the PR — each demands a persistent, GitHub-native audit trail beyond the conversation and the roborev review record. **Skip** is internal to one review round only.
+
+### Fix
+
+Implement the change, batch into the review round's commit (`fix: address roborev findings`). No further bookkeeping needed — the diff is the record.
+
+### Defer (finding is valid, will not be addressed in this PR)
+
+Use when the finding is legitimate but out of scope, lower priority than current work, or requires more design than the current PR affords.
+
+1. **Search existing issues first** — `gh issue list --search "<keywords from the finding>" --state all` and `gh issue list --state open` to skim recent. Never create a duplicate. If an open issue covers the finding, reuse it
+2. **If no existing issue covers it**, create one with `gh issue create`. The title states the problem; the body quotes the reviewer's claim verbatim, links back to the source PR and the originating roborev review, and includes the suggested fix if any. Future-you should be able to act on the issue without re-running the review
+3. **Reference the issue in the PR body** under a `## Deferred findings` section: `- <one-line finding summary> — tracked in #N`. This keeps the link discoverable from the merged PR
+
+### Dismiss (finding is wrong, does not apply, or contradicts a project decision)
+
+Use when after investigation the reviewer's claim is factually incorrect, contradicts a project rule, or is a stylistic disagreement the project has explicitly settled differently. Never use Dismiss for high-severity or blocker findings unless the claim is verified-wrong.
+
+1. **Post a PR comment with the dismissal rationale** — `gh pr comment <N> --body "..."`. This is the audit trail. The PR body summary is too easily skimmed past and is rewritten across pushes
+2. The comment must: quote the finding (severity + file + line + reviewer's words), state the dismissal reason, link to the supporting evidence — project rule path, prior precedent, verified fact, or documentation URL
+3. **Reference the dismissal in the PR body** under a `## Dismissed findings` section: `- <one-line finding summary> — see [rationale](<comment URL>)`. Copy the comment URL from `gh pr view <N> --json comments` or the GitHub UI
+
+### Skip (revisit later in this review cycle)
+
+Internal to a single review round. A skipped finding must be re-presented before the round ends — it cannot leak into the merged PR as an untracked item. If the user explicitly defers a skipped finding at end of round, convert it to Defer (with issue) before pushing.
+
+### Why GitHub issues and PR comments
+
+PR bodies are rewritten on every push and easily skimmed. Roborev review records are tool-specific and not GitHub-native. GitHub issues and PR comments are searchable, link-able, survive PR rewrites, and live forever in the project's audit trail. Saying "deferred" or "dismissed" in PR body prose alone is silent disposition — exactly what this section prevents.
 
 ## Multi-Agent Reviews
 
@@ -102,7 +135,7 @@ The default behavior is to wait for all agents, consolidate, and walk through fi
    - Never resolve any finding without the user's explicit choice — see interactive mode rules
 6. **Commit and review** — batch all fixes into a single commit (`fix: address review findings`), push, then trigger a new review cycle. Every push implies a review — never push without reviewing
 7. **Convergence check** — if a re-review produces only low/medium findings that fail closed, or if the same file has been through 3+ review rounds, flag this to the user as a convergence signal and ask whether to continue fixing, create issues for remaining findings, or stop. Never decide autonomously to exit the cycle
-8. **Deferring to issues** — when the user decides to defer a finding, create the issue but do not commit the unfixed code. Issues track work for a future PR, not permission to merge known problems. If all remaining findings are deferred, the current code is clean enough to push
+8. **Deferring or dismissing** — when the user decides to defer or dismiss rather than fix, follow Finding Dispositions: search existing issues before creating a new one for defers; post a PR comment with rationale for dismissals; reference both in the PR body. Issues track work for a future PR, not permission to merge known problems
 9. **Push** — when all agents are clean or remaining findings are deferred to issues with user approval
 
 ### Triage signals
@@ -212,3 +245,6 @@ The post-commit hook sends jobs to the daemon. If the daemon is not running, rev
 - Treating existing bad patterns as justification — "the old code did it too" is not a reason to dismiss
 - Running `roborev init` in a repo that already has `.roborev.toml` — use `install-hook` instead
 - Manually editing review results — use `roborev address` or `roborev comment` to interact with findings
+- **Silent defer** — saying "deferred" in the PR body without creating or linking a tracking issue. Findings that aren't tracked are findings that get lost between PRs
+- **Silent dismiss** — judging a finding wrong without posting a PR comment that captures the rationale and the supporting evidence. The PR body summary is rewritten and skimmed; only PR comments give a durable, link-able audit trail
+- **Creating duplicate issues** — skipping the `gh issue list --search` step before `gh issue create`. Always check open and closed issues; an existing issue (even closed) is the right place to reopen or reference

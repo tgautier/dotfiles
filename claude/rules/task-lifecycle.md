@@ -84,3 +84,4 @@ After ANY correction from the user:
 - Defending your own code with technical arguments instead of checking codebase coherence
 - Assuming external tool contracts (status values, field names, CLI flags) without checking `--help` or actual output
 - Complexity spiral: iterative fix/review cycles that grow a file's surface area instead of simplifying — if 2-3 rounds of "fix finding → new finding on the fix," step back and reassess the approach
+- Proposing destructive actions without first confirming a restorable backup — see `claude/rules/restore-readiness.md`. "User authorized X" is not the same as "X is safe to roll back from"

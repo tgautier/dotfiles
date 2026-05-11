@@ -100,6 +100,7 @@ Global rules (`claude/rules/`) are symlinked from this repo to all projects:
 | `shell.md` | zsh `!` corruption, jq compatibility |
 | `claude-config.md` | Two-tier config system (rules vs skills) |
 | `coherence-check.md` | Sunk-cost defense prevention — evaluate own code objectively |
+| `restore-readiness.md` | Verify a real, restorable backup exists before any destructive action |
 
 Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name`. Routing is defined in `skill-triggers.md`.
 

@@ -76,7 +76,7 @@ Implement the change, batch into the review round's commit (`fix: address robore
 
 Use when the finding is legitimate but out of scope, lower priority than current work, or requires more design than the current PR affords.
 
-1. **Search existing issues first** — `gh issue list --search "<keywords from the finding>" --state all` and `gh issue list --state open` to skim recent. Never create a duplicate. If an open issue covers the finding, reuse it
+1. **Search existing issues first** — `gh issue list --search "<keywords from the finding>" --state all`. `--state all` covers both open and closed; a closed issue may need reopening rather than a new one. If no obvious keywords come from the finding, fall back to `gh issue list --state open` to skim the recent backlog. Never create a duplicate
 2. **If no existing issue covers it**, create one with `gh issue create`. The title states the problem; the body quotes the reviewer's claim verbatim, links back to the source PR and the originating roborev review, and includes the suggested fix if any. Future-you should be able to act on the issue without re-running the review
 3. **Reference the issue in the PR body** under a `## Deferred findings` section: `- <one-line finding summary> — tracked in #N`. This keeps the link discoverable from the merged PR
 

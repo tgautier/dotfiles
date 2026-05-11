@@ -18,6 +18,7 @@ brew "coreutils"
 brew "ctags"
 brew "curl"
 brew "doctl"
+brew "duti"
 brew "eksctl"
 brew "ethereum"
 brew "ffmpeg"
@@ -110,14 +111,12 @@ cask "1password"
 cask "1password-cli"
 cask "adobe-creative-cloud"
 cask "android-studio"
-cask "antigravity"
 cask "audacity"
 cask "claude"
 ## claude-code: use native installer instead (auto-updates, no deps)
 ## curl -fsSL https://claude.ai/install.sh | bash
 cask "codex"
 cask "copilot-cli"
-cask "cursor"
 cask "discord"
 cask "docker-desktop"
 cask "figma"
@@ -137,6 +136,7 @@ cask "postman"
 cask "proton-mail"
 cask "proton-mail-bridge"
 cask "rectangle"
+cask "rode-central"
 cask "setapp"
 cask "signal"
 cask "slack"
@@ -153,6 +153,7 @@ cask "font-source-code-pro"
 
 # Mac App Store Applications
 mas "1Password for Safari", id: 1569813296
+mas "Infuse", id: 1136220934
 mas "Keynote", id: 361285480
 mas "Notion Web Clipper", id: 1559269364
 mas "Numbers", id: 361304891

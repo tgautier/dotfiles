@@ -15,6 +15,12 @@ window-padding-x = 4
 window-padding-y = 4
 window-decoration = auto
 
+# New windows/tabs/splits open in $HOME instead of inheriting the current directory
+window-inherit-working-directory = false
+tab-inherit-working-directory = false
+split-inherit-working-directory = false
+working-directory = home
+
 # Cursor
 cursor-style = block
 

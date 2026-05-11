@@ -3,15 +3,15 @@ not_found_auto_install = true
 trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
-dart = "3.11.5"
-deno = "2.7.12"
+dart = "3.11.6"
+deno = "2.7.14"
 elixir = "1.19.5-otp-28"
-erlang = "28.4"
-"vfox:mise-plugins/vfox-flutter" = "3.41.7"
-go = "1.26.2"
+erlang = "28.5"
+"vfox:mise-plugins/vfox-flutter" = "3.41.9"
+go = "1.26.3"
 helm = "4.1.4"
-node = "25"
+node = "26"
 python = "3.14.4"
-ruby = "4.0.2"
+ruby = "4.0.3"
 yarn = "4.14.1"
 yq = "4.53.2"

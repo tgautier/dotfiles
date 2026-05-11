@@ -14,8 +14,6 @@ fi
 # Common environment variables
 export CDPATH="${CDPATH}:${HOME}/Workspace"
 export DISABLE_AUTO_TITLE="true"
-export EDITOR=vim
-export GIT_EDITOR=vim
 export GOPATH=~/Workspace/go
 export HOMEBREW_BUNDLE_NO_LOCK=true
 export HOMEBREW_NO_ENV_HINTS=true
@@ -96,7 +94,15 @@ path+=(
 # Tool-specific paths (check if they exist)
 [[ -d "${HOME}/.dapr/bin" ]] && path+="${HOME}/.dapr/bin"
 [[ -d "${HOME}/Workspace/tgautier/dotfiles" ]] && path+="${HOME}/Workspace/tgautier/dotfiles"
-[[ -d "${HOME}/.antigravity/antigravity/bin" ]] && path+="${HOME}/.antigravity/antigravity/bin"
 [[ -d "${GOPATH}/bin" ]] && path+="${GOPATH}/bin"
 
 export PATH
+
+# Prefer VS Code as editor when available, fall back to vim for headless shells
+if command -v code >/dev/null 2>&1; then
+  export EDITOR="code --wait"
+  export GIT_EDITOR="code --wait"
+else
+  export EDITOR=vim
+  export GIT_EDITOR=vim
+fi

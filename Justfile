@@ -68,6 +68,68 @@ update-mise:
 update-rust:
     rustup update
 
+# Register VS Code as default opener for text/code/data files (macOS only).
+# Word and Pages documents are deliberately excluded.
+set-default-editor:
+    #!/usr/bin/env zsh
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+        echo "set-default-editor: macOS only — skipping."
+        exit 0
+    fi
+    if ! command -v duti >/dev/null 2>&1; then
+        echo "duti not installed — run 'brew bundle install --file=Brewfile'"
+        exit 1
+    fi
+    bundle="com.microsoft.VSCode"
+    # Generic UTIs covering broad file categories
+    utis=(
+        public.plain-text
+        public.text
+        public.source-code
+        public.script
+        public.shell-script
+        public.python-script
+        public.ruby-script
+        public.perl-script
+        public.php-script
+        public.json
+        public.xml
+        public.yaml
+        public.comma-separated-values-text
+        public.tab-separated-values-text
+        public.log
+        public.data
+    )
+    for uti in "${utis[@]}"; do
+        duti -s "$bundle" "$uti" all 2>/dev/null || true
+    done
+    # Extension-level associations (catches files without a registered UTI).
+    # Excludes Word (.doc, .docx) and Pages (.pages) by design.
+    exts=(
+        txt md markdown rst adoc org tex log csv tsv
+        json yaml yml toml xml ini conf cfg env properties plist
+        sh bash zsh fish ps1 bat cmd
+        js mjs cjs jsx ts tsx vue svelte astro
+        py rb php pl lua tcl r jl nim zig v
+        go rs swift kt kts java scala clj cljs cljc edn
+        c cc cpp cxx h hh hpp hxx m mm
+        cs fs fsx vb
+        ex exs erl hrl hs lhs ml mli ocaml
+        sol move
+        css scss sass less styl html htm xhtml svg
+        sql graphql gql proto thrift avsc
+        dart
+        tf hcl tfvars
+        dockerfile containerfile
+        gitignore gitattributes editorconfig nvmrc tool-versions
+        diff patch
+    )
+    for ext in "${exts[@]}"; do
+        duti -s "$bundle" ".$ext" all 2>/dev/null || true
+    done
+    echo "VS Code registered as default for text/code/data files."
+    echo "Word (.doc/.docx) and Pages (.pages) intentionally left untouched."
+
 # Remove stale symlinks in $HOME that point into dotfiles dirs
 cleanup-symlinks:
     #!/usr/bin/env zsh

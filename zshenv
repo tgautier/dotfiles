@@ -98,8 +98,10 @@ path+=(
 
 export PATH
 
-# Prefer VS Code as editor when available, fall back to vim for headless shells
-if command -v code >/dev/null 2>&1; then
+# Prefer VS Code as editor on a local GUI session, fall back to vim over SSH
+# or when code is not installed. `code --wait` over SSH would block git commit,
+# rebase -i, crontab, visudo, etc. waiting on a GUI window we cannot see.
+if [[ -z "$SSH_CONNECTION" && -z "$SSH_TTY" ]] && command -v code >/dev/null 2>&1; then
   export EDITOR="code --wait"
   export GIT_EDITOR="code --wait"
 else

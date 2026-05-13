@@ -1,2 +1,3 @@
 EXCLUDES="README.md .githooks"
 DOTFILES_DIRS="${HOME}/Workspace/tgautier/dotfiles ${HOME}/Workspace/tgautier/dotfiles-private"
+SYMLINK_DIRS="claude/skills claude/rules claude/hooks"

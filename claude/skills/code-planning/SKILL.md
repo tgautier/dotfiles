@@ -1,6 +1,6 @@
 ---
 name: code-planning
-description: |
+description: >
   Planning discipline skill for structuring implementation plans.
   Covers: trade-off evaluation, task decomposition, scope management, risk identification,
   complexity signals, plan structure, and planning anti-patterns.

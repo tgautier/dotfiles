@@ -1,13 +1,16 @@
 ---
 name: saas-product
-description: |
+description: >
   SaaS product design methodology for building user-facing application features.
   Covers: onboarding, empty states, billing UX, feature gating, dashboard design,
   notification patterns, settings/admin UX, audit trails, loading states, multi-tenancy.
   Use when: designing new SaaS features, creating dashboards, planning onboarding flows,
   or reviewing product-level UX decisions.
-version: 1.0.0
-date: 2026-02-28
+  Not for: design tokens and accessibility (use `/ux-design`),
+  React component patterns (use `/react`), API contracts behind features (use `/api-design`),
+  domain modeling (use `/domain-design`).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
 ---
 
@@ -15,7 +18,7 @@ user-invocable: true
 
 Methodology for building production SaaS features that drive user adoption and retention. Focused on patterns that reduce time-to-value and handle the complexity of multi-tenant, subscription-based applications.
 
-For design system tokens and accessibility, see `/ux-design`. For React component patterns, see `/react`. For API contracts behind features, see `/api-design`. For domain modeling, see `/domain-design`.
+> **Scope boundary:** For design system tokens and accessibility, see `/ux-design`. For React component patterns, see `/react`. For API contracts behind features, see `/api-design`. For domain modeling, see `/domain-design`.
 
 ---
 

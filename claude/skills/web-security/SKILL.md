@@ -1,6 +1,6 @@
 ---
 name: web-security
-description: |
+description: >
   Browser-facing and cross-cutting web security skill for production applications.
   Covers: CSRF, XSS, CSP, cookie security, CORS, session management, authentication,
   JWT security, OAuth 2.1, SSRF, security headers, input validation, dependency scanning,

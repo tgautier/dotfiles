@@ -1,14 +1,17 @@
 ---
 name: ux-design
-description: |
+description: >
   Design system methodology and UX engineering for production applications.
   Covers: design token architecture, visual hierarchy, component API design,
   form UX depth, ARIA widget patterns, motion/animation, dark mode strategy,
   theming, icon systems, and data visualization UX.
   Use when: building design systems, implementing complex form flows,
   adding animation, designing data visualizations, or auditing accessibility.
-version: 1.0.0
-date: 2026-02-28
+  Not for: responsive layout and breakpoints (use `/css-responsive`),
+  product-level patterns like onboarding or billing (use `/saas-product`),
+  React hooks and state (use `/react`).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
 ---
 
@@ -16,7 +19,7 @@ user-invocable: true
 
 Canonical reference for design system engineering, accessibility, and UX patterns. This skill absorbs and expands component design, form handling, and accessibility guidance — these topics live here, not in language-specific skills.
 
-For responsive CSS and Tailwind patterns, see `/css-responsive`. For SaaS-specific product patterns, see `/saas-product`. For React hooks and state, see `/react`.
+> **Scope boundary:** For responsive CSS and Tailwind patterns, see `/css-responsive`. For SaaS-specific product patterns, see `/saas-product`. For React hooks and state, see `/react`.
 
 ---
 

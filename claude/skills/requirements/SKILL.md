@@ -1,6 +1,6 @@
 ---
 name: requirements
-description: |
+description: >
   Pre-implementation requirements elicitation using EARS notation.
   Covers: acceptance criteria, edge cases, entity sketches, open questions.
   Use when: clarifying what to build before implementation on complex features

@@ -1,6 +1,6 @@
 ---
 name: code-research
-description: |
+description: >
   Source evaluation and research methodology skill for code and architecture decisions.
   Covers: source authority hierarchy, evaluating recency and context, conflict resolution,
   idiomatic code selection, research process, and reporting findings with attribution.

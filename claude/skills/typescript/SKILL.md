@@ -1,19 +1,23 @@
 ---
 name: typescript
-description: |
+description: >
   TypeScript language patterns, testing methodology, and build tooling for production applications.
   Covers: type safety, testing (Vitest/Playwright), performance optimization,
   security practices, linting, module patterns, and build configuration.
   Use when: configuring TypeScript strictness, writing tests, optimizing bundles,
   reviewing security, or setting up build tooling.
-version: 2.0.0
-date: 2026-02-28
+  Not for: React component patterns (use `/react`), route data loading (use `/react-router`),
+  component design and accessibility (use `/ux-design`), responsive CSS (use `/css-responsive`).
+version: 2.1.0
+date: 2026-05-13
 user-invocable: true
 ---
 
 # TypeScript Language & Build Tooling
 
-For React-specific patterns (hooks, state, composition), see the React skill (`/react`). For React Router loaders, actions, and data patterns, see the React Router skill (`/react-router`). For component design, form UX, and accessibility, see the UX Design skill (`/ux-design`). For CSS and responsive patterns, see the CSS & Responsive skill (`/css-responsive`).
+TypeScript language patterns, testing methodology, and build tooling for production applications.
+
+> **Scope boundary:** For React-specific patterns (hooks, state, composition), see `/react`. For React Router loaders, actions, and data patterns, see `/react-router`. For component design, form UX, and accessibility, see `/ux-design`. For CSS and responsive patterns, see `/css-responsive`.
 
 ---
 

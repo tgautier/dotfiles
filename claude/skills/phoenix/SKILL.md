@@ -1,21 +1,26 @@
 ---
 name: phoenix
-description: |
-  Full-stack Elixir/Phoenix development skill for LiveView applications.
+description: >
+  Full-stack Elixir/Phoenix development skill for Phoenix applications.
   Covers: Elixir idioms, Mix workflow, Phoenix conventions, Ecto patterns,
   LiveView, HEEx templates, forms, testing, JS/CSS integration, and UI/UX.
-  Use when: writing LiveViews, Ecto schemas, migrations, Phoenix routes,
+  LiveView is the primary interactive UI layer covered; the same conventions
+  apply to traditional Phoenix controllers and JSON APIs.
+  Use when: writing LiveViews, controllers, Ecto schemas, migrations, Phoenix routes,
   HEEx templates, or reviewing Elixir code quality.
-version: 1.0.0
-date: 2026-03-01
+  Not for: API contract design (use `/api-design`), domain modeling (use `/domain-design`),
+  responsive CSS (use `/css-responsive`), design system and accessibility (use `/ux-design`),
+  observability (use `/observability`).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
 ---
 
 # Phoenix Development
 
-Full-stack guidance for production Phoenix + LiveView applications. Covers the Elixir language layer, Phoenix framework conventions, Ecto data access, LiveView interactivity, HEEx templating, forms, and testing.
+Full-stack guidance for production Phoenix applications. Covers the Elixir language layer, Phoenix framework conventions, Ecto data access, LiveView interactivity, HEEx templating, forms, and testing. LiveView is the primary interactive UI layer documented here; the same conventions apply to traditional Phoenix controllers and JSON APIs.
 
-For API contract design and HTTP semantics, see `/api-design`. For domain modeling and schema evolution, see `/domain-design`. For responsive CSS and Tailwind v4, see `/css-responsive`. For design system and accessibility, see `/ux-design`. For observability, see `/observability`.
+> **Scope boundary:** For API contract design and HTTP semantics, see `/api-design`. For domain modeling and schema evolution, see `/domain-design`. For responsive CSS and Tailwind v4, see `/css-responsive`. For design system and accessibility, see `/ux-design`. For observability, see `/observability`.
 
 ---
 

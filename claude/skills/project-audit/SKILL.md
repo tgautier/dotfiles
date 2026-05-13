@@ -1,6 +1,16 @@
 ---
+name: project-audit
+description: >
+  Comprehensive project health audit methodology.
+  Covers: drift detection, tech currency, cross-reference integrity, codebase quality,
+  semantic checks that automation cannot perform.
+  Use when: running a quarterly audit, validating after major dependency upgrades,
+  checking cross-references after adding or removing rules/skills, or assessing
+  release readiness.
+  Not for: routine lint checks (run the project's `just check`/`just ci` recipe instead).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
-description: Comprehensive project health audit — drift detection, tech currency, cross-reference integrity, and codebase quality
 ---
 
 # Project Audit

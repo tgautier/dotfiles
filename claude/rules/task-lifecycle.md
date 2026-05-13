@@ -54,18 +54,11 @@ For plan quality methodology → `/code-planning`.
 
 ## Quality principles
 
-- **No laziness** — find root causes. No temporary fixes. Senior developer standards
-- **Never degrade quality incrementally** — every change must meet the same standard as the codebase
-- **Correctness over progress** — when uncertain, stop and ask the user. Never improvise to keep moving. Stopping is a signal to think harder, not to lower standards
-- **No sunk-cost defense** — when questioned about code you wrote, run the coherence check (`claude/rules/coherence-check.md`) before answering
+See `claude/rules/quality-principles.md`.
 
 ## Self-improvement
 
-After ANY correction from the user:
-
-1. Identify the pattern (wrong assumption, missed convention, skipped verification)
-2. **Rule first, memory second** — if the mistake could recur across sessions, write or update a rule (enforced). Only use memory for project-specific context that doesn't generalize
-3. Check if an existing rule already covered this — if so, the problem is discipline, not missing rules. Add the specific anti-pattern to make it harder to ignore
+See `claude/rules/findings-capture.md` — fires on corrections and on non-correction discoveries.
 
 ## Anti-patterns
 

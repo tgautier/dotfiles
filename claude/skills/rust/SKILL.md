@@ -3,16 +3,18 @@ name: rust
 description: >
   Rust development skill — conventions and quality discipline for any Rust code.
   Universal sections apply to all Rust (CLI, library, service): crate-level safety,
-  naming, error handling, validation, domain types and newtypes, testing,
-  security and dependency hygiene, performance, clippy/lint discipline, pre-commit checklist.
+  naming, error handling, validation, domain types and newtypes,
+  Diesel models, transactions, and migrations (when using Diesel),
+  testing, security and dependency hygiene, performance,
+  clippy/lint discipline, pre-commit checklist.
   HTTP-server sections apply to Axum + Diesel + utoipa APIs: handler design,
-  Diesel models and migrations, Tower middleware, server hardening, API patterns, resilience.
+  input extractor patterns, Tower middleware, server hardening, API patterns, resilience.
   Use when: writing any Rust code — CLI, library, handlers, models, migrations, tests —
   or reviewing Rust code quality.
   Not for: HTTP contract design (use `/api-design`), domain modeling (use `/domain-design`),
   cross-cutting web security (use `/web-security`).
-version: 3.2.0
-date: 2026-05-13
+version: 3.3.0
+date: 2026-05-14
 user-invocable: true
 ---
 
@@ -20,7 +22,7 @@ user-invocable: true
 
 Rust development conventions and quality discipline. Based on industry best practices from Cloudflare, Discord, AWS, and the broader Rust ecosystem.
 
-> **Scope boundary:** Universal Rust guidance lives in §1, §2, §4, §7, §12, §13, §14, §17, §18 — applies to all Rust code (CLI, library, service). HTTP-server guidance lives in §3, §5, §6, §8–§11, §15, §16 — specific to Axum + Diesel + utoipa APIs. For HTTP contract decisions (status codes, pagination, error format) see `/api-design`. For domain modeling see `/domain-design`. For cross-cutting web security see `/web-security`.
+> **Scope boundary:** Universal Rust guidance lives in §1, §2, §4, §6, §7, §8, §9, §12, §13, §14, §17, §18 — applies to all Rust code (CLI, library, service). Diesel-specific sections (§6 models, §8 transactions, §9 migrations) apply to any project using Diesel, not just HTTP services. HTTP-server guidance lives in §3, §5, §10, §11, §15, §16 — specific to Axum + Diesel + utoipa APIs. For HTTP contract decisions (status codes, pagination, error format) see `/api-design`. For domain modeling see `/domain-design`. For cross-cutting web security see `/web-security`.
 
 ---
 

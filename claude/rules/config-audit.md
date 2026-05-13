@@ -8,7 +8,8 @@ When adding, removing, or modifying any file in `.claude/rules/`, `.claude/skill
 - [ ] **Bidirectional cross-references** — if file A references file B, file B references file A where relevant
 - [ ] **CLAUDE.md concern map updated** — correct typographic convention: *italic* for global rules (from dotfiles), `backtick` for project-local rules
 - [ ] **CLAUDE.md rules index updated** — new rules appear in the correct subsection (global vs path-scoped) with concern and description
-- [ ] **`skill-triggers.md` updated** — if adding a skill: task-triggered table entry + composite workflows row if applicable
+- [ ] **`skill-triggers.md` updated** — if adding a skill: task-triggered table entry; file-pattern row if relevant
+- [ ] **`skill-routing.md` updated** — if the new skill participates in composite workflows or disambiguation, add the row
 - [ ] **Path-scoped globs verified** — run `just claude-check-rule-scopes` (if the project provides it) to confirm globs match existing files
 - [ ] **`just check` passes** — escaping + cross-refs + lint + typecheck
 - [ ] **No orphaned cross-references** — if removing a rule or skill, grep for references to it and update or remove them

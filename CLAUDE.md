@@ -93,16 +93,20 @@ Global rules (`claude/rules/`) are symlinked from this repo to all projects:
 | Rule | Purpose |
 | --- | --- |
 | `git-conventions.md` | Branching, commits, push workflow, merge strategy |
-| `skill-triggers.md` | Routing table — maps intents and file patterns to skills |
+| `skill-triggers.md` | Routing tables — file-pattern and task-triggered mappings to skills |
+| `skill-routing.md` | Composite workflows and disambiguation for multi-skill tasks |
 | `task-lifecycle.md` | How to assess, plan, implement, and verify work |
+| `findings-capture.md` | Capture non-obvious discoveries; verify claims before asserting |
+| `quality-principles.md` | Always-on conduct: no laziness, no quality degradation, correctness over progress |
+| `claude-config.md` | Two-tier config system (rules vs skills) |
+| `config-audit.md` | Checklist for adding/removing config files |
+| `coherence-check.md` | Sunk-cost defense prevention — evaluate own code objectively |
+| `restore-readiness.md` | Verify a real, restorable backup exists before any destructive action |
 | `ci-integrity.md` | CI must reflect reality — no silencing failures |
 | `secrets.md` | Never commit credentials outside dotfiles-private |
 | `shell.md` | zsh `!` corruption, jq compatibility |
-| `claude-config.md` | Two-tier config system (rules vs skills) |
-| `coherence-check.md` | Sunk-cost defense prevention — evaluate own code objectively |
-| `restore-readiness.md` | Verify a real, restorable backup exists before any destructive action |
 
-Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name`. Routing is defined in `skill-triggers.md`.
+Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name`. Routing is defined in `skill-triggers.md` and `skill-routing.md`.
 
 ## Project-Local Rules
 

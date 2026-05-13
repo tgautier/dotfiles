@@ -84,7 +84,7 @@ Broken links between config files that cause hallucinated guidance.
 **Method:** Automated checks handle existence verification. AI audit verifies semantic correctness — does the referenced section still say what the referencing file assumes it says?
 
 **Checklist:**
-- [ ] `skill-triggers.md` — all existing skills appear in the task-triggered table (no orphaned skills)
+- [ ] `skill-triggers.md` — every existing skill is reachable via at least one routing entry (task-triggered intent, file-pattern, or both); no orphaned skills
 - [ ] `skill-routing.md` — composite workflows reference valid combinations
 - [ ] CLAUDE.md rules index — matches actual rule files and their scoping
 - [ ] Bidirectional cross-references — if A references B, B references A

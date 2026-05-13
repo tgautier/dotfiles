@@ -96,8 +96,8 @@ Global rules (`claude/rules/`) are symlinked from this repo to all projects:
 | `skill-triggers.md` | Routing tables — file-pattern and task-triggered mappings to skills |
 | `skill-routing.md` | Composite workflows and disambiguation for multi-skill tasks |
 | `task-lifecycle.md` | How to assess, plan, implement, and verify work |
-| `findings-capture.md` | Capture non-obvious discoveries; verify claims before asserting |
-| `quality-principles.md` | Always-on conduct: no laziness, no quality degradation, correctness over progress |
+| `findings-capture.md` | Capture non-obvious discoveries (drift, quirks, working patterns) before moving on |
+| `quality-principles.md` | Always-on conduct: no laziness, no quality degradation, correctness over progress, verify before asserting |
 | `claude-config.md` | Two-tier config system (rules vs skills) |
 | `config-audit.md` | Checklist for adding/removing config files |
 | `coherence-check.md` | Sunk-cost defense prevention — evaluate own code objectively |

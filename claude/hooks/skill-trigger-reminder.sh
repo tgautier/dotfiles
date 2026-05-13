@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Edit/Write: emit a system reminder when the target path
+# PreToolUse hook on Edit/Write — emits a reminder when the target path
 # matches a file-pattern trigger in ~/.claude/rules/skill-triggers.md.
 #
 # Keep the pattern list in sync with the "File-pattern triggers" table in
@@ -34,5 +34,14 @@ matched=""
 
 unique=$(echo "$matched" | tr ' ' '\n' | awk 'NF && !seen[$0]++' | tr '\n' ' ' | sed 's/ *$//')
 
-echo "[skill-trigger] About to modify \`$file_path\`. Per ~/.claude/rules/skill-triggers.md (File-pattern triggers), load before continuing if not already loaded: $unique"
+msg="[skill-trigger] About to modify \`$file_path\`. Per ~/.claude/rules/skill-triggers.md (File-pattern triggers), load before continuing if not already loaded: $unique"
+
+# PreToolUse stdout is not injected into context — emit JSON with
+# hookSpecificOutput.additionalContext so the model actually sees the reminder.
+jq -n --arg msg "$msg" '{
+  hookSpecificOutput: {
+    hookEventName: "PreToolUse",
+    additionalContext: $msg
+  }
+}'
 exit 0

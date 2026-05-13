@@ -29,7 +29,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/code-planning` | Planning before implementation | "plan", "design the approach", "how should we" |
 | `/code-research` | Evaluating approaches or sources | "research", "compare options", "best practice" |
 | `/claude-authoring` | Writing or auditing Claude config | "audit rules", "write a rule", "config hygiene" |
-| `/rust` | Rust handlers, models, errors, config | "add a handler", "new model", "Rust error" |
+| `/rust` | Any Rust code — CLI, library, or service | "new rust project", "rust CLI", "cargo new", "add a handler", "new model", "Rust error" |
 | `/react` | React components, hooks, composition | "add a component", "write a hook", "extract component" |
 | `/react-router` | Route data loading, mutations, SSR | "new route with data", "form mutation", "loader", "action" |
 | `/typescript` | Type safety, testing, build tooling | "write a test", "fix type error", "bundle size" |
@@ -71,6 +71,7 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 | Full-stack feature with mobile | project feature skill | `/flutter`, `/rust`, `/api-design` | "add X to mobile", "new mobile screen", "API + mobile" |
 | Flutter feature with generated client | `/flutter` | `/api-design` | "new screen with API data", "Flutter + REST" |
 | Flutter design system | `/flutter` | `/ux-design` | "Flutter theming", "design tokens in Flutter" |
+| New project scaffold | `/code-planning` | language skill (`/rust`, `/typescript`, `/phoenix`, `/flutter`) | "new project", "scaffold X", "create X from scratch", "basic X app" |
 
 For full-stack features: check the project's `CLAUDE.md` for an end-to-end feature skill (e.g., `/new-feature`) that orchestrates the pipeline order.
 

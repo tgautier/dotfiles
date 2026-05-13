@@ -1,6 +1,6 @@
 ---
 name: roborev
-description: |
+description: >
   Automated code review management with roborev daemon and CLI.
   Covers: multi-agent reviews (claude, copilot, codex), review modes (interactive/auto),
   fixing findings, pre-push workflow, daemon management, per-project config.

@@ -1,21 +1,23 @@
 ---
 name: flutter
-description: |
-  Production Flutter development skill for native mobile applications.
+description: >
+  Production Flutter development skill for Flutter applications across mobile, web, and desktop targets.
   Covers: MVVM architecture, Riverpod state management, go_router navigation,
   Freezed models, widget composition, theming (Material 3), testing methodology,
   performance optimization, and platform channels.
   Use when: writing widgets, providers, screens, models, tests, or reviewing Flutter code quality.
-version: 1.0.0
-date: 2026-03-27
+  Not for: API contract design (use `/api-design`), domain modeling (use `/domain-design`),
+  design system and accessibility (use `/ux-design`), observability (use `/observability`).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
 ---
 
 # Flutter Development
 
-Production guidance for Flutter native mobile applications. Based on the Flutter team's official architecture guide (2024), Riverpod documentation, Very Good Ventures patterns, and Andrea Bizzotto's architecture series.
+Production guidance for Flutter applications. Patterns target mobile first but apply equally to Flutter web and desktop builds; platform-specific deviations are called out where relevant. Based on the Flutter team's official architecture guide (2024), Riverpod documentation, Very Good Ventures patterns, and Andrea Bizzotto's architecture series.
 
-For API contract design and HTTP semantics, see `/api-design`. For domain modeling, see `/domain-design`. For design system and accessibility, see `/ux-design`. For observability, see `/observability`.
+> **Scope boundary:** For API contract design and HTTP semantics, see `/api-design`. For domain modeling, see `/domain-design`. For design system and accessibility, see `/ux-design`. For observability, see `/observability`.
 
 ---
 

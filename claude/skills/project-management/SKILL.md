@@ -1,6 +1,6 @@
 ---
 name: project-management
-description: |
+description: >
   Tool-agnostic conventions for writing issues and PRs.
   Covers: issue structure, PR format, naming consistency, lifecycle.
   Use when: creating issues, writing PR descriptions, filing bugs, or planning work items.

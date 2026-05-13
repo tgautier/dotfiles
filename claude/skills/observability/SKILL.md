@@ -1,6 +1,6 @@
 ---
 name: observability
-description: |
+description: >
   Language-agnostic observability skill covering traces, metrics, structured logging,
   health checks, frontend RUM, security, and configuration patterns.
   Covers: three pillars, span naming, metric naming, cardinality discipline, sampling,

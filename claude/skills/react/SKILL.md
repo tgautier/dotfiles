@@ -1,13 +1,17 @@
 ---
 name: react
-description: |
+description: >
   React 19 development patterns for production web applications.
   Covers: React 19 features, hooks, component composition, state management,
   error handling, and testing methodology.
   Use when: writing React components, managing component state, handling errors,
   testing components, or designing component APIs.
-version: 2.1.0
-date: 2026-03-25
+  Not for: route data loading and mutations (use `/react-router`),
+  TypeScript build tooling and testing (use `/typescript`),
+  component design, form UX, and accessibility (use `/ux-design`),
+  responsive CSS (use `/css-responsive`).
+version: 2.2.0
+date: 2026-05-13
 user-invocable: true
 ---
 
@@ -15,7 +19,7 @@ user-invocable: true
 
 React 19 component patterns, hooks, and testing methodology for production applications. This covers the component and composition layer — component design, hooks, state management, error handling within components, and testing strategies.
 
-For React Router loaders, actions, mutations, and data patterns, see `/react-router`. For TypeScript strictness, testing, and build tooling, see `/typescript`. For component design, form UX, and accessibility, see `/ux-design`. For CSS and responsive patterns, see `/css-responsive`.
+> **Scope boundary:** For React Router loaders, actions, mutations, and data patterns, see `/react-router`. For TypeScript strictness, testing, and build tooling, see `/typescript`. For component design, form UX, and accessibility, see `/ux-design`. For CSS and responsive patterns, see `/css-responsive`.
 
 ---
 

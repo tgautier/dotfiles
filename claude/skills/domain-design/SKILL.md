@@ -1,13 +1,16 @@
 ---
 name: domain-design
-description: |
+description: >
   Language-agnostic domain design skill for modeling business domains.
   Covers: bounded contexts, aggregates, entities, value objects, domain events,
   data modeling, schema evolution, system decomposition, and anti-patterns.
   Use when: designing new domain models, evaluating aggregate boundaries, planning
   schema changes, decomposing systems, or reviewing domain modeling decisions.
-version: 1.0.0
-date: 2026-02-22
+  Not for: pre-implementation requirements (use `/requirements`),
+  implementation in a specific language (use `/rust`, `/typescript`, or `/phoenix`),
+  HTTP resource design (use `/api-design`).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
 ---
 

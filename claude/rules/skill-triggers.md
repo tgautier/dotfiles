@@ -1,10 +1,10 @@
 # Skill Triggers
 
-Routing table for skill selection. Always loaded — no path scoping, because intent-based routing must be available regardless of which files are open.
+Routing tables for skill selection. Always loaded — no path scoping, because intent-based routing must be available regardless of which files are open. For composite workflows (combining skills) and disambiguation when intent maps to several skills, see `claude/rules/skill-routing.md`.
 
 ## File-pattern triggers
 
-When editing files that match a pattern below, load the corresponding skill before making changes.
+When editing files that match a pattern below, load the corresponding skill before making changes. A `PreToolUse` hook (`claude/hooks/skill-trigger-reminder.sh`) injects a reminder into context on every `Edit`/`Write` whose path matches a row. Keep the hook's pattern list in sync with this table when adding rows.
 
 | File pattern | Skill | Why |
 | --- | --- | --- |
@@ -12,7 +12,13 @@ When editing files that match a pattern below, load the corresponding skill befo
 | `*.md` | `/markdown` | Consistent formatting across all Markdown files |
 | `docs/**` | `/documentation` | Doc structure, navigation, drift prevention |
 | `**/CLAUDE.md`, `.claude/**`, `claude/**`, `memory/**` | `/claude-authoring` | Config structure and authoring conventions |
+| `Cargo.toml`, `*.rs` | `/rust` | Rust conventions, error handling, testing discipline |
+| `*.tsx`, `*.jsx` | `/react` | React component patterns, hooks, composition |
+| `tsconfig.json`, `*.ts`, `*.mts`, `*.cts` | `/typescript` | Type safety, testing, build configuration |
+| `*.css`, `tailwind.config.*` | `/css-responsive` | Tailwind v4 conventions, responsive patterns |
+| `*.ex`, `*.exs` | `/phoenix` | Elixir/Phoenix conventions, Ecto, HEEx |
 | `*.dart`, `pubspec.yaml`, `pubspec.lock` | `/flutter` | Flutter architecture and widget patterns |
+| `openapi.yaml`, `openapi.yml`, `*.openapi.yaml`, `*.openapi.yml` | `/api-design` | HTTP semantics, error format, pagination |
 
 ## Task-triggered skills
 
@@ -23,7 +29,7 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/code-planning` | Planning before implementation | "plan", "design the approach", "how should we" |
 | `/code-research` | Evaluating approaches or sources | "research", "compare options", "best practice" |
 | `/claude-authoring` | Writing or auditing Claude config | "audit rules", "write a rule", "config hygiene" |
-| `/rust` | Rust handlers, models, errors, config | "add a handler", "new model", "Rust error" |
+| `/rust` | Any Rust code — CLI, library, or service | "new rust project", "rust CLI", "cargo new", "add a handler", "new model", "Rust error" |
 | `/react` | React components, hooks, composition | "add a component", "write a hook", "extract component" |
 | `/react-router` | Route data loading, mutations, SSR | "new route with data", "form mutation", "loader", "action" |
 | `/typescript` | Type safety, testing, build tooling | "write a test", "fix type error", "bundle size" |
@@ -42,37 +48,4 @@ When the user's request matches an intent below, invoke the skill before startin
 | `/flutter` | Flutter widgets, state, navigation, theming | "add a screen", "new widget", "Riverpod provider", "Flutter navigation", "dart model" |
 | `/project-audit` | Comprehensive project health audit | "full audit", "audit the project", "check for drift", "are our rules still accurate" |
 
-## Composite workflows
-
-Most real tasks need multiple skills. When a task matches a pattern below, load all listed skills — primary first.
-
-| Task shape | Primary | Also load | Trigger signals |
-| --- | --- | --- | --- |
-| Full-stack feature (API + page) | project feature skill | `/rust`, `/api-design`, `/react-router`, `/react`, `/css-responsive` | "add X feature", "new endpoint with UI" |
-| API endpoint (no frontend) | `/rust` | `/api-design` | "add endpoint", "new handler" |
-| Frontend page with data | `/react-router` | `/react`, `/css-responsive` | "new page", "add a route with data", "new page with loader" |
-| Form mutation | `/react-router` | `/ux-design` | "form submission", "mutation", "add an action" |
-| Database/schema change | `/domain-design` | `/rust` | "add a migration", "new column", "change schema" |
-| Design system work | `/ux-design` | `/css-responsive` | "update tokens", "theme", "component variants" |
-| Dashboard or analytics | `/saas-product` | `/react`, `/css-responsive` | "build dashboard", "add charts", "KPI cards" |
-| Security hardening | `/web-security` | `/rust` or `/react` | "security audit", "pen test findings" |
-| Testing campaign | `/typescript` | `/react` or `/rust` | "add test coverage", "write E2E tests" |
-| Performance optimization | `/typescript` | `/css-responsive` | "bundle analysis", "lighthouse", "CLS" |
-| Pre-push workflow | `/roborev` | — | "push my changes", "ready to push" |
-| Complex domain feature | `/requirements` | `/domain-design`, `/code-planning` | "new entity", "new domain concept", "multi-entity feature" |
-| Full-stack Phoenix feature | `/phoenix` | `/api-design`, `/domain-design` | "add LiveView with Ecto", "new Phoenix feature", "LiveView + schema" |
-| Phoenix testing campaign | `/phoenix` | `/domain-design` | "write LiveView tests", "test Ecto queries" |
-| Full-stack feature with mobile | project feature skill | `/flutter`, `/rust`, `/api-design` | "add X to mobile", "new mobile screen", "API + mobile" |
-| Flutter feature with generated client | `/flutter` | `/api-design` | "new screen with API data", "Flutter + REST" |
-| Flutter design system | `/flutter` | `/ux-design` | "Flutter theming", "design tokens in Flutter" |
-
-For full-stack features: check the project's `CLAUDE.md` for an end-to-end feature skill (e.g., `/new-feature`) that orchestrates the pipeline order.
-
-## Disambiguation
-
-When intent is ambiguous, prefer the more specific skill:
-
-- "Fix a bug" → investigate first, then load the skill matching the root cause layer
-- "Add validation" → `/rust` if server-side, `/ux-design` if form UX, `/react` if client logic
-- "Refactor" → load the skill matching the code layer being refactored
-- "Write tests" → `/typescript` (testing methodology), plus the layer-specific skill for context
+For composite workflows (multi-skill tasks) and ambiguity resolution, see `claude/rules/skill-routing.md`.

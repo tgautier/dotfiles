@@ -1,13 +1,16 @@
 ---
 name: react-router
-description: |
+description: >
   React Router v7 framework patterns for data loading, mutations, error handling, and routing.
   Covers: loaders, actions, data revalidation, Form patterns, route error boundaries,
   type-safe loader/action data, and progressive enhancement.
   Use when: building server-first applications, handling route-level data fetching,
   processing form mutations, managing URL state, or implementing error handling.
-version: 1.1.0
-date: 2026-03-25
+  Not for: component composition and hooks (use `/react`),
+  TypeScript build tooling (use `/typescript`),
+  component design and accessibility (use `/ux-design`).
+version: 1.2.0
+date: 2026-05-13
 user-invocable: true
 ---
 
@@ -15,7 +18,7 @@ user-invocable: true
 
 Server-first data and mutation patterns for React Router v7. React Router v7 combines client-side routing with server-side data loading and mutation handling — eliminating the need for SPA-era client-side data layers.
 
-For general React patterns (hooks, state, composition), see `/react`. For TypeScript language patterns and build tooling, see `/typescript`. For component design and accessibility, see `/ux-design`.
+> **Scope boundary:** For general React patterns (hooks, state, composition), see `/react`. For TypeScript language patterns and build tooling, see `/typescript`. For component design and accessibility, see `/ux-design`.
 
 ---
 

@@ -1,6 +1,16 @@
 ---
+name: project-audit
+description: >
+  Comprehensive project health audit methodology.
+  Covers: drift detection, tech currency, cross-reference integrity, codebase quality,
+  semantic checks that automation cannot perform.
+  Use when: running a quarterly audit, validating after major dependency upgrades,
+  checking cross-references after adding or removing rules/skills, or assessing
+  release readiness.
+  Not for: routine lint checks (run the project's `just check`/`just ci` recipe instead).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
-description: Comprehensive project health audit — drift detection, tech currency, cross-reference integrity, and codebase quality
 ---
 
 # Project Audit
@@ -74,8 +84,8 @@ Broken links between config files that cause hallucinated guidance.
 **Method:** Automated checks handle existence verification. AI audit verifies semantic correctness — does the referenced section still say what the referencing file assumes it says?
 
 **Checklist:**
-- [ ] `skill-triggers.md` — all existing skills are routed (no orphaned skills)
-- [ ] `skill-triggers.md` — composite workflows reference valid combinations
+- [ ] `skill-triggers.md` — every existing skill is reachable via at least one routing entry (task-triggered intent, file-pattern, or both); no orphaned skills
+- [ ] `skill-routing.md` — composite workflows reference valid combinations
 - [ ] CLAUDE.md rules index — matches actual rule files and their scoping
 - [ ] Bidirectional cross-references — if A references B, B references A
 

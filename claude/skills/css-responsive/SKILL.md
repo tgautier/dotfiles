@@ -1,21 +1,24 @@
 ---
 name: css-responsive
-description: |
-  Mobile-first CSS architecture and Tailwind CSS v4 strategy for responsive web applications.
-  Covers: breakpoint strategy, touch interaction, viewport handling, Tailwind v4 patterns,
+description: >
+  Mobile-first CSS and responsive layout skill for production web applications.
+  Covers: breakpoint strategy, touch interaction, viewport handling,
   responsive typography, container queries, layout patterns, navigation patterns, performance.
-  Use when: building responsive layouts, implementing mobile-first designs, configuring
-  Tailwind v4, or auditing responsive behavior across breakpoints.
-version: 1.0.0
-date: 2026-02-23
+  Tailwind CSS v4 is the default implementation; the architectural patterns apply to plain CSS, CSS-in-JS, or other utility frameworks.
+  Use when: building responsive layouts, implementing mobile-first designs,
+  configuring Tailwind v4, or auditing responsive behavior across breakpoints.
+  Not for: design tokens or visual hierarchy (use `/ux-design`),
+  React component composition (use `/react`).
+version: 1.1.0
+date: 2026-05-13
 user-invocable: true
 ---
 
 # CSS & Responsive Design
 
-Mobile-first CSS architecture for production web applications. Covers responsive strategy, Tailwind CSS v4 patterns, and performance optimization.
+Mobile-first CSS architecture for production web applications. Covers responsive strategy, performance, and layout patterns. Tailwind CSS v4 is the default implementation referenced in examples, but the architectural patterns apply to plain CSS, CSS-in-JS, or other utility frameworks.
 
-For design tokens and visual hierarchy, see `/ux-design`. For React component patterns, see `/react`. For project-specific breakpoints and Tailwind configuration, check the project's `CLAUDE.md`.
+> **Scope boundary:** Design tokens, visual hierarchy, and component design are in `/ux-design`. React component patterns are in `/react`. Project-specific breakpoints and Tailwind configuration belong in the project's `CLAUDE.md`.
 
 ---
 

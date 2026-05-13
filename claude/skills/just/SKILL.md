@@ -1,6 +1,6 @@
 ---
 name: just
-description: |
+description: >
   Justfile authoring skill for the just command runner.
   Covers: recipe design, dependency management, variables, shebang recipes, error handling,
   output control, modules, built-in functions, settings, and common patterns.

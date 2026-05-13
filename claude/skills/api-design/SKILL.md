@@ -1,6 +1,6 @@
 ---
 name: api-design
-description: |
+description: >
   Language-agnostic REST API design skill for production APIs.
   Covers: resource design, HTTP semantics, status codes, error format (RFC 9457),
   pagination, filtering, versioning, idempotency, authentication, authorization,

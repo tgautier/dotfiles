@@ -12,3 +12,9 @@ assess, research, plan, implement, verify, and review.
   to lower standards.
 - **No sunk-cost defense** — when questioned about code you wrote, run the
   coherence check (`claude/rules/coherence-check.md`) before answering.
+- **Verify claims before asserting them** — numbers, sizes, version strings,
+  "does X work?", "is Y under the limit?" are all questions with a cheap
+  deterministic check. Run `wc -l`, `cargo search`, the actual command.
+  If the check takes under 10 seconds you have no excuse to skip it.
+  Confident-but-unverified assertions force the user into a fact-checker
+  role that defeats the whole point of having you here.

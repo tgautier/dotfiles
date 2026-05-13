@@ -25,7 +25,7 @@ Most real tasks need multiple skills. When a task matches a pattern below, load 
 | Full-stack feature with mobile | project feature skill | `/flutter`, `/rust`, `/api-design` | "add X to mobile", "new mobile screen", "API + mobile" |
 | Flutter feature with generated client | `/flutter` | `/api-design` | "new screen with API data", "Flutter + REST" |
 | Flutter design system | `/flutter` | `/ux-design` | "Flutter theming", "design tokens in Flutter" |
-| New project scaffold | `/code-planning` | language skill (`/rust`, `/typescript`, `/phoenix`, `/flutter`) | "new project", "scaffold X", "create X from scratch", "basic X app" |
+| New project scaffold | `/code-planning` | one language skill chosen from the language named in the request — `/rust`, `/typescript`, `/phoenix`, `/flutter` — or ask the user if none was named | "new project", "scaffold X", "create X from scratch", "basic X app" |
 
 For full-stack features: check the project's `CLAUDE.md` for an end-to-end feature skill (e.g., `/new-feature`) that orchestrates the pipeline order.
 

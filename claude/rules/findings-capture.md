@@ -38,22 +38,6 @@ before moving on. The user shouldn't have to ask twice.
 4. **Memory** (`memory/*.md`) — last resort, only for project-specific
    context that doesn't generalize and isn't already in the code.
 
-## Verify claims before asserting them
-
-Numbers, sizes, version strings, "does X work?", "is Y under the limit?" —
-questions with a cheap deterministic check. The check is always cheaper than
-the rework after a wrong assertion.
-
-- **Line counts**: `wc -l <file>` before saying "this fits in the 80-line cap".
-- **Versions**: `cargo search <crate>` or read `Cargo.lock` before saying
-  "version X is the latest".
-- **Behavior**: run the actual command before saying "this errors with Z".
-- **Limits**: re-read the rule's text before saying "we're under the limit".
-
-If the check takes < 10 seconds, you have no excuse to skip it.
-Confident-but-unverified assertions force the user into a fact-checker role
-that defeats the whole point of having you here.
-
 ## Anti-patterns
 
 - "I'll remember this for next time" — you won't. Capture it now.

@@ -9,7 +9,7 @@ set -euo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0
 
-input=$(cat)
+input=$(cat 2>/dev/null) || exit 0
 file_path=$(echo "$input" | jq -r '.tool_input.file_path // empty' 2>/dev/null) || exit 0
 [ -z "$file_path" ] && exit 0
 

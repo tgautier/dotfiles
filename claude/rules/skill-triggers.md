@@ -4,7 +4,7 @@ Routing table for skill selection. Always loaded — no path scoping, because in
 
 ## File-pattern triggers
 
-When editing files that match a pattern below, load the corresponding skill before making changes.
+When editing files that match a pattern below, load the corresponding skill before making changes. A `PreToolUse` hook (`claude/hooks/skill-trigger-reminder.sh`) injects a reminder into context on every `Edit`/`Write` whose path matches a row. Keep the hook's pattern list in sync with this table when adding rows.
 
 | File pattern | Skill | Why |
 | --- | --- | --- |
@@ -12,7 +12,13 @@ When editing files that match a pattern below, load the corresponding skill befo
 | `*.md` | `/markdown` | Consistent formatting across all Markdown files |
 | `docs/**` | `/documentation` | Doc structure, navigation, drift prevention |
 | `**/CLAUDE.md`, `.claude/**`, `claude/**`, `memory/**` | `/claude-authoring` | Config structure and authoring conventions |
+| `Cargo.toml`, `*.rs` | `/rust` | Rust conventions, error handling, testing discipline |
+| `*.tsx`, `*.jsx` | `/react` | React component patterns, hooks, composition |
+| `tsconfig.json`, `*.ts`, `*.mts`, `*.cts` | `/typescript` | Type safety, testing, build configuration |
+| `*.css`, `tailwind.config.*` | `/css-responsive` | Tailwind v4 conventions, responsive patterns |
+| `*.ex`, `*.exs` | `/phoenix` | Elixir/Phoenix conventions, Ecto, HEEx |
 | `*.dart`, `pubspec.yaml`, `pubspec.lock` | `/flutter` | Flutter architecture and widget patterns |
+| `openapi.yaml`, `openapi.yml`, `*.openapi.yaml`, `*.openapi.yml` | `/api-design` | HTTP semantics, error format, pagination |
 
 ## Task-triggered skills
 

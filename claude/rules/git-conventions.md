@@ -17,6 +17,7 @@
 - Never add "Generated with Claude Code" or similar footers to PRs
 - Use conventional commit format: `type(scope): description`
   - `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `perf`
+- A trailing `!` (`feat!:`) or a `BREAKING CHANGE:` line marks a breaking change; commit types drive version bumps per `claude/rules/versioning.md`
 - Keep the first line under 72 characters
 - Only commit when explicitly asked
 

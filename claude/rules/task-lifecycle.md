@@ -45,7 +45,7 @@ For plan quality methodology → `/code-planning`.
 - **Staff engineer bar** — "Would a staff engineer approve this?"
 - **Demand elegance** — "Is there a more elegant way?" If yes, propose it to the user — don't refactor without approval
 - **Diff against intent** — does the change do exactly what was asked? No more, no less?
-- **CLAUDE.md drift check** — if the PR adds new files/config/rules, verify CLAUDE.md still reflects reality
+- **Doc drift check** — verify every doc that the change touches still matches reality: `README.md`, `CLAUDE.md`, `docs/**`, `CHANGELOG.md`. Grep for the affected concept; update every hit in the same PR. See the "Docs reflect reality" principle in `claude/rules/quality-principles.md`.
 
 ### Failing tests are blockers
 

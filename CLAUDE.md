@@ -105,6 +105,7 @@ Global rules (`claude/rules/`) are symlinked from this repo to all projects:
 | `ci-integrity.md` | CI must reflect reality — no silencing failures |
 | `secrets.md` | Never commit credentials outside dotfiles-private |
 | `shell.md` | zsh `!` corruption, jq compatibility |
+| `versioning.md` | SemVer policy, changelog format, release procedure |
 
 Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name`. Routing is defined in `skill-triggers.md` and `skill-routing.md`.
 

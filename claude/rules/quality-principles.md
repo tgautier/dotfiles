@@ -18,3 +18,10 @@ assess, research, plan, implement, verify, and review.
   If the check takes under 10 seconds you have no excuse to skip it.
   Confident-but-unverified assertions force the user into a fact-checker
   role that defeats the whole point of having you here.
+- **Docs reflect reality** — any change that alters behavior, stack, status,
+  scope, or version invalidates docs. Grep the repo (`README.md`, `CLAUDE.md`,
+  `docs/**`, `CHANGELOG.md`) for the affected concept and update every hit
+  in the *same* PR. Stale docs are worse than absent docs: they mislead the
+  reader with confidence. If you pivoted (TS → Rust, single → workspace, v1
+  → v1.x), assume the original docs are now wrong somewhere and audit them
+  end-to-end before declaring the task done.

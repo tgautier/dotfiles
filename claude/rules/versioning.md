@@ -39,7 +39,7 @@ Every project keeps a `CHANGELOG.md` at the root, in [Keep a Changelog](https://
 1. **Bump the version** in the canonical location, no other places — derive everywhere else.
 2. **Update `CHANGELOG.md`**: move `[Unreleased]` content under the new version heading; date it.
 3. **Commit** with `chore(release): vX.Y.Z`.
-4. **Tag** with `git tag vX.Y.Z` (annotated, signed if signing is configured). Tag and crate/package versions must agree.
+4. **Tag** with `git tag -a vX.Y.Z -m "vX.Y.Z"` (annotated) — or `git tag -s vX.Y.Z -m "vX.Y.Z"` if commit signing is configured. Plain `git tag vX.Y.Z` is lightweight (no tagger / timestamp / message) and breaks signed-tag verification — don't use it. Tag and crate/package versions must agree.
 5. **Push** the tag (`git push origin vX.Y.Z`) and the commit. The tag is the immutable artifact.
 6. **GitHub release** (`gh release create vX.Y.Z --notes-from-tag` or with `--notes-file CHANGELOG.md` excerpt). Releases attach binaries / artifacts if the project ships them.
 

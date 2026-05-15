@@ -1,44 +1,22 @@
 # Dotfiles Repository Conventions
 
-Cross-platform personal dotfiles for macOS, Linux, and WSL2, managed with rcm (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`.
-
-## Config System
-
-Two-tier model for organizing Claude Code instructions — **rules** (constraints) and **skills** (methodology):
-
-- **Global rules** (`claude/rules/`): symlinked to all projects via rcm. Loaded automatically — either always, or when `paths:` frontmatter matches the files being edited.
-- **Skills** (`claude/skills/<name>/SKILL.md`): on-demand, invoked via `/name`. Reusable methodology and checklists.
-- **Project-local rules** (`.claude/rules/`): specific to one repo, not symlinked. Same auto-loading behavior as global rules.
-
-### Frontmatter conventions
-
-Skill files (`SKILL.md`) require YAML frontmatter with: `name`, `description`, `version` (semver, unquoted), `date`, `user-invocable` (boolean). This is required metadata, not boilerplate.
-
-Rules may include `paths:` frontmatter for auto-loading only when working on matching files. Rules without `paths:` load on every task.
-
-### Naming
-
-- Rules: `kebab-case.md` — descriptive noun or noun-phrase
-- Skills: `kebab-case/SKILL.md` — verb-phrase or domain name
-- Path-scoped rules use a layer prefix (`domain-`, `frontend-`, `rust-`, `db-`)
+Cross-platform personal dotfiles for macOS, Linux, and WSL2, managed with rcm (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`. The global Claude Code config (rules, skills, hooks) lives in the companion private repo `dotfiles-private` and is NOT in this tree.
 
 ## Hard Invariants
 
 Flag violations of these as blockers:
 
 1. **Secrets**: never commit credentials, tokens, API keys, or secrets. This repo is public on GitHub. The only exception is `dotfiles-private` (a separate private repo).
-2. **Shell compatibility**: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content. Rule and skill `.md` files must not contain `\!` — flag any occurrence as corruption.
-3. **One concern per file**: each rule covers exactly one topic. If two unrelated topics exist in one file, flag for split.
-4. **80-line signal**: rules over 80 lines likely cover too much. Flag for review. Skills are allowed to be longer.
-5. **Cross-references**: if file A references file B, verify B exists. Broken cross-refs are blockers.
-6. **Hook exit codes**: PreToolUse hooks in `claude/hooks/` must use `exit 2` (block with reason on stderr) or `exit 0` (allow). Never `exit 1` for intentional blocks.
-7. **No project-specific references**: global rules and skills must never reference project-local paths (`.claude/rules/`, specific source paths). Use generic language like "check the project's CLAUDE.md".
+2. **Personal/sensitive content**: never include PII, employer name, colleague names, broker/financial figures, internal product/project names, or memory-file references that hint at sensitive content. Examples and placeholders count. This repo is public.
+3. **Shell compatibility**: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content. Files must not contain `\!` — flag any occurrence as corruption.
+4. **Cross-platform**: any shell, tmux, or tool config change must consider macOS, Linux, and WSL2. Guard platform-specific code with `$PLATFORM` checks (set in `zshenv`). Brewfile edits must be mirrored in `Brewfile.linux` for CLI tools.
+5. **Project-local rule** (`.claude/rules/brewfile.md`): dual-Brewfile sync + alphabetical sorting inside sections.
 
 ## Cross-Platform Discipline
 
 This repo targets macOS, Linux, and WSL2. Every change must consider all three:
 
-- Shell config: guard platform-specific code with `$PLATFORM` checks (set in `zshenv`)
+- Shell config: guard platform-specific code with `$PLATFORM` checks
 - Brewfiles: edit both `Brewfile` (macOS) and `Brewfile.linux` for CLI tools. Keep alphabetical order within sections.
 - tmux: use `if-shell` platform detection for OS-specific commands (clipboard, terminfo)
 - Never assume macOS-only tools exist (`pbcopy`, `open`) — provide WSL (`clip.exe`) and Linux (`xclip`) alternatives
@@ -53,7 +31,5 @@ This repo targets macOS, Linux, and WSL2. Every change must consider all three:
 
 ## What Not to Flag
 
-- YAML frontmatter in `SKILL.md` files — it is required metadata
-- Files over 200 lines in `claude/skills/` — skills are allowed to be longer than rules
 - Shell scripts using `jq` for JSON parsing — `jq` is expected to be available on macOS/Linux
-- Files excluded from markdownlint: `claude/skills/**` (skills have their own formatting conventions)
+- Brewfile lines that look long — keep them as written, alphabetically sorted within their section

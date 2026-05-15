@@ -18,7 +18,7 @@ HARD INVARIANTS — flag violations as blockers:
 SCOPE CONTEXT — understand before flagging:
 
 - rcup symlinks: tracked files are symlinked into $HOME by rcm based on `rcrc`. Both this repo and `dotfiles-private` are merged via `DOTFILES_DIRS`.
-- Versioning: SemVer policy and release procedure documented in the global `versioning.md` rule (loaded from `~/.claude/rules/`).
+- Versioning: SemVer and changelog policy are defined in the global Claude Code config (in `dotfiles-private`) and auto-load via rcm. Don't expect a `versioning.md` file in this repo's tree.
 - CI: `just ci` runs shell, markdown, Brewfile, and mise lints — the same checks run in GitHub Actions.
 
 DO NOT FLAG:

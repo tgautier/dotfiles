@@ -14,7 +14,7 @@ Personal financial workflows, vault-specific content, employer-tied notes, colle
 
 ## Repository Overview
 
-Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`. A companion private repo (`dotfiles-private`) is merged via `DOTFILES_DIRS` in `rcrc`; it hosts plaintext shell secrets, the Synology NAS arr-stack, and the global Claude Code config.
+Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`. A companion private repo (`dotfiles-private`) is merged via `DOTFILES_DIRS` in `rcrc`; it hosts plaintext shell secrets, personal workflow config, and the global Claude Code config.
 
 ## Key Commands
 

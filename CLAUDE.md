@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Every `Write`, `Edit`, and `git add` in this working tree ships to a public GitHub repo. Before any such action, apply the `public-repo-hygiene` rule (auto-loaded from `~/.claude/rules/public-repo-hygiene.md` via rcm symlinks):
 
-1. Read the sensitive-terms list at `~/Workspace/tgautier/dotfiles-private/claude/sensitive-terms.md` (ask the user to seed it if missing)
+1. Read the sensitive-terms list at `~/.claude/sensitive-terms.md` (rcm symlink to `dotfiles-private/claude/sensitive-terms.md` — portable across macOS, Linux, WSL)
 2. Scan the new/changed content against that list AND the categorical examples in the rule (PII, employer, financial, colleagues, internal references, session context)
 3. Sensitive content → route to `dotfiles-private` or redact to neutral placeholders. **Never** rely on "I'll catch it at commit time" — scan on every write
 

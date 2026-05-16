@@ -2,9 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ This repo is PUBLIC
+
+Every `Write`, `Edit`, and `git add` in this working tree ships to a public GitHub repo. Before any such action, apply the `public-repo-hygiene` rule (auto-loaded from `~/.claude/rules/public-repo-hygiene.md` via rcm symlinks):
+
+1. Read the sensitive-terms list at `~/.claude/sensitive-terms.md` (rcm symlink to `dotfiles-private/claude/sensitive-terms.md` — portable across macOS, Linux, WSL)
+2. Scan the new/changed content against that list AND the categorical examples in the rule (PII, employer, financial, colleagues, internal references, session context)
+3. Sensitive content → route to `dotfiles-private` or redact to neutral placeholders. **Never** rely on "I'll catch it at commit time" — scan on every write
+
+Personal financial workflows, vault-specific content, employer-tied notes, colleague names, and the global Claude Code config (rules, skills, hooks) all live in `dotfiles-private`, never here.
+
 ## Repository Overview
 
-Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`. A companion private repo (`dotfiles-private`) is merged via `DOTFILES_DIRS` in `rcrc`.
+Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`. A companion private repo (`dotfiles-private`) is merged via `DOTFILES_DIRS` in `rcrc`; it hosts plaintext shell secrets, personal workflow config, and the global Claude Code config.
 
 ## Key Commands
 
@@ -63,7 +73,7 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 - `just ci` — runs all checks (shell, markdown, Brewfile, mise)
 - `just lint-shell` — shellcheck on `bin/*` and zsh files
-- `just setup` — enables `.githooks/pre-commit` and installs native tools (e.g., claude-code)
+- `just setup` — enables `.githooks/pre-commit` and installs native tools
 
 ### tmux
 
@@ -75,40 +85,6 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 - `gh` credential helper for GitHub HTTPS
 - Rebase-based pulls with fast-forward only
 
-## Commit Conventions
-
-Per `claude/rules/git-conventions.md` (commit conventions section):
-
-- Conventional commit format: `type(scope): description`
-- Types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `perf`
-- First line under 72 characters
-- Never include `Co-Authored-By` lines mentioning Claude or any AI
-- Never mention Claude, AI, or LLM in commit messages
-- Only commit when explicitly asked
-
-## Global Rules and Skills
-
-Global rules (`claude/rules/`) are symlinked from this repo to all projects:
-
-| Rule | Purpose |
-| --- | --- |
-| `git-conventions.md` | Branching, commits, push workflow, merge strategy |
-| `skill-triggers.md` | Routing tables — file-pattern and task-triggered mappings to skills |
-| `skill-routing.md` | Composite workflows and disambiguation for multi-skill tasks |
-| `task-lifecycle.md` | How to assess, plan, implement, and verify work |
-| `findings-capture.md` | Capture non-obvious discoveries (drift, quirks, working patterns) before moving on |
-| `quality-principles.md` | Always-on conduct: no laziness, no quality degradation, correctness over progress, verify before asserting |
-| `claude-config.md` | Two-tier config system (rules vs skills) |
-| `config-audit.md` | Checklist for adding/removing config files |
-| `coherence-check.md` | Sunk-cost defense prevention — evaluate own code objectively |
-| `restore-readiness.md` | Verify a real, restorable backup exists before any destructive action |
-| `ci-integrity.md` | CI must reflect reality — no silencing failures |
-| `secrets.md` | Never commit credentials outside dotfiles-private |
-| `shell.md` | zsh `!` corruption, jq compatibility |
-| `versioning.md` | SemVer policy, changelog format, release procedure |
-
-Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name`. Routing is defined in `skill-triggers.md` and `skill-routing.md`.
-
 ## Project-Local Rules
 
 `.claude/rules/` contains rules specific to this repo (not symlinked to other projects):
@@ -116,6 +92,8 @@ Skills (`claude/skills/`) provide on-demand methodology invoked via `/skill-name
 | Rule | Scope | Purpose |
 | --- | --- | --- |
 | `brewfile.md` | `Brewfile`, `Brewfile.linux` | Dual-Brewfile sync and alphabetical sorting |
+
+Global Claude Code rules and skills (commit conventions, task lifecycle, code-planning, language-specific patterns, etc.) live in `dotfiles-private/claude/` and auto-load via the rcm symlinks at `~/.claude/`. Edit them there.
 
 ## Documentation
 

@@ -5,28 +5,24 @@ review_reasoning = "thorough"
 excluded_branches = ["main"]
 
 review_guidelines = '''
-Dotfiles repo: shell config, Claude Code config (rules, skills, hooks), and Homebrew config.
+Dotfiles repo: cross-platform shell config, Homebrew, mise, tmux, git config. The global Claude Code config (rules, skills, hooks) lives in the companion private repo and is NOT in this tree.
 
 HARD INVARIANTS — flag violations as blockers:
 
 1. Secrets: never commit credentials, tokens, API keys, or secrets. This repo is public on GitHub.
-2. Shell compatibility: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content. Rule and skill .md files must not contain `\!` — flag any occurrence as corruption.
-3. One concern per file: each rule covers exactly one topic. If two unrelated topics exist, flag for split.
-4. 80-line signal: rules over 80 lines likely cover too much. Flag for review.
-5. Cross-references: if file A references file B, verify B exists. Broken cross-refs are blockers.
-6. Hook exit codes: PreToolUse hooks must use exit 2 (block with reason) or exit 0 (allow). Never exit 1 for intentional blocks.
-7. No project-specific references: global rules and skills must never reference project-local paths (.claude/rules/, specific source paths). Use generic language like "check the project's CLAUDE.md".
+2. Personal/sensitive content: never include PII, employer name, colleague names, broker/financial figures, internal product/project names, or memory-file references that hint at sensitive content. Examples and placeholders count. This repo is public.
+3. Shell compatibility: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content. Files must not contain `\!` — flag any occurrence as corruption.
+4. Cross-platform: any shell, tmux, or tool config change must consider macOS, Linux, and WSL2. Guard platform-specific code with `$PLATFORM` checks. Brewfile edits must be mirrored in `Brewfile.linux` for CLI tools.
+5. Project-local rule (`.claude/rules/brewfile.md`): dual-Brewfile sync + alphabetical sorting inside sections.
 
 SCOPE CONTEXT — understand before flagging:
 
-- Two-tier config: rules in claude/rules/ (global, always loaded), skills in claude/skills/ (on-demand via /name).
-- rcup symlinks: files in this repo are symlinked to ~/.claude/ by rcup. The repo structure mirrors the home directory.
-- Skill frontmatter: SKILL.md files have YAML frontmatter (name, description, version, date, user-invocable). This is required, not boilerplate.
-- Hook scripts: claude/hooks/ contains shell scripts invoked by Claude Code settings.json. They receive $TOOL_INPUT as JSON.
+- rcup symlinks: tracked files are symlinked into $HOME by rcm based on `rcrc`. Both this repo and `dotfiles-private` are merged via `DOTFILES_DIRS`.
+- Versioning: SemVer and changelog policy are defined in the global Claude Code config (in `dotfiles-private`) and auto-load via rcm. Don't expect a `versioning.md` file in this repo's tree.
+- CI: `just ci` runs shell, markdown, Brewfile, and mise lints — the same checks run in GitHub Actions.
 
 DO NOT FLAG:
 
-- YAML frontmatter in SKILL.md files — it is required metadata
-- Files over 200 lines in claude/skills/ — skills are allowed to be longer than rules
-- Shell scripts using jq for JSON parsing — jq is expected to be available on macOS/Linux
+- Shell scripts using `jq` for JSON parsing — `jq` is expected to be available on macOS/Linux
+- Brewfile lines that look long — keep them as written, alphabetically sorted within their section
 '''

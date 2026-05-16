@@ -21,7 +21,6 @@ setup:
 # Lint shell scripts with ShellCheck
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
-    shellcheck --severity=warning claude/statusline-command.sh
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 
 # Lint markdown files

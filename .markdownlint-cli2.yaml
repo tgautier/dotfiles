@@ -1,3 +1,2 @@
 globs:
   - "**/*.md"
-  - "!claude/skills/**"

@@ -17,6 +17,43 @@ setup:
     git config --local core.hooksPath .githooks
     if command -v roborev >/dev/null 2>&1; then roborev install-hook; fi
     command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
+    {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
+
+# Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for
+# Dart/Flutter (Drift) FFI, which dlopen()s the unversioned 'libsqlite3.so' the
+# distro doesn't ship. Dedicated dir so only this symlink is ever on the loader
+# path (see zshenv). Linux/WSL only; resolves the real path via ldconfig, preferring
+# the entry matching the native arch so a multiarch box (e.g. amd64 + i386) can't
+# select a wrong-arch lib. Falls back to the first match on unrecognized arches.
+_link-libsqlite3:
+    #!/usr/bin/env sh
+    set -eu
+    # ldconfig usually lives in /sbin, which isn't always on a non-root PATH.
+    ldconfig_bin=$(command -v ldconfig || echo /sbin/ldconfig)
+    if [ ! -x "$ldconfig_bin" ]; then
+        echo "ldconfig not found (looked on PATH and /sbin) — cannot locate libsqlite3.so.0" >&2
+        exit 0
+    fi
+    # ldconfig -p tags each entry with its ABI, e.g. '(libc6,x86-64)'. Prefer the
+    # entry matching this machine's arch; fall back to the first match otherwise.
+    case "$(uname -m)" in
+        x86_64)  abi='x86-64' ;;
+        aarch64) abi='AArch64' ;;
+        *)       abi='' ;;
+    esac
+    src=$("$ldconfig_bin" -p | awk -v abi="$abi" '
+        /libsqlite3\.so\.0/ {
+            if (first == "") first = $NF
+            if (abi != "" && index($0, "(libc6," abi)) { print $NF; found = 1; exit }
+        }
+        END { if (!found) print first }')
+    if [ -z "$src" ]; then
+        echo "libsqlite3.so.0 not in ldconfig cache — install it (e.g. apt install libsqlite3-0) for Flutter Drift FFI" >&2
+        exit 0
+    fi
+    mkdir -p "$HOME/.local/lib/flutter-ffi"
+    ln -sf "$src" "$HOME/.local/lib/flutter-ffi/libsqlite3.so"
+    echo "linked $src -> $HOME/.local/lib/flutter-ffi/libsqlite3.so"
 
 # Lint shell scripts with ShellCheck
 lint-shell:

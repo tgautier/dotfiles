@@ -67,6 +67,13 @@ if [[ $PLATFORM == "macos" ]]; then
 elif [[ $PLATFORM == "linux" ]] || [[ $PLATFORM == "wsl" ]]; then
   # Homebrew on Linux (optional)
   [[ -d "/home/linuxbrew/.linuxbrew/bin" ]] && path+="/home/linuxbrew/.linuxbrew/bin"
+  # Dart/Flutter FFI (Drift) dlopen()s the unversioned 'libsqlite3.so', which the
+  # distro doesn't ship (only 'libsqlite3.so.0'). 'just setup' symlinks it into a
+  # dedicated ~/.local/lib/flutter-ffi dir; prepend that dir to the loader path
+  # when the symlink exists. The dir holds ONLY this symlink, so nothing else can
+  # shadow system libs — structural, not incidental — and startup stays mutation-free.
+  [[ -e "${HOME}/.local/lib/flutter-ffi/libsqlite3.so" && ":${LD_LIBRARY_PATH}:" != *":${HOME}/.local/lib/flutter-ffi:"* ]] && \
+    export LD_LIBRARY_PATH="${HOME}/.local/lib/flutter-ffi${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
 # WSL: Add Windows interop paths

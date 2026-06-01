@@ -10,7 +10,7 @@ deno = "2.8.1"
 # ships. Bump these two as a pair, never independently.
 elixir = "1.19.5-otp-28"
 erlang = "28.5"
-"vfox:mise-plugins/vfox-flutter" = "3.44.0"
+"vfox:mise-plugins/vfox-flutter" = "3.44.1"
 go = "1.26.3"
 helm = "4.2.0"
 node = "26"

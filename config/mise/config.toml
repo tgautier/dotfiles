@@ -3,15 +3,18 @@ not_found_auto_install = true
 trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
-dart = "3.11.6"
-deno = "2.7.14"
+dart = { version = "3.12.1", url = "https://storage.googleapis.com/dart-archive/channels/stable/release/{{ version }}/sdk/dartsdk-{{ os() }}-{{ arch() }}-release.zip", version_list_url = "https://storage.googleapis.com/storage/v1/b/dart-archive/o?prefix=channels/stable/release/&delimiter=/", version_regex = 'channels/stable/release/(\d+\.\d+\.\d+)/' }
+deno = "2.8.1"
+# elixir's -otp-N suffix must match erlang's OTP major. 1.19.x has no -otp-29
+# build (only 1.20.0-rc), so erlang stays on 28.x until a stable elixir-otp-29
+# ships. Bump these two as a pair, never independently.
 elixir = "1.19.5-otp-28"
 erlang = "28.5"
-"vfox:mise-plugins/vfox-flutter" = "3.41.9"
+"vfox:mise-plugins/vfox-flutter" = "3.44.0"
 go = "1.26.3"
-helm = "4.1.4"
+helm = "4.2.0"
 node = "26"
 python = "3.14.5"
-ruby = "4.0.3"
-yarn = "4.14.1"
+ruby = "4.0.5"
+yarn = "4.15.0"
 yq = "4.53.2"

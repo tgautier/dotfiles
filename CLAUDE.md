@@ -95,6 +95,16 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 Global Claude Code rules and skills (commit conventions, task lifecycle, code-planning, language-specific patterns, etc.) live in `dotfiles-private/claude/` and auto-load via the rcm symlinks at `~/.claude/`. Edit them there.
 
+## Changelog
+
+`CHANGELOG.md` tracks notable changes. This is a rolling repo with no tagged
+releases, so entries are **date-based** (`## [YYYY-MM-DD]`), newest first, in
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format. Any
+user-visible change (new tool, version bump, config behavior, removed feature)
+adds an entry under the current date — group it by `Added` / `Changed` /
+`Removed` / `Fixed` and reference the PR. The `[Unreleased]` section holds
+entries not yet dated.
+
 ## Documentation
 
 Detailed guides live in `docs/`:

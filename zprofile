@@ -21,5 +21,8 @@ fi
 # Add mise to PATH (needed by non-interactive shells, e.g. VSCode extensions)
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
 
+# Add LM Studio CLI (lms) to PATH (if available)
+[[ -d "$HOME/.lmstudio/bin" ]] && export PATH="$PATH:$HOME/.lmstudio/bin"
+
 # Initialize Rust/Cargo environment (if available)
 [[ -f "$HOME/.cargo/env" ]] && . "$HOME/.cargo/env"

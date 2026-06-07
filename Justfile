@@ -17,6 +17,7 @@ setup:
     git config --local core.hooksPath .githooks
     if command -v roborev >/dev/null 2>&1; then roborev install-hook; fi
     command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
+    command -v hermes >/dev/null 2>&1 || curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
     {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
 
 # Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for

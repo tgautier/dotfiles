@@ -8,6 +8,19 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+### Added
+
+- `hermes-agent` via native installer in `just setup`, with cross-references in
+  both Brewfiles; document the native-installer pattern (single source of truth
+  in the `setup` recipe) in `.claude/rules/brewfile.md`.
+- `uv` in `Brewfile` and `Brewfile.linux`.
+- `codex-app` and `lm-studio` casks in `Brewfile` (macOS).
+
+### Changed
+
+- LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
+  (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
+
 ## [2026-06-01]
 
 ### Changed

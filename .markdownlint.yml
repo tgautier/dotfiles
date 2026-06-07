@@ -1,3 +1,5 @@
 MD013: false  # line length — dotfiles docs aren't prose
+MD024:
+  siblings_only: true  # Keep a Changelog repeats Added/Changed/... under each date
 MD033: false  # inline HTML — used in markdown for formatting
 MD041: false  # first line heading — not all files start with h1

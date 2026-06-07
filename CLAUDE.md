@@ -91,7 +91,7 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 | Rule | Scope | Purpose |
 | --- | --- | --- |
-| `brewfile.md` | `Brewfile`, `Brewfile.linux` | Dual-Brewfile sync and alphabetical sorting |
+| `brewfile.md` | `Brewfile`, `Brewfile.linux`, `Justfile` | Dual-Brewfile sync, alphabetical sorting, native-installer pattern (`just setup` as single source of truth) |
 
 Global Claude Code rules and skills (commit conventions, task lifecycle, code-planning, language-specific patterns, etc.) live in `dotfiles-private/claude/` and auto-load via the rcm symlinks at `~/.claude/`. Edit them there.
 

@@ -150,9 +150,10 @@ mas "Xcode", id: 497799835
 # live in Brewfile.work / Brewfile.personal and are merged in here so that
 # `brew bundle` AND `brew bundle cleanup` operate on the full per-machine set.
 # The profile is read from ~/.config/dotfiles/profile (set it with
-# `just set-profile work|personal`; `just setup` writes it on first run,
-# defaulting to "work" so a fresh machine never installs personal apps by
-# accident). An absent, empty, or unknown marker fails loud: silently merging
+# `just set-profile work|personal`; interactive `just setup` prompts for it
+# on first run, defaulting the answer to "work" so a fresh machine never
+# installs personal apps by accident — non-interactive runs fail instead of
+# guessing). An absent, empty, or unknown marker fails loud: silently merging
 # the wrong overlay would let `brew bundle cleanup --force` (in `just
 # update-brew`) uninstall every overlay app on the machine.
 profile_path = File.expand_path("~/.config/dotfiles/profile")

@@ -14,7 +14,7 @@ The Brewfiles must stay in sync and sorted. Tools enter a machine through exactl
 ## Files
 
 - `Brewfile` — macOS **shared base**: every package common to all Macs, plus a profile-overlay tail that merges the machine-specific overlay via `instance_eval`
-- `Brewfile.work` / `Brewfile.personal` — macOS **per-machine overlays**: casks/mas/brew that belong on only that profile. Each Mac picks one via the marker at `~/.config/dotfiles/profile` (set with `just set-profile work|personal`; `just setup` writes it on first run, defaulting to `work`). An absent/empty/unknown marker makes `brew bundle` fail loud — never silently merge the wrong overlay, since `brew bundle cleanup --force` would then uninstall every overlay app
+- `Brewfile.work` / `Brewfile.personal` — macOS **per-machine overlays**: casks/mas/brew that belong on only that profile. Each Mac picks one via the marker at `~/.config/dotfiles/profile` (set with `just set-profile work|personal`; interactive `just setup` prompts on first run, default `work` — non-interactive runs fail instead of guessing). An absent/empty/unknown marker makes `brew bundle` fail loud — never silently merge the wrong overlay, since `brew bundle cleanup --force` would then uninstall every overlay app
 - `Brewfile.linux` — Linux base (no casks/mas)
 
 Because the overlay is merged into the same `brew bundle` evaluation, both `brew bundle install` and `brew bundle cleanup` operate on the full per-machine set — cleanup never uninstalls a sibling profile's apps on that machine.

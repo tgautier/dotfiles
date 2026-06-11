@@ -35,7 +35,12 @@ setup: _ensure-profile
     fi
     mise_bin="$(command -v mise || true)"
     [ -z "$mise_bin" ] && [ -x "${HOME}/.local/bin/mise" ] && mise_bin="${HOME}/.local/bin/mise"
-    if [ -n "$mise_bin" ]; then "$mise_bin" install; fi
+    if [ -n "$mise_bin" ]; then
+        "$mise_bin" install
+    else
+        echo "mise not found on PATH or at ~/.local/bin/mise after the install attempt — aborting." >&2
+        exit 1
+    fi
 
     # 4. Git hooks + review tooling.
     git config --local core.hooksPath .githooks
@@ -88,8 +93,12 @@ _link-libsqlite3:
     echo "linked $src -> $HOME/.local/lib/flutter-ffi/libsqlite3.so"
 
 # Ensure a valid Brewfile profile marker exists (macOS only — Brewfile.linux
-# never reads it); prompt on first interactive setup, default to work when
-# non-interactive. No-op when the marker already holds a valid profile.
+# never reads it); prompt on first interactive setup (default: work). A
+# non-interactive run fails instead of defaulting: silently minting a
+# valid-but-wrong marker on an unmigrated personal Mac would let
+# `brew bundle cleanup --force` uninstall every personal app — the exact
+# disaster the Brewfile marker guard exists to prevent.
+# No-op when the marker already holds a valid profile.
 _ensure-profile:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -98,18 +107,19 @@ _ensure-profile:
     fi
     marker="${HOME}/.config/dotfiles/profile"
     current=""
-    [[ -f "$marker" ]] && current="$(tr -d '[:space:]' < "$marker")"
+    # Trim-only (ends), mirroring the Brewfile's String#strip on the same file.
+    [[ -f "$marker" ]] && current="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$marker")"
     if [[ "$current" == "work" || "$current" == "personal" ]]; then
         echo "Machine profile already set: $current"
         exit 0
     fi
-    if [[ -t 0 ]]; then
-        printf 'Select machine profile [work/personal] (default: work): '
-        read -r reply
-    else
-        reply=""
-        echo "Non-interactive shell; defaulting machine profile to 'work'."
+    if [[ ! -t 0 ]]; then
+        echo "No machine profile set and stdin is not a terminal." >&2
+        echo "Run 'just set-profile work|personal' first, then re-run 'just setup'." >&2
+        exit 1
     fi
+    printf 'Select machine profile [work/personal] (default: work): '
+    read -r reply
     just set-profile "${reply:-work}"
 
 # Lint shell scripts with ShellCheck
@@ -123,17 +133,21 @@ lint-markdown:
 
 # Set this machine's Brewfile profile (work|personal). Writes the marker the
 # Brewfile reads to pick Brewfile.work / Brewfile.personal — the Brewfile
-# fails loud when the marker is absent; `just setup` defaults it to work.
+# fails loud when the marker is absent; interactive `just setup` prompts
+# for it (default: work).
 set-profile profile:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [[ "{{profile}}" != "work" && "{{profile}}" != "personal" ]]; then
-        echo "Error: profile must be 'work' or 'personal', got '{{profile}}'" >&2
+    # quote() interpolates once as a shell-safe literal; metacharacters in the
+    # argument (e.g. typed at the _ensure-profile prompt) stay inert data.
+    profile={{quote(profile)}}
+    if [[ "$profile" != "work" && "$profile" != "personal" ]]; then
+        echo "Error: profile must be 'work' or 'personal', got '$profile'" >&2
         exit 1
     fi
     mkdir -p "${HOME}/.config/dotfiles"
-    printf '%s\n' "{{profile}}" > "${HOME}/.config/dotfiles/profile"
-    echo "Machine profile set to '{{profile}}' (${HOME}/.config/dotfiles/profile)."
+    printf '%s\n' "$profile" > "${HOME}/.config/dotfiles/profile"
+    echo "Machine profile set to '$profile' (${HOME}/.config/dotfiles/profile)."
     echo "Run 'just update-brew' to sync packages for this profile."
 
 # Check Brewfile Ruby syntax + evaluate the profile-overlay merge logic

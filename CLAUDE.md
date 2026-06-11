@@ -26,7 +26,7 @@ rcup
 brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
 
 # Declare this Mac's profile (work|personal) — required before brew bundle;
-# `just setup` writes it on first run (default: work)
+# interactive `just setup` prompts for it on first run (default: work)
 just set-profile personal
 
 # Install Linux packages

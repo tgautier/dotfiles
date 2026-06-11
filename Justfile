@@ -153,22 +153,27 @@ lint-brewfile:
       %i[tap brew cask mas].each { |m| dsl.define_singleton_method(m) { |*a, **k| } }
       dsl.instance_eval(File.read(ARGV[0]), ARGV[0])
     '
+    tmp_root="$(mktemp -d)"
+    trap 'rm -rf "$tmp_root"' EXIT
     for profile in work personal; do
-        tmp_home="$(mktemp -d)"
-        mkdir -p "$tmp_home/.config/dotfiles"
-        printf '%s\n' "$profile" > "$tmp_home/.config/dotfiles/profile"
-        (cd /tmp && HOME="$tmp_home" ruby -e "$harness" "$brewfile")
-        rm -rf "$tmp_home"
+        home_dir="$tmp_root/$profile"
+        mkdir -p "$home_dir/.config/dotfiles"
+        printf '%s\n' "$profile" > "$home_dir/.config/dotfiles/profile"
+        (cd /tmp && HOME="$home_dir" ruby -e "$harness" "$brewfile")
         echo "Brewfile merge OK: $profile"
     done
-    # An absent marker must fail loud, never silently bundle the base-only set.
-    tmp_home="$(mktemp -d)"
-    if (cd /tmp && HOME="$tmp_home" ruby -e "$harness" "$brewfile" 2>/dev/null); then
+    # An absent marker must trip the marker guard, never silently bundle the
+    # base-only set — assert the guard's own message, not just any failure.
+    mkdir -p "$tmp_root/absent"
+    if out="$(cd /tmp && HOME="$tmp_root/absent" ruby -e "$harness" "$brewfile" 2>&1)"; then
         echo "ERROR: Brewfile must raise when the profile marker is absent" >&2
-        rm -rf "$tmp_home"
         exit 1
     fi
-    rm -rf "$tmp_home"
+    if ! grep -q 'No valid machine profile' <<<"$out"; then
+        echo "ERROR: absent-marker failure did not come from the marker guard:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
     echo "Brewfile absent-marker raise OK"
 
 # Validate mise config

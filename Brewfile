@@ -150,15 +150,15 @@ mas "Xcode", id: 497799835
 # live in Brewfile.work / Brewfile.personal and are merged in here so that
 # `brew bundle` AND `brew bundle cleanup` operate on the full per-machine set.
 # The profile is read from ~/.config/dotfiles/profile (set it with
-# `just set-profile work|personal`); it defaults to "work" when absent, so a
-# fresh machine never installs personal apps by accident.
+# `just set-profile work|personal`; `just setup` writes it on first run,
+# defaulting to "work" so a fresh machine never installs personal apps by
+# accident). An absent, empty, or unknown marker fails loud: silently merging
+# the wrong overlay would let `brew bundle cleanup --force` (in `just
+# update-brew`) uninstall every overlay app on the machine.
 profile_path = File.expand_path("~/.config/dotfiles/profile")
 profile = File.exist?(profile_path) ? File.read(profile_path).strip : ""
-profile = "work" if profile.empty?
-# Fail loud on an unknown profile or missing overlay: silently skipping the
-# overlay would let `brew bundle cleanup --force` uninstall every overlay app.
 unless %w[work personal].include?(profile)
-  raise "Unknown profile #{profile.inspect} in #{profile_path} — expected 'work' or 'personal' (just set-profile)"
+  raise "No valid machine profile in #{profile_path} (got #{profile.inspect}) — run 'just set-profile work|personal'"
 end
 overlay = File.expand_path("Brewfile.#{profile}", __dir__)
 raise "Missing overlay #{overlay}" unless File.exist?(overlay)

@@ -16,8 +16,10 @@ grouped by **date** rather than by semantic version. Newest first.
 - `uv` in `Brewfile` and `Brewfile.linux`.
 - `codex-app` and `lm-studio` casks in `Brewfile` (macOS).
 - Per-machine macOS Brewfile profiles: `Brewfile.work` and `Brewfile.personal`
-  overlays merged into `Brewfile` based on `~/.config/dotfiles/profile` (absent
-  defaults to `work`). Set it with `just set-profile work|personal`.
+  overlays merged into `Brewfile` based on `~/.config/dotfiles/profile`. Set it
+  with `just set-profile work|personal` (`just setup` writes it on first run,
+  defaulting to `work`); `brew bundle` fails loud when the marker is absent or
+  invalid so a forced cleanup can never uninstall the overlay apps.
 
 ### Changed
 

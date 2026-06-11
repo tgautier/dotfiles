@@ -14,7 +14,7 @@ The Brewfiles must stay in sync and sorted. Tools enter a machine through exactl
 ## Files
 
 - `Brewfile` — macOS **shared base**: every package common to all Macs, plus a profile-overlay tail that merges the machine-specific overlay via `instance_eval`
-- `Brewfile.work` / `Brewfile.personal` — macOS **per-machine overlays**: casks/mas/brew that belong on only that profile. Each Mac picks one via the marker at `~/.config/dotfiles/profile` (set with `just set-profile work|personal`; absent ⇒ `work`)
+- `Brewfile.work` / `Brewfile.personal` — macOS **per-machine overlays**: casks/mas/brew that belong on only that profile. Each Mac picks one via the marker at `~/.config/dotfiles/profile` (set with `just set-profile work|personal`; `just setup` writes it on first run, defaulting to `work`). An absent/empty/unknown marker makes `brew bundle` fail loud — never silently merge the wrong overlay, since `brew bundle cleanup --force` would then uninstall every overlay app
 - `Brewfile.linux` — Linux base (no casks/mas)
 
 Because the overlay is merged into the same `brew bundle` evaluation, both `brew bundle install` and `brew bundle cleanup` operate on the full per-machine set — cleanup never uninstalls a sibling profile's apps on that machine.
@@ -29,7 +29,7 @@ Because the overlay is merged into the same `brew bundle` evaluation, both `brew
 - Within each block in each file, entries are sorted alphabetically (a-z) by package name
 - Tap entries (`tap`) come before all blocks
 - For tap-prefixed formulae (e.g., `brew "terror/tap/just-lsp"`), sort by the full string including the tap prefix
-- Keep `lint-brewfile` in the `Justfile` in sync with this file set — every Brewfile gets a `ruby -c` check
+- Keep `lint-brewfile` in the `Justfile` in sync with this file set — every Brewfile gets a `ruby -c` check, and the overlay-merge harness must keep evaluating every profile plus the absent-marker failure
 
 ## Native-installer tools
 

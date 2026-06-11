@@ -31,7 +31,7 @@ setup: _ensure-profile
     # 3. Language runtimes from the pinned mise config. Install mise first if the
     #    machine doesn't have it yet (matches the README curl bootstrap).
     if ! command -v mise >/dev/null 2>&1 && [ ! -x "${HOME}/.local/bin/mise" ]; then
-        curl https://mise.run | sh
+        curl -fsSL https://mise.run | sh
     fi
     mise_bin="$(command -v mise || true)"
     [ -z "$mise_bin" ] && [ -x "${HOME}/.local/bin/mise" ] && mise_bin="${HOME}/.local/bin/mise"
@@ -87,14 +87,20 @@ _link-libsqlite3:
     ln -sf "$src" "$HOME/.local/lib/flutter-ffi/libsqlite3.so"
     echo "linked $src -> $HOME/.local/lib/flutter-ffi/libsqlite3.so"
 
-# Ensure a Brewfile profile marker exists; prompt on first interactive setup,
-# default to work when non-interactive. No-op when the marker is already set.
+# Ensure a valid Brewfile profile marker exists (macOS only — Brewfile.linux
+# never reads it); prompt on first interactive setup, default to work when
+# non-interactive. No-op when the marker already holds a valid profile.
 _ensure-profile:
     #!/usr/bin/env bash
     set -euo pipefail
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+        exit 0
+    fi
     marker="${HOME}/.config/dotfiles/profile"
-    if [[ -s "$marker" ]]; then
-        echo "Machine profile already set: $(cat "$marker")"
+    current=""
+    [[ -f "$marker" ]] && current="$(tr -d '[:space:]' < "$marker")"
+    if [[ "$current" == "work" || "$current" == "personal" ]]; then
+        echo "Machine profile already set: $current"
         exit 0
     fi
     if [[ -t 0 ]]; then
@@ -116,7 +122,8 @@ lint-markdown:
     markdownlint-cli2
 
 # Set this machine's Brewfile profile (work|personal). Writes the marker the
-# Brewfile reads to pick Brewfile.work / Brewfile.personal. Absent = work.
+# Brewfile reads to pick Brewfile.work / Brewfile.personal — the Brewfile
+# fails loud when the marker is absent; `just setup` defaults it to work.
 set-profile profile:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -129,12 +136,40 @@ set-profile profile:
     echo "Machine profile set to '{{profile}}' (${HOME}/.config/dotfiles/profile)."
     echo "Run 'just update-brew' to sync packages for this profile."
 
-# Check Brewfile Ruby syntax
+# Check Brewfile Ruby syntax + evaluate the profile-overlay merge logic
 lint-brewfile:
+    #!/usr/bin/env bash
+    set -euo pipefail
     ruby -c Brewfile
     ruby -c Brewfile.work
     ruby -c Brewfile.personal
     ruby -c Brewfile.linux
+    # Evaluate the merged Brewfile for each profile from a non-repo cwd with
+    # stubbed DSL methods — catches overlay-resolution and fail-loud regressions
+    # that `ruby -c` (syntax only) cannot see.
+    brewfile="$PWD/Brewfile"
+    harness='
+      dsl = Object.new
+      %i[tap brew cask mas].each { |m| dsl.define_singleton_method(m) { |*a, **k| } }
+      dsl.instance_eval(File.read(ARGV[0]), ARGV[0])
+    '
+    for profile in work personal; do
+        tmp_home="$(mktemp -d)"
+        mkdir -p "$tmp_home/.config/dotfiles"
+        printf '%s\n' "$profile" > "$tmp_home/.config/dotfiles/profile"
+        (cd /tmp && HOME="$tmp_home" ruby -e "$harness" "$brewfile")
+        rm -rf "$tmp_home"
+        echo "Brewfile merge OK: $profile"
+    done
+    # An absent marker must fail loud, never silently bundle the base-only set.
+    tmp_home="$(mktemp -d)"
+    if (cd /tmp && HOME="$tmp_home" ruby -e "$harness" "$brewfile" 2>/dev/null); then
+        echo "ERROR: Brewfile must raise when the profile marker is absent" >&2
+        rm -rf "$tmp_home"
+        exit 1
+    fi
+    rm -rf "$tmp_home"
+    echo "Brewfile absent-marker raise OK"
 
 # Validate mise config
 lint-mise:

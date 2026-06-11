@@ -33,7 +33,11 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    # DOTFILES_DIRS). If absent, setup links the public repo only.
    ```
 
-3. **Bootstrap and run setup:**
+3. **Sign in to the App Store** (the Brewfile's `mas` entries fail without
+   it, which aborts the bootstrap — `just setup` is rerunnable after signing
+   in).
+
+4. **Bootstrap and run setup:**
 
    ```sh
    brew install just                       # the only package needed by hand
@@ -46,17 +50,17 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    installs mise and the pinned runtimes, and enables git hooks and tools.
    It is idempotent — re-run it anytime.
 
-4. **Set up 1Password SSH agent:**
+5. **Set up 1Password SSH agent:**
    Open 1Password, sign in, and enable the SSH agent under
    Settings > Developer > SSH Agent.
 
-5. **Switch git remote to SSH** (now that 1Password SSH is configured):
+6. **Switch git remote to SSH** (now that 1Password SSH is configured):
 
    ```sh
    git -C ~/Workspace/tgautier/dotfiles remote set-url origin git@github.com:tgautier/dotfiles.git
    ```
 
-6. **Keep everything current** (later, for maintenance):
+7. **Keep everything current** (later, for maintenance):
 
    ```sh
    just update
@@ -128,9 +132,10 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    just setup
    ```
 
-   `just setup` prompts for the machine profile on first run, then installs all
-   packages, links every dotfiles repo, installs mise and the pinned runtimes,
-   and enables git hooks and tools. It is idempotent — re-run it anytime.
+   `just setup` installs all packages, links every dotfiles repo, installs
+   mise and the pinned runtimes, and enables git hooks and tools (the
+   work/personal machine profile is macOS-only — Linux has no overlay).
+   It is idempotent — re-run it anytime.
 
 7. **Change shell to zsh:**
 

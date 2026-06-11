@@ -12,12 +12,48 @@ lint-via-private:
         just -f ~/Workspace/tgautier/dotfiles-private/justfile lint-public-no-arr; \
     fi
 
-# Enable the pre-commit hook and install native tools
-setup:
+# Bootstrap this machine: profile, packages, symlinks, runtimes, hooks, tools (idempotent)
+setup: _ensure-profile
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Prerequisites (just does not exist before them): install Homebrew, clone
+    # this repo (+ dotfiles-private if used), run `brew bundle` once to get `just`.
+    cd "{{dotfiles_dir}}"
+
+    # 1. Packages for this machine's profile (install only; `just update` upgrades).
+    brew bundle install --file="{{brewfile}}"
+
+    # 2. Symlink dotfiles. RCRC points rcm at the repo config so a fresh machine
+    #    (no ~/.rcrc yet) links every DOTFILES_DIRS entry; a missing private repo
+    #    is skipped, not fatal.
+    RCRC="{{dotfiles_dir}}/rcrc" rcup
+
+    # 3. Language runtimes from the pinned mise config. Install mise first if the
+    #    machine doesn't have it yet (matches the README curl bootstrap).
+    if ! command -v mise >/dev/null 2>&1 && [ ! -x "${HOME}/.local/bin/mise" ]; then
+        curl -fsSL https://mise.run | sh
+    fi
+    mise_bin="$(command -v mise || true)"
+    [ -z "$mise_bin" ] && [ -x "${HOME}/.local/bin/mise" ] && mise_bin="${HOME}/.local/bin/mise"
+    if [ -n "$mise_bin" ]; then
+        "$mise_bin" install
+    else
+        echo "mise not found on PATH or at ~/.local/bin/mise after the install attempt — aborting." >&2
+        exit 1
+    fi
+
+    # 4. Git hooks + review tooling.
     git config --local core.hooksPath .githooks
     if command -v roborev >/dev/null 2>&1; then roborev install-hook; fi
+
+    # 5. Native-installer tools (self-update through their own channels).
     command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
     command -v hermes >/dev/null 2>&1 || curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+
+    # 6. Default editor associations (macOS only; no-ops elsewhere).
+    just set-default-editor
+
+    # 7. Linux/WSL: symlink libsqlite3 for Dart/Flutter FFI (no-op on macOS).
     {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
 
 # Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for
@@ -56,6 +92,36 @@ _link-libsqlite3:
     ln -sf "$src" "$HOME/.local/lib/flutter-ffi/libsqlite3.so"
     echo "linked $src -> $HOME/.local/lib/flutter-ffi/libsqlite3.so"
 
+# Ensure a valid Brewfile profile marker exists (macOS only — Brewfile.linux
+# never reads it); prompt on first interactive setup (default: work). A
+# non-interactive run fails instead of defaulting: silently minting a
+# valid-but-wrong marker on an unmigrated personal Mac would let
+# `brew bundle cleanup --force` uninstall every personal app — the exact
+# disaster the Brewfile marker guard exists to prevent.
+# No-op when the marker already holds a valid profile.
+_ensure-profile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "$(uname -s)" != "Darwin" ]]; then
+        exit 0
+    fi
+    marker="${HOME}/.config/dotfiles/profile"
+    current=""
+    # Trim-only (ends), mirroring the Brewfile's String#strip on the same file.
+    [[ -f "$marker" ]] && current="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$marker")"
+    if [[ "$current" == "work" || "$current" == "personal" ]]; then
+        echo "Machine profile already set: $current"
+        exit 0
+    fi
+    if [[ ! -t 0 ]]; then
+        echo "No machine profile set and stdin is not a terminal." >&2
+        echo "Run 'just set-profile work|personal' first, then re-run 'just setup'." >&2
+        exit 1
+    fi
+    printf 'Select machine profile [work/personal] (default: work): '
+    read -r reply
+    just set-profile "${reply:-work}"
+
 # Lint shell scripts with ShellCheck
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
@@ -65,10 +131,64 @@ lint-shell:
 lint-markdown:
     markdownlint-cli2
 
-# Check Brewfile Ruby syntax
+# Set this machine's Brewfile profile (work|personal). Writes the marker the
+# Brewfile reads to pick Brewfile.work / Brewfile.personal — the Brewfile
+# fails loud when the marker is absent; interactive `just setup` prompts
+# for it (default: work).
+set-profile profile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # quote() interpolates once as a shell-safe literal; metacharacters in the
+    # argument (e.g. typed at the _ensure-profile prompt) stay inert data.
+    profile={{quote(profile)}}
+    if [[ "$profile" != "work" && "$profile" != "personal" ]]; then
+        echo "Error: profile must be 'work' or 'personal', got '$profile'" >&2
+        exit 1
+    fi
+    mkdir -p "${HOME}/.config/dotfiles"
+    printf '%s\n' "$profile" > "${HOME}/.config/dotfiles/profile"
+    echo "Machine profile set to '$profile' (${HOME}/.config/dotfiles/profile)."
+    echo "Run 'just update-brew' to sync packages for this profile."
+
+# Check Brewfile Ruby syntax + evaluate the profile-overlay merge logic
 lint-brewfile:
+    #!/usr/bin/env bash
+    set -euo pipefail
     ruby -c Brewfile
+    ruby -c Brewfile.work
+    ruby -c Brewfile.personal
     ruby -c Brewfile.linux
+    # Evaluate the merged Brewfile for each profile from a non-repo cwd with
+    # stubbed DSL methods — catches overlay-resolution and fail-loud regressions
+    # that `ruby -c` (syntax only) cannot see.
+    brewfile="$PWD/Brewfile"
+    harness='
+      dsl = Object.new
+      %i[tap brew cask mas].each { |m| dsl.define_singleton_method(m) { |*a, **k| } }
+      dsl.instance_eval(File.read(ARGV[0]), ARGV[0])
+    '
+    tmp_root="$(mktemp -d)"
+    trap 'rm -rf "$tmp_root"' EXIT
+    for profile in work personal; do
+        home_dir="$tmp_root/$profile"
+        mkdir -p "$home_dir/.config/dotfiles"
+        printf '%s\n' "$profile" > "$home_dir/.config/dotfiles/profile"
+        (cd /tmp && HOME="$home_dir" ruby -e "$harness" "$brewfile")
+        echo "Brewfile merge OK: $profile"
+    done
+    # An absent marker must trip the marker guard, never silently bundle the
+    # base-only set — assert the guard's own message, not just any failure.
+    mkdir -p "$tmp_root/absent"
+    if out="$(cd /tmp && HOME="$tmp_root/absent" ruby -e "$harness" "$brewfile" 2>&1)"; then
+        echo "ERROR: Brewfile must raise when the profile marker is absent" >&2
+        exit 1
+    fi
+    if ! grep -q 'No valid machine profile' <<<"$out"; then
+        echo "ERROR: absent-marker failure did not come from the marker guard:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "Brewfile absent-marker raise OK"
 
 # Validate mise config
 lint-mise:

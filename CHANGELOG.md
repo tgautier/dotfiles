@@ -20,6 +20,8 @@ grouped by **date** rather than by semantic version. Newest first.
 
 - LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
   (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
+- Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0
+  (OTP 28 → 29, bumped as a pair), go 1.26.4, yarn 4.16.0.
 
 ## [2026-06-01]
 

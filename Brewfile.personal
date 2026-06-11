@@ -1,0 +1,29 @@
+# Personal-only macOS overlay — merged into Brewfile when the machine profile
+# is "personal" (see the profile-overlay block in Brewfile). Add casks/mas/brew
+# here that belong ONLY on the personal laptop. Shared apps stay in Brewfile.
+#
+# Keep entries sorted alphabetically within each block, per
+# .claude/rules/brewfile.md.
+
+# Applications
+cask "adobe-creative-cloud"
+cask "audacity"
+cask "discord"
+cask "figma"
+cask "ledger-wallet"
+cask "linear-linear"
+cask "microsoft-auto-update"
+cask "microsoft-office"
+cask "notion"
+cask "proton-mail"
+cask "proton-mail-bridge"
+cask "rectangle"
+cask "rode-central"
+cask "setapp"
+cask "synology-drive"
+cask "tailscale-app"
+
+# Mac App Store Applications
+mas "Infuse", id: 1136220934
+mas "Notion Web Clipper", id: 1559269364
+mas "Reeder 5", id: 1529448980

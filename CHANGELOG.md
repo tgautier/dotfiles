@@ -15,6 +15,9 @@ grouped by **date** rather than by semantic version. Newest first.
   in the `setup` recipe) in `.claude/rules/brewfile.md`.
 - `uv` in `Brewfile` and `Brewfile.linux`.
 - `codex-app` and `lm-studio` casks in `Brewfile` (macOS).
+- Per-machine macOS Brewfile profiles: `Brewfile.work` and `Brewfile.personal`
+  overlays merged into `Brewfile` based on `~/.config/dotfiles/profile` (absent
+  defaults to `work`). Set it with `just set-profile work|personal`.
 
 ### Changed
 
@@ -22,6 +25,9 @@ grouped by **date** rather than by semantic version. Newest first.
   (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
 - Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0
   (OTP 28 → 29, bumped as a pair), go 1.26.4, yarn 4.16.0.
+- `just setup` is now a full idempotent bootstrap — selects the machine profile,
+  then installs packages, links dotfiles, installs mise runtimes, and enables
+  git hooks and tools — so a fresh machine is one command after `brew install just`.
 
 ## [2026-06-01]
 

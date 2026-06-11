@@ -111,41 +111,25 @@ brew "zsh-completions"
 # Applications
 cask "1password"
 cask "1password-cli"
-cask "adobe-creative-cloud"
 cask "android-studio"
-cask "audacity"
 cask "claude"
 ## claude-code: native installer via `just setup` (auto-updates, no deps)
 cask "codex"
 cask "codex-app"
 cask "copilot-cli"
-cask "discord"
 cask "docker-desktop"
-cask "figma"
 cask "firefox"
 cask "gcloud-cli"
 cask "ghostty"
 cask "google-chrome"
 cask "iterm2"
-cask "ledger-wallet"
-cask "linear-linear"
 cask "lm-studio"
-cask "microsoft-auto-update"
-cask "microsoft-office"
-cask "notion"
 cask "obsidian"
 cask "parsec"
 cask "postman"
-cask "proton-mail"
-cask "proton-mail-bridge"
-cask "rectangle"
-cask "rode-central"
-cask "setapp"
 cask "signal"
 cask "slack"
 cask "spotify"
-cask "synology-drive"
-cask "tailscale-app"
 cask "visual-studio-code"
 cask "vlc"
 cask "whatsapp"
@@ -156,10 +140,26 @@ cask "font-source-code-pro"
 
 # Mac App Store Applications
 mas "1Password for Safari", id: 1569813296
-mas "Infuse", id: 1136220934
 mas "Keynote", id: 361285480
-mas "Notion Web Clipper", id: 1559269364
 mas "Numbers", id: 361304891
 mas "Pages", id: 361309726
-mas "Reeder 5", id: 1529448980
 mas "Xcode", id: 497799835
+
+# Profile overlay
+# Everything above is shared by every macOS machine. Machine-specific entries
+# live in Brewfile.work / Brewfile.personal and are merged in here so that
+# `brew bundle` AND `brew bundle cleanup` operate on the full per-machine set.
+# The profile is read from ~/.config/dotfiles/profile (set it with
+# `just set-profile work|personal`); it defaults to "work" when absent, so a
+# fresh machine never installs personal apps by accident.
+profile_path = File.expand_path("~/.config/dotfiles/profile")
+profile = File.exist?(profile_path) ? File.read(profile_path).strip : ""
+profile = "work" if profile.empty?
+# Fail loud on an unknown profile or missing overlay: silently skipping the
+# overlay would let `brew bundle cleanup --force` uninstall every overlay app.
+unless %w[work personal].include?(profile)
+  raise "Unknown profile #{profile.inspect} in #{profile_path} — expected 'work' or 'personal' (just set-profile)"
+end
+overlay = File.expand_path("Brewfile.#{profile}", __dir__)
+raise "Missing overlay #{overlay}" unless File.exist?(overlay)
+instance_eval(File.read(overlay), overlay)

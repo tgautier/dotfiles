@@ -12,12 +12,43 @@ lint-via-private:
         just -f ~/Workspace/tgautier/dotfiles-private/justfile lint-public-no-arr; \
     fi
 
-# Enable the pre-commit hook and install native tools
-setup:
+# Bootstrap this machine: profile, packages, symlinks, runtimes, hooks, tools (idempotent)
+setup: _ensure-profile
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Prerequisites (just does not exist before them): install Homebrew, clone
+    # this repo (+ dotfiles-private if used), run `brew bundle` once to get `just`.
+    cd "{{dotfiles_dir}}"
+
+    # 1. Packages for this machine's profile (install only; `just update` upgrades).
+    brew bundle install --file="{{brewfile}}"
+
+    # 2. Symlink dotfiles. RCRC points rcm at the repo config so a fresh machine
+    #    (no ~/.rcrc yet) links every DOTFILES_DIRS entry; a missing private repo
+    #    is skipped, not fatal.
+    RCRC="{{dotfiles_dir}}/rcrc" rcup
+
+    # 3. Language runtimes from the pinned mise config. Install mise first if the
+    #    machine doesn't have it yet (matches the README curl bootstrap).
+    if ! command -v mise >/dev/null 2>&1 && [ ! -x "${HOME}/.local/bin/mise" ]; then
+        curl https://mise.run | sh
+    fi
+    mise_bin="$(command -v mise || true)"
+    [ -z "$mise_bin" ] && [ -x "${HOME}/.local/bin/mise" ] && mise_bin="${HOME}/.local/bin/mise"
+    if [ -n "$mise_bin" ]; then "$mise_bin" install; fi
+
+    # 4. Git hooks + review tooling.
     git config --local core.hooksPath .githooks
     if command -v roborev >/dev/null 2>&1; then roborev install-hook; fi
+
+    # 5. Native-installer tools (self-update through their own channels).
     command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
     command -v hermes >/dev/null 2>&1 || curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
+
+    # 6. Default editor associations (macOS only; no-ops elsewhere).
+    just set-default-editor
+
+    # 7. Linux/WSL: symlink libsqlite3 for Dart/Flutter FFI (no-op on macOS).
     {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
 
 # Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for
@@ -56,6 +87,25 @@ _link-libsqlite3:
     ln -sf "$src" "$HOME/.local/lib/flutter-ffi/libsqlite3.so"
     echo "linked $src -> $HOME/.local/lib/flutter-ffi/libsqlite3.so"
 
+# Ensure a Brewfile profile marker exists; prompt on first interactive setup,
+# default to work when non-interactive. No-op when the marker is already set.
+_ensure-profile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    marker="${HOME}/.config/dotfiles/profile"
+    if [[ -s "$marker" ]]; then
+        echo "Machine profile already set: $(cat "$marker")"
+        exit 0
+    fi
+    if [[ -t 0 ]]; then
+        printf 'Select machine profile [work/personal] (default: work): '
+        read -r reply
+    else
+        reply=""
+        echo "Non-interactive shell; defaulting machine profile to 'work'."
+    fi
+    just set-profile "${reply:-work}"
+
 # Lint shell scripts with ShellCheck
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
@@ -65,9 +115,25 @@ lint-shell:
 lint-markdown:
     markdownlint-cli2
 
+# Set this machine's Brewfile profile (work|personal). Writes the marker the
+# Brewfile reads to pick Brewfile.work / Brewfile.personal. Absent = work.
+set-profile profile:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "{{profile}}" != "work" && "{{profile}}" != "personal" ]]; then
+        echo "Error: profile must be 'work' or 'personal', got '{{profile}}'" >&2
+        exit 1
+    fi
+    mkdir -p "${HOME}/.config/dotfiles"
+    printf '%s\n' "{{profile}}" > "${HOME}/.config/dotfiles/profile"
+    echo "Machine profile set to '{{profile}}' (${HOME}/.config/dotfiles/profile)."
+    echo "Run 'just update-brew' to sync packages for this profile."
+
 # Check Brewfile Ruby syntax
 lint-brewfile:
     ruby -c Brewfile
+    ruby -c Brewfile.work
+    ruby -c Brewfile.personal
     ruby -c Brewfile.linux
 
 # Validate mise config

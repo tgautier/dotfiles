@@ -1,0 +1,10 @@
+# Work-only macOS overlay — merged into Brewfile when the machine profile is
+# "work" (see the profile-overlay block in Brewfile). Add casks/mas/brew here
+# that belong ONLY on the work laptop. Shared apps stay in Brewfile.
+#
+# Keep entries sorted alphabetically within each block, per
+# .claude/rules/brewfile.md.
+
+# Applications
+
+# Mac App Store Applications

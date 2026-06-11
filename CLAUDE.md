@@ -22,8 +22,11 @@ Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** 
 # Link/update dotfiles after changes (uses DOTFILES_DIRS from rcrc)
 rcup
 
-# Install macOS packages
+# Install macOS packages (auto-selects the work/personal overlay)
 brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
+
+# Declare this Mac's profile (work|personal); absent defaults to work
+just set-profile personal
 
 # Install Linux packages
 brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
@@ -34,7 +37,7 @@ just ci
 # Update everything (brew, mas, mise, rust)
 just update
 
-# Enable pre-commit hook and install native tools
+# Bootstrap a machine: profile, packages, symlinks, runtimes, hooks, tools
 just setup
 ```
 
@@ -43,7 +46,7 @@ just setup
 This repo targets **three platforms**: macOS, Linux, and WSL2. Every change must consider all three:
 
 - Shell config: guard platform-specific code with `$PLATFORM` checks (set in `zshenv`)
-- Brewfiles: edit **both** `Brewfile` and `Brewfile.linux` for CLI tools (see `.claude/rules/brewfile.md`)
+- Brewfiles: shared CLI tools go in **both** `Brewfile` and `Brewfile.linux`; macOS apps that belong to only one Mac go in `Brewfile.work` / `Brewfile.personal` (see `.claude/rules/brewfile.md`)
 - tmux: use `if-shell` platform detection for OS-specific commands (clipboard, terminfo)
 - Never assume macOS-only tools exist (`pbcopy`, `open`) — provide WSL (`clip.exe`) and Linux (`xclip`) alternatives
 
@@ -73,7 +76,7 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 - `just ci` — runs all checks (shell, markdown, Brewfile, mise)
 - `just lint-shell` — shellcheck on `bin/*` and zsh files
-- `just setup` — enables `.githooks/pre-commit` and installs native tools
+- `just setup` — full machine bootstrap (profile, packages, symlinks, runtimes, hooks, tools)
 
 ### tmux
 
@@ -91,7 +94,7 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 | Rule | Scope | Purpose |
 | --- | --- | --- |
-| `brewfile.md` | `Brewfile`, `Brewfile.linux`, `Justfile` | Dual-Brewfile sync, alphabetical sorting, native-installer pattern (`just setup` as single source of truth) |
+| `brewfile.md` | `Brewfile`, `Brewfile.work`, `Brewfile.personal`, `Brewfile.linux`, `Justfile` | Brewfile sync, work/personal overlays, alphabetical sorting, native-installer pattern (`just setup` as single source of truth) |
 
 Global Claude Code rules and skills (commit conventions, task lifecycle, code-planning, language-specific patterns, etc.) live in `dotfiles-private/claude/` and auto-load via the rcm symlinks at `~/.claude/`. Edit them there.
 

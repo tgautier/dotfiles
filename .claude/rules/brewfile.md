@@ -1,23 +1,35 @@
 ---
 paths:
   - Brewfile
+  - Brewfile.work
+  - Brewfile.personal
   - Brewfile.linux
   - Justfile
 ---
 
 # Brewfile Conventions
 
-Both Brewfiles must stay in sync and sorted. Tools enter a machine through exactly one of two channels: a `brew` entry, or the native-installer pattern below — never both.
+The Brewfiles must stay in sync and sorted. Tools enter a machine through exactly one of two channels: a `brew` entry, or the native-installer pattern below — never both.
+
+## Files
+
+- `Brewfile` — macOS **shared base**: every package common to all Macs, plus a profile-overlay tail that merges the machine-specific overlay via `instance_eval`
+- `Brewfile.work` / `Brewfile.personal` — macOS **per-machine overlays**: casks/mas/brew that belong on only that profile. Each Mac picks one via the marker at `~/.config/dotfiles/profile` (set with `just set-profile work|personal`; absent ⇒ `work`)
+- `Brewfile.linux` — Linux base (no casks/mas)
+
+Because the overlay is merged into the same `brew bundle` evaluation, both `brew bundle install` and `brew bundle cleanup` operate on the full per-machine set — cleanup never uninstalls a sibling profile's apps on that machine.
 
 ## Rules
 
-- When adding or removing a package, apply the change to **both** `Brewfile` and `Brewfile.linux` unless the package is platform-specific (casks, Mac App Store apps, or Linux-only tools)
-- Casks (`cask`) and Mac App Store (`mas`) entries only exist in `Brewfile` — they are not available on Linux
-- The macOS `Brewfile` is organized into comment-delimited blocks: `# CLI Tools & Development`, `# Applications`, `# Fonts`, `# Mac App Store Applications`
-- The `Brewfile.linux` is organized into a `# CLI Tools & Development` block (casks and Mac App Store apps are not supported on Linux)
-- Within each block in each Brewfile, entries are sorted alphabetically (a-z) by the package name
+- A package shared by **all** machines goes in the base (`Brewfile` for macOS, and also `Brewfile.linux` unless it's a cask/mas or platform-specific tool)
+- A package for **one Mac profile only** goes in `Brewfile.work` or `Brewfile.personal` — never in the shared `Brewfile` base
+- Casks (`cask`) and Mac App Store (`mas`) entries never appear in `Brewfile.linux` — they are not available on Linux
+- The macOS `Brewfile` base is organized into comment-delimited blocks: `# CLI Tools & Development`, `# Applications`, `# Fonts`, `# Mac App Store Applications`. The overlays use `# Applications` and `# Mac App Store Applications` blocks
+- `Brewfile.linux` is organized into a `# CLI Tools & Development` block
+- Within each block in each file, entries are sorted alphabetically (a-z) by package name
 - Tap entries (`tap`) come before all blocks
 - For tap-prefixed formulae (e.g., `brew "terror/tap/just-lsp"`), sort by the full string including the tap prefix
+- Keep `lint-brewfile` in the `Justfile` in sync with this file set — every Brewfile gets a `ruby -c` check
 
 ## Native-installer tools
 

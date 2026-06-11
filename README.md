@@ -29,38 +29,34 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    ```sh
    mkdir -p ~/Workspace/tgautier
    git clone https://github.com/tgautier/dotfiles.git ~/Workspace/tgautier/dotfiles
+   # Optional: clone the private companion repo alongside it (merged via
+   # DOTFILES_DIRS). If absent, setup links the public repo only.
    ```
 
-3. **Install packages from Brewfile** (includes rcm, just, rustup, 1Password, and everything else):
+3. **Bootstrap and run setup:**
 
    ```sh
-   brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
+   brew install just                       # the only package needed by hand
+   cd ~/Workspace/tgautier/dotfiles
+   just setup
    ```
 
-4. **Link dotfiles** (rcm was installed in step 3):
+   `just setup` prompts for the machine profile (work/personal) on first run,
+   then installs all packages for that profile, links every dotfiles repo,
+   installs mise and the pinned runtimes, and enables git hooks and tools.
+   It is idempotent — re-run it anytime.
 
-   ```sh
-   rcup -d ~/Workspace/tgautier/dotfiles
-   ```
-
-5. **Set up 1Password SSH agent:**
+4. **Set up 1Password SSH agent:**
    Open 1Password, sign in, and enable the SSH agent under
    Settings > Developer > SSH Agent.
 
-6. **Switch git remote to SSH** (now that 1Password SSH is configured):
+5. **Switch git remote to SSH** (now that 1Password SSH is configured):
 
    ```sh
    git -C ~/Workspace/tgautier/dotfiles remote set-url origin git@github.com:tgautier/dotfiles.git
    ```
 
-7. **Install mise:**
-
-   ```sh
-   curl https://mise.run | sh
-   mise install
-   ```
-
-8. **Update everything:**
+6. **Keep everything current** (later, for maintenance):
 
    ```sh
    just update
@@ -120,21 +116,23 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    ```sh
    mkdir -p ~/Workspace/tgautier
    git clone https://github.com/tgautier/dotfiles.git ~/Workspace/tgautier/dotfiles
+   # Optional: clone the private companion repo alongside it (merged via
+   # DOTFILES_DIRS). If absent, setup links the public repo only.
    ```
 
-6. **Install packages from Brewfile** (includes rcm, just, rustup, and other tools):
+6. **Bootstrap and run setup** (uses `Brewfile.linux` automatically):
 
    ```sh
-   brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
+   brew install just                       # the only package needed by hand
+   cd ~/Workspace/tgautier/dotfiles
+   just setup
    ```
 
-7. **Link dotfiles** (rcm was installed in step 6):
+   `just setup` prompts for the machine profile on first run, then installs all
+   packages, links every dotfiles repo, installs mise and the pinned runtimes,
+   and enables git hooks and tools. It is idempotent — re-run it anytime.
 
-   ```sh
-   rcup -d ~/Workspace/tgautier/dotfiles
-   ```
-
-8. **Change shell to zsh:**
+7. **Change shell to zsh:**
 
    ```sh
    chsh -s $(which zsh)
@@ -142,24 +140,17 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
 
    Log out and log back in for the shell change to take effect.
 
-9. **Switch git remote to SSH** (1Password SSH agent was set up on the Windows side):
+8. **Switch git remote to SSH** (1Password SSH agent was set up on the Windows side):
 
    ```sh
    git -C ~/Workspace/tgautier/dotfiles remote set-url origin git@github.com:tgautier/dotfiles.git
    ```
 
-10. **Install mise:**
+9. **Keep everything current** (later, for maintenance):
 
-    ```sh
-    curl https://mise.run | sh
-    mise install
-    ```
-
-11. **Update everything:**
-
-    ```sh
-    just update
-    ```
+   ```sh
+   just update
+   ```
 
 ## Day-to-Day Updates
 
@@ -241,7 +232,7 @@ Individual targets:
 | `just lint-brewfile`   | Ruby syntax check on Brewfiles                       |
 | `just lint-mise`       | Validate mise config                                 |
 
-Enable the pre-commit hook:
+The pre-commit hook is enabled by the bootstrap (idempotent — safe to re-run):
 
 ```sh
 just setup

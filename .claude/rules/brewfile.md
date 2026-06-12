@@ -21,6 +21,7 @@ Because the overlay is merged into the same `brew bundle` evaluation, both `brew
 
 ## Rules
 
+- Before adding an entry to **any** Brewfile, grep all four (`grep -n "<name>" Brewfile Brewfile.work Brewfile.personal Brewfile.linux`) for an existing entry — the package may already live in an overlay. Promoting an overlay package to the base means **removing** the overlay entry in the same change; `lint-brewfile` does not catch duplicates (the merge harness stubs the DSL), so a stale overlay entry stays green in CI while duplicating the merged bundle
 - A package shared by **all** machines goes in the base (`Brewfile` for macOS, and also `Brewfile.linux` unless it's a cask/mas or platform-specific tool)
 - A package for **one Mac profile only** goes in `Brewfile.work` or `Brewfile.personal` — never in the shared `Brewfile` base
 - Casks (`cask`) and Mac App Store (`mas`) entries never appear in `Brewfile.linux` — they are not available on Linux

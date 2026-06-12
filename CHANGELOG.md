@@ -10,8 +10,8 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
-- `protonvpn` cask in `Brewfile` (macOS, shared — installs on both the work and
-  personal Macs).
+- `protonvpn` and `tailscale-app` casks in `Brewfile` (macOS, shared — install
+  on both the work and personal Macs).
 - `hermes-agent` via native installer in `just setup`, with cross-references in
   both Brewfiles; document the native-installer pattern (single source of truth
   in the `setup` recipe) in `.claude/rules/brewfile.md`.

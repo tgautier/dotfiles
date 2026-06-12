@@ -29,6 +29,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- `.claude/rules/brewfile.md`: grep all four Brewfiles before adding an entry —
+  promoting an overlay package to the base must remove the overlay entry in the
+  same change; `lint-brewfile` can't catch duplicates
+  ([#185](https://github.com/tgautier/dotfiles/issues/185) tracks lint support).
 - LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
   (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
 - Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0

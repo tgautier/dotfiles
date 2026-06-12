@@ -40,6 +40,9 @@ grouped by **date** rather than by semantic version. Newest first.
   yq 4.53.3.
 - Rename `linear-linear` cask to `linear` in `Brewfile.personal` (upstream
   Homebrew rename).
+- `CLAUDE.md` Key Commands: package installs go through `just setup` /
+  `just update-brew` — raw `brew install` / `brew bundle` is bootstrap-only,
+  before `just` itself exists.
 - `.claude/rules/brewfile.md`: grep all four Brewfiles before adding an entry —
   promoting an overlay package to the base must remove the overlay entry in the
   same change; `lint-brewfile` can't catch duplicates

@@ -10,6 +10,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `protonvpn` cask in `Brewfile` (macOS, shared — installs on both the work and
+  personal Macs).
+- `tailscale-app` cask in the shared `Brewfile`, promoted from the
+  `Brewfile.personal` overlay so the work Mac gets it too (the overlay entry is
+  removed — one channel per package).
 - `hermes-agent` via native installer in `just setup`, with cross-references in
   both Brewfiles; document the native-installer pattern (single source of truth
   in the `setup` recipe) in `.claude/rules/brewfile.md`.
@@ -24,6 +29,13 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- `CLAUDE.md` Key Commands: package installs go through `just setup` /
+  `just update-brew` — raw `brew install` / `brew bundle` is bootstrap-only,
+  before `just` itself exists.
+- `.claude/rules/brewfile.md`: grep all four Brewfiles before adding an entry —
+  promoting an overlay package to the base must remove the overlay entry in the
+  same change; `lint-brewfile` can't catch duplicates
+  ([#185](https://github.com/tgautier/dotfiles/issues/185) tracks lint support).
 - LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
   (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
 - Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0

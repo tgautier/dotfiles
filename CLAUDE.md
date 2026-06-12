@@ -22,15 +22,15 @@ Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** 
 # Link/update dotfiles after changes (uses DOTFILES_DIRS from rcrc)
 rcup
 
-# Install macOS packages (auto-selects the work/personal overlay)
-brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile
+# Install packages (auto-selects the platform Brewfile and, on macOS, the
+# work/personal overlay). Never run raw `brew install` / `brew bundle` —
+# packages always flow through the just recipes; raw `brew bundle` is only
+# for first bootstrap, before `just` itself is installed
+just setup
 
 # Declare this Mac's profile (work|personal) — required before brew bundle;
 # interactive `just setup` prompts for it on first run (default: work)
 just set-profile personal
-
-# Install Linux packages
-brew bundle --file=~/Workspace/tgautier/dotfiles/Brewfile.linux
 
 # Run all linters locally (same as CI)
 just ci

@@ -21,7 +21,6 @@ cask "rectangle"
 cask "rode-central"
 cask "setapp"
 cask "synology-drive"
-cask "tailscale-app"
 
 # Mac App Store Applications
 mas "Infuse", id: 1136220934

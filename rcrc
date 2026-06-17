@@ -1,3 +1,18 @@
-EXCLUDES="README.md .githooks"
-DOTFILES_DIRS="${HOME}/Workspace/tgautier/dotfiles ${HOME}/Workspace/tgautier/dotfiles-private"
+# Private repo path, used by both EXCLUDES and DOTFILES_DIRS below. Single
+# source of truth: if it drifts, the exclude-sourcing would silently no-op
+# (2>/dev/null) and rcup would resume hanging on the excluded directory.
+PRIVATE_DIR="${HOME}/Workspace/tgautier/dotfiles-private"
+
+# Base excludes plus any private-only exclude patterns appended from
+# ${PRIVATE_DIR}/rcm-excludes. Sourced here (rcm reads rcrc as shell) so
+# bare `rcup` and `just setup` both honor them; an absent private repo is a
+# no-op. Keeps project/dir names we don't publish out of this public file.
+# Justfile and CHANGELOG.md are run/used in-repo, not home dotfiles, so they
+# are excluded. Excluding Justfile also avoids colliding with the private
+# repo's `justfile` -> ~/.justfile on case-insensitive filesystems (macOS).
+# NB: Brewfile / Brewfile.linux must stay linked — zshenv exports
+# HOMEBREW_BUNDLE_FILE=~/.Brewfile[.linux], so excluding them breaks bare
+# `brew bundle`.
+EXCLUDES="README.md .githooks Justfile CHANGELOG.md rcm-excludes $( { grep -hvE '^[[:space:]]*(#|$)' "${PRIVATE_DIR}/rcm-excludes" 2>/dev/null || true; } | tr '\n' ' ')"
+DOTFILES_DIRS="${HOME}/Workspace/tgautier/dotfiles ${PRIVATE_DIR}"
 SYMLINK_DIRS="claude/skills claude/rules claude/hooks"

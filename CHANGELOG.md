@@ -10,6 +10,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `antigravity` and `cursor` casks in `Brewfile` (macOS, all profiles).
 - `hermes-agent` via native installer in `just setup`, with cross-references in
   both Brewfiles; document the native-installer pattern (single source of truth
   in the `setup` recipe) in `.claude/rules/brewfile.md`.
@@ -24,6 +25,16 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Rename the roborev Homebrew tap `roborev-dev/tap` → `kenn-io/tap` in
+  `Brewfile` and `Brewfile.linux` (upstream GitHub org rename; the old name
+  now redirects). Stops the "Redirected tap … Not trusted tap" warning on
+  `brew update`. Homebrew 6's trusted-taps gate still needs a one-time
+  `brew trust kenn-io/tap` (and `brew trust terror/tap`) per machine.
+- Bump mise tool versions: dart 3.12.2, deno 2.8.3, elixir 1.20.1-otp-29,
+  Flutter (`vfox-flutter`) 3.44.2, helm 4.2.1, python 3.14.6, yarn 4.17.0,
+  yq 4.53.3.
+- Rename `linear-linear` cask to `linear` in `Brewfile.personal` (upstream
+  Homebrew rename).
 - LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
   (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
 - Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0

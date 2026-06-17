@@ -3,17 +3,17 @@ not_found_auto_install = true
 trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
-dart = { version = "3.12.1", url = "https://storage.googleapis.com/dart-archive/channels/stable/release/{{ version }}/sdk/dartsdk-{{ os() }}-{{ arch() }}-release.zip", version_list_url = "https://storage.googleapis.com/storage/v1/b/dart-archive/o?prefix=channels/stable/release/&delimiter=/", version_regex = 'channels/stable/release/(\d+\.\d+\.\d+)/' }
-deno = "2.8.2"
+dart = { version = "3.12.2", url = "https://storage.googleapis.com/dart-archive/channels/stable/release/{{ version }}/sdk/dartsdk-{{ os() }}-{{ arch() }}-release.zip", version_list_url = "https://storage.googleapis.com/storage/v1/b/dart-archive/o?prefix=channels/stable/release/&delimiter=/", version_regex = 'channels/stable/release/(\d+\.\d+\.\d+)/' }
+deno = "2.8.3"
 # elixir's -otp-N suffix must match erlang's OTP major. Bump these two as a
 # pair, never independently.
-elixir = "1.20.0-otp-29"
+elixir = "1.20.1-otp-29"
 erlang = "29.0"
-"vfox:mise-plugins/vfox-flutter" = "3.44.1"
+"vfox:mise-plugins/vfox-flutter" = "3.44.2"
 go = "1.26.4"
-helm = "4.2.0"
+helm = "4.2.1"
 node = "26"
-python = "3.14.5"
+python = "3.14.6"
 ruby = "4.0.5"
-yarn = "4.16.0"
-yq = "4.53.2"
+yarn = "4.17.0"
+yq = "4.53.3"

@@ -43,6 +43,21 @@ grouped by **date** rather than by semantic version. Newest first.
   then installs packages, links dotfiles, installs mise runtimes, and enables
   git hooks and tools — so a fresh machine is one command after `brew install just`.
 
+### Fixed
+
+- `rcup` / `just setup` no longer hang for minutes with no output. rcm was
+  descending into a large non-dotfile project directory (managed only via
+  `dotfiles-private`) and symlinking its tens of thousands of build
+  artifacts one by one. That directory is now excluded via a new
+  `dotfiles-private/rcm-excludes` list, sourced by `rcrc` at link time so its
+  name stays out of this public repo (works for bare `rcup` and `just setup`).
+- Exclude the repo `Justfile` and `CHANGELOG.md` from rcm symlinking — they are
+  run/used in-repo, not home dotfiles. Excluding `Justfile` also fixes a
+  collision with the private repo's `justfile` → `~/.justfile` on
+  case-insensitive filesystems (macOS) that made every `rcup` prompt
+  `overwrite ~/.Justfile?` (a silent hang when stdin is not a TTY). Brewfiles
+  stay linked (`zshenv` exports `HOMEBREW_BUNDLE_FILE=~/.Brewfile[.linux]`).
+
 ## [2026-06-01]
 
 ### Changed

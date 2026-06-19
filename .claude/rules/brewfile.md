@@ -21,7 +21,7 @@ Because the overlay is merged into the same `brew bundle` evaluation, both `brew
 
 ## Rules
 
-- Before adding an entry to **any** Brewfile, grep all four (`grep -n "<name>" Brewfile Brewfile.work Brewfile.personal Brewfile.linux`) for an existing entry — the package may already live in an overlay. Promoting an overlay package to the base means **removing** the overlay entry in the same change; `lint-brewfile` does not catch duplicates (the merge harness stubs the DSL), so a stale overlay entry stays green in CI while duplicating the merged bundle
+- Before adding an entry to **any** Brewfile, grep all four (`grep -n "<name>" Brewfile Brewfile.work Brewfile.personal Brewfile.linux`) for an existing entry — the package may already live in an overlay. Promoting an overlay package to the base means **removing** the overlay entry in the same change. `lint-brewfile` now catches a duplicate `brew`/`cask`/`mas` name across the merged base + overlay set (its harness records entry names during the eval), but grep first — a clear diff beats a CI failure
 - A package shared by **all** machines goes in the base (`Brewfile` for macOS, and also `Brewfile.linux` unless it's a cask/mas or platform-specific tool)
 - A package for **one Mac profile only** goes in `Brewfile.work` or `Brewfile.personal` — never in the shared `Brewfile` base
 - Casks (`cask`) and Mac App Store (`mas`) entries never appear in `Brewfile.linux` — they are not available on Linux
@@ -30,7 +30,7 @@ Because the overlay is merged into the same `brew bundle` evaluation, both `brew
 - Within each block in each file, entries are sorted alphabetically (a-z) by package name
 - Tap entries (`tap`) come before all blocks
 - For tap-prefixed formulae (e.g., `brew "terror/tap/just-lsp"`), sort by the full string including the tap prefix
-- Keep `lint-brewfile` in the `Justfile` in sync with this file set — every Brewfile gets a `ruby -c` check, and the overlay-merge harness must keep evaluating every profile plus the absent-marker failure
+- Keep `lint-brewfile` in the `Justfile` in sync with this file set — every Brewfile gets a `ruby -c` check, and the overlay-merge harness must keep evaluating every profile plus the absent-marker failure and the duplicate-entry guard (with its negative fixture test)
 
 ## Native-installer tools
 

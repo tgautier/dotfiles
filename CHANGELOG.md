@@ -41,8 +41,11 @@ grouped by **date** rather than by semantic version. Newest first.
   before `just` itself exists.
 - `.claude/rules/brewfile.md`: grep all four Brewfiles before adding an entry —
   promoting an overlay package to the base must remove the overlay entry in the
-  same change; `lint-brewfile` can't catch duplicates
-  ([#192](https://github.com/tgautier/dotfiles/issues/192) tracks lint support).
+  same change.
+- `lint-brewfile` now detects duplicate `brew`/`cask`/`mas` names across the
+  merged base + overlay set: the eval harness records entry names and fails on
+  a repeat, with a negative fixture test asserting the guard fires
+  ([#192](https://github.com/tgautier/dotfiles/issues/192)).
 - LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
   (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
 - Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0

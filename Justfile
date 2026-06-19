@@ -160,12 +160,29 @@ lint-brewfile:
     ruby -c Brewfile.linux
     # Evaluate the merged Brewfile for each profile from a non-repo cwd with
     # stubbed DSL methods — catches overlay-resolution and fail-loud regressions
-    # that `ruby -c` (syntax only) cannot see.
+    # that `ruby -c` (syntax only) cannot see. The stubs also record each
+    # brew/cask/mas entry name so a package present in BOTH the base and an
+    # overlay (a duplicate in the merged bundle, which `ruby -c` cannot see and
+    # `brew bundle` may error on) fails the lint — issue #192.
     brewfile="$PWD/Brewfile"
     harness='
+      seen = Hash.new(0)
+      dups = []
       dsl = Object.new
-      %i[tap brew cask mas].each { |m| dsl.define_singleton_method(m) { |*a, **k| } }
+      %i[brew cask mas].each do |m|
+        dsl.define_singleton_method(m) do |name, *a, **k|
+          key = [m, name]
+          seen[key] += 1
+          dups << key if seen[key] == 2
+        end
+      end
+      dsl.define_singleton_method(:tap) { |*a, **k| }
       dsl.instance_eval(File.read(ARGV[0]), ARGV[0])
+      unless dups.empty?
+        STDERR.puts "DUPLICATE Brewfile entries in merged bundle:"
+        dups.each { |m, n| STDERR.puts %(  #{m} "#{n}") }
+        exit 1
+      end
     '
     tmp_root="$(mktemp -d)"
     trap 'rm -rf "$tmp_root"' EXIT
@@ -189,6 +206,21 @@ lint-brewfile:
         exit 1
     fi
     echo "Brewfile absent-marker raise OK"
+    # A duplicate brew/cask/mas name (here within one file; the same guard
+    # catches a base+overlay duplicate) must fail loud — assert the dup guard
+    # fires on a known duplicate, not just any error.
+    dup_brewfile="$tmp_root/dup-Brewfile"
+    printf 'cask "vlc"\ncask "vlc"\n' > "$dup_brewfile"
+    if dout="$(cd /tmp && ruby -e "$harness" "$dup_brewfile" 2>&1)"; then
+        echo "ERROR: duplicate detection did not fire on a known duplicate" >&2
+        exit 1
+    fi
+    if ! grep -q 'DUPLICATE' <<<"$dout"; then
+        echo "ERROR: duplicate-case failure did not come from the dup guard:" >&2
+        echo "$dout" >&2
+        exit 1
+    fi
+    echo "Brewfile duplicate-detection OK"
 
 # Validate mise config
 lint-mise:

@@ -56,6 +56,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `just setup` now trusts the Brewfile's own declared taps (`brew trust`,
+  guarded on Homebrew 6+) before `brew bundle`, so the trusted-taps gate
+  ($HOMEBREW_REQUIRE_TAP_TRUST) no longer aborts a fresh-machine bootstrap with
+  "Refusing to load formula … from untrusted tap". A no-op on older Homebrew.
 - `just set-default-editor` no longer hijacks the macOS web-browser role. Web
   content types (`html`/`htm`/`xhtml`/`svg`) and the root `public.data` UTI are
   now excluded — registering VS Code as their handler cascaded into the browser

@@ -20,7 +20,23 @@ setup: _ensure-profile
     # this repo (+ dotfiles-private if used), run `brew bundle` once to get `just`.
     cd "{{dotfiles_dir}}"
 
-    # 1. Packages for this machine's profile (install only; `just update` upgrades).
+    # 1. Packages for this machine's profile (install only; `just update`
+    #    upgrades). First trust the repo's own declared taps so Homebrew's
+    #    trusted-taps gate ($HOMEBREW_REQUIRE_TAP_TRUST, Homebrew 6+) doesn't
+    #    refuse to load their formulae mid-bundle. `brew trust` only records the
+    #    tap name in trust.json (no clone needed), so it's safe before the tap
+    #    is added; guarded on the subcommand, so it's a no-op on older Homebrew.
+    #    Verified against Homebrew 6.0.2 (`brew trust --help`); the gate is the
+    #    exact one that fails a fresh bootstrap ("Refusing to load formula …
+    #    from untrusted tap. Run `brew trust …`").
+    #    Scans only the base brewfile: per-machine overlays carry no `tap` lines
+    #    by convention (Applications/Mas only, per .claude/rules/brewfile.md).
+    #    A failed trust is non-fatal (`|| true`) — it just degrades to the gate
+    #    `brew bundle` would have hit anyway, never aborts the bootstrap.
+    if brew trust --help >/dev/null 2>&1; then
+        taps="$(grep -E '^tap "' "{{brewfile}}" | sed -E 's/^tap "([^"]+)".*/\1/' || true)"
+        for tap in $taps; do brew trust "$tap" || true; done
+    fi
     brew bundle install --file="{{brewfile}}"
 
     # 2. Symlink dotfiles. RCRC points rcm at the repo config so a fresh machine

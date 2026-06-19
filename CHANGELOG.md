@@ -11,6 +11,7 @@ grouped by **date** rather than by semantic version. Newest first.
 ### Added
 
 - `antigravity` and `cursor` casks in `Brewfile` (macOS, all profiles).
+- `protonvpn` cask in the `Brewfile.personal` overlay (macOS).
 - `hermes-agent` via native installer in `just setup`, with cross-references in
   both Brewfiles; document the native-installer pattern (single source of truth
   in the `setup` recipe) in `.claude/rules/brewfile.md`.
@@ -35,6 +36,13 @@ grouped by **date** rather than by semantic version. Newest first.
   yq 4.53.3.
 - Rename `linear-linear` cask to `linear` in `Brewfile.personal` (upstream
   Homebrew rename).
+- `CLAUDE.md` Key Commands: package installs go through `just setup` /
+  `just update-brew` — raw `brew install` / `brew bundle` is bootstrap-only,
+  before `just` itself exists.
+- `.claude/rules/brewfile.md`: grep all four Brewfiles before adding an entry —
+  promoting an overlay package to the base must remove the overlay entry in the
+  same change; `lint-brewfile` can't catch duplicates
+  ([#192](https://github.com/tgautier/dotfiles/issues/192) tracks lint support).
 - LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
   (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
 - Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0

@@ -53,6 +53,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `just set-default-editor` no longer hijacks the macOS web-browser role. Web
+  content types (`html`/`htm`/`xhtml`/`svg`) and the root `public.data` UTI are
+  now excluded — registering VS Code as their handler cascaded into the browser
+  role and the `http`/`https` URL schemes, sending web links to VS Code instead
+  of the browser.
 - `rcup` / `just setup` no longer hang for minutes with no output. rcm was
   descending into a large non-dotfile project directory (managed only via
   `dotfiles-private`) and symlinking its tens of thousands of build

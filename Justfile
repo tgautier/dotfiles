@@ -226,7 +226,10 @@ update-rust:
     rustup update
 
 # Register VS Code as default opener for text/code/data files (macOS only).
-# Word and Pages documents are deliberately excluded.
+# Word and Pages documents are deliberately excluded. Web-content types
+# (html/htm/xhtml/svg) and the root public.data UTI are ALSO excluded: making
+# VS Code the default HTML handler cascades into the macOS web-browser role and
+# the http/https URL schemes, hijacking web links away from the browser.
 set-default-editor:
     #!/usr/bin/env zsh
     if [[ "$(uname -s)" != "Darwin" ]]; then
@@ -255,13 +258,13 @@ set-default-editor:
         public.comma-separated-values-text
         public.tab-separated-values-text
         public.log
-        public.data
     )
     for uti in "${utis[@]}"; do
         duti -s "$bundle" "$uti" all 2>/dev/null || true
     done
     # Extension-level associations (catches files without a registered UTI).
-    # Excludes Word (.doc, .docx) and Pages (.pages) by design.
+    # Excludes Word (.doc, .docx), Pages (.pages), and web content
+    # (.html/.htm/.xhtml/.svg) by design — see the recipe header above.
     exts=(
         txt md markdown rst adoc org tex log csv tsv
         json yaml yml toml xml ini conf cfg env properties plist
@@ -273,7 +276,7 @@ set-default-editor:
         cs fs fsx vb
         ex exs erl hrl hs lhs ml mli ocaml
         sol move
-        css scss sass less styl html htm xhtml svg
+        css scss sass less styl
         sql graphql gql proto thrift avsc
         dart
         tf hcl tfvars
@@ -285,7 +288,8 @@ set-default-editor:
         duti -s "$bundle" ".$ext" all 2>/dev/null || true
     done
     echo "VS Code registered as default for text/code/data files."
-    echo "Word (.doc/.docx) and Pages (.pages) intentionally left untouched."
+    echo "Word (.doc/.docx), Pages (.pages), and web content (.html/.svg)"
+    echo "intentionally left untouched so the browser keeps http/https links."
 
 # Remove stale symlinks in $HOME that point into dotfiles dirs
 cleanup-symlinks:

@@ -113,6 +113,8 @@ cask "1password"
 cask "1password-cli"
 cask "android-studio"
 cask "antigravity"
+cask "antigravity-cli"
+cask "antigravity-ide"
 cask "claude"
 ## claude-code: native installer via `just setup` (auto-updates, no deps)
 cask "codex"

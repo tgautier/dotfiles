@@ -11,6 +11,8 @@ grouped by **date** rather than by semantic version. Newest first.
 ### Added
 
 - `antigravity` and `cursor` casks in `Brewfile` (macOS, all profiles).
+- `antigravity-cli` and `antigravity-ide` casks in `Brewfile` (macOS, all
+  profiles).
 - `protonvpn` cask in the `Brewfile.personal` overlay (macOS).
 - `hermes-agent` via native installer in `just setup`, with cross-references in
   both Brewfiles; document the native-installer pattern (single source of truth

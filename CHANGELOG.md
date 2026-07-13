@@ -58,6 +58,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `just setup` now runs `brew bundle install --no-upgrade`, matching its
+  documented "install only" contract (`just update` owns upgrades). Previously
+  `brew bundle` upgraded every outdated cask/formula, so a single failing
+  upgrade (e.g. `google-chrome` with a stale Caskroom app) aborted the whole
+  bootstrap.
 - `just setup` now trusts the Brewfile's own declared taps (`brew trust`,
   guarded on Homebrew 6+) before `brew bundle`, so the trusted-taps gate
   ($HOMEBREW_REQUIRE_TAP_TRUST) no longer aborts a fresh-machine bootstrap with

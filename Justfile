@@ -37,7 +37,13 @@ setup: _ensure-profile
         taps="$(grep -E '^tap "' "{{brewfile}}" | sed -E 's/^tap "([^"]+)".*/\1/' || true)"
         for tap in $taps; do brew trust "$tap" || true; done
     fi
-    brew bundle install --file="{{brewfile}}"
+    #    `--no-upgrade` keeps this install-only: bootstrap should not try to
+    #    upgrade already-installed packages (`just update` owns upgrades). Without
+    #    it, `brew bundle install` upgrades every outdated cask/formula, so a
+    #    single failing upgrade (e.g. a cask with a stale Caskroom app) aborts the
+    #    whole bootstrap — a fresh-machine step must not depend on every existing
+    #    package upgrading cleanly.
+    brew bundle install --no-upgrade --file="{{brewfile}}"
 
     # 2. Symlink dotfiles. RCRC points rcm at the repo config so a fresh machine
     #    (no ~/.rcrc yet) links every DOTFILES_DIRS entry; a missing private repo

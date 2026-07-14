@@ -28,6 +28,8 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
+  (`vfox-flutter`) 3.44.6, go 1.26.5, helm 4.2.3, ruby 4.0.6, yarn 4.17.1.
 - Rename the roborev Homebrew tap `roborev-dev/tap` → `kenn-io/tap` in
   `Brewfile` and `Brewfile.linux` (upstream GitHub org rename; the old name
   now redirects). Stops the "Redirected tap … Not trusted tap" warning on

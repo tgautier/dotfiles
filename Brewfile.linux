@@ -94,5 +94,7 @@ brew "zsh-completions"
 # - 1Password: https://1password.com/downloads/linux/
 # - Docker: apt install docker.io
 # - gcloud CLI: https://cloud.google.com/sdk/docs/install#linux
+# - Gemini CLI: no Linux brew replacement (the antigravity-cli cask is
+#   macOS-only) — install via Google's official channel if needed
 # - Ghostty: https://ghostty.org/docs/install/binary
 # - VS Code: https://code.visualstudio.com/docs/setup/linux

@@ -36,7 +36,8 @@ grouped by **date** rather than by semantic version. Newest first.
   `trusted:` entries, so trust recorded imperatively with `brew trust` was
   wiped on every update and `brew doctor` kept warning about untrusted taps.
   `brew bundle install` applies the declared trust before fetching, so fresh
-  bootstraps need no separate trust step either.
+  bootstraps need no separate trust step either
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
 - Bump mise deno 2.9.2 → 2.9.3
   ([#198](https://github.com/tgautier/dotfiles/pull/198)).
 - Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
@@ -77,14 +78,16 @@ grouped by **date** rather than by semantic version. Newest first.
   superseded on macOS by the `antigravity-cli` cask already in `Brewfile`.
   Linux/WSL gets no brew replacement (the cask is macOS-only) — the
   `# Native installers` block in `Brewfile.linux` points at Google's own
-  install channel.
+  install channel ([#199](https://github.com/tgautier/dotfiles/pull/199)).
 - `pcre` from `Brewfile` — deprecated in homebrew-core (unmaintained
   upstream); no installed formula depends on it, and `pcre2` arrives as a
-  dependency where needed.
+  dependency where needed ([#199](https://github.com/tgautier/dotfiles/pull/199)).
 - `codex-app` cask from `Brewfile` — discontinued upstream (the Codex desktop
-  app merged into the ChatGPT app); the `codex` CLI cask stays.
+  app merged into the ChatGPT app); the `codex` CLI cask stays
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
 - `_trust-taps` recipe from the `Justfile` — superseded by the Brewfile
-  `trusted:` options (see Changed).
+  `trusted:` options (see Changed)
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
 
 ### Fixed
 

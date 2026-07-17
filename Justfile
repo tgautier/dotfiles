@@ -252,7 +252,10 @@ brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.li
 # Brewfile (`trusted: true` on tap-prefixed formulae), never via an
 # imperative `brew trust` step: `brew bundle cleanup --force` resets the
 # trust store to exactly the Brewfile-declared `trusted:` entries, so
-# hand-recorded trust is wiped on every run of this recipe.
+# hand-recorded trust is wiped on every run of this recipe. If the store
+# lacks the entries (fresh tap clone, manual untrust), the first `brew
+# update` may warn "Not trusted tap" once — harmless, and self-healing when
+# `brew bundle install` applies the declared trust in the next step.
 update-brew:
     brew update
     brew bundle install --file={{brewfile}}

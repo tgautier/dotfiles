@@ -60,6 +60,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `just update` now trusts the Brewfile's declared taps before `brew bundle`,
+  the same fix `just setup` received: Homebrew 6's trusted-taps gate aborted
+  `update-brew` with "Refusing to load formula kenn-io/tap/roborev from
+  untrusted tap". The trust logic moved from the `setup` recipe body into a
+  shared `_trust-taps` recipe that both `setup` and `update-brew` run.
 - `just setup` now runs `brew bundle install --no-upgrade`, matching its
   documented "install only" contract (`just update` owns upgrades). Previously
   `brew bundle` upgraded every outdated cask/formula, so a single failing

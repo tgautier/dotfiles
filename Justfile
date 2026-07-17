@@ -22,21 +22,9 @@ setup: _ensure-profile
 
     # 1. Packages for this machine's profile (install only; `just update`
     #    upgrades). First trust the repo's own declared taps so Homebrew's
-    #    trusted-taps gate ($HOMEBREW_REQUIRE_TAP_TRUST, Homebrew 6+) doesn't
-    #    refuse to load their formulae mid-bundle. `brew trust` only records the
-    #    tap name in trust.json (no clone needed), so it's safe before the tap
-    #    is added; guarded on the subcommand, so it's a no-op on older Homebrew.
-    #    Verified against Homebrew 6.0.2 (`brew trust --help`); the gate is the
-    #    exact one that fails a fresh bootstrap ("Refusing to load formula …
-    #    from untrusted tap. Run `brew trust …`").
-    #    Scans only the base brewfile: per-machine overlays carry no `tap` lines
-    #    by convention (Applications/Mas only, per .claude/rules/brewfile.md).
-    #    A failed trust is non-fatal (`|| true`) — it just degrades to the gate
-    #    `brew bundle` would have hit anyway, never aborts the bootstrap.
-    if brew trust --help >/dev/null 2>&1; then
-        taps="$(grep -E '^tap "' "{{brewfile}}" | sed -E 's/^tap "([^"]+)".*/\1/' || true)"
-        for tap in $taps; do brew trust "$tap" || true; done
-    fi
+    #    trusted-taps gate doesn't refuse to load their formulae mid-bundle —
+    #    see _trust-taps for the full rationale.
+    just _trust-taps
     #    `--no-upgrade` keeps this install-only: bootstrap should not try to
     #    upgrade already-installed packages (`just update` owns upgrades). Without
     #    it, `brew bundle install` upgrades every outdated cask/formula, so a
@@ -257,8 +245,26 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 # Platform-specific Brewfile
 brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
 
+# Trust the base Brewfile's declared taps so Homebrew's trusted-taps gate
+# ($HOMEBREW_REQUIRE_TAP_TRUST, Homebrew 6+) doesn't refuse to load their
+# formulae mid-bundle ("Refusing to load formula … from untrusted tap. Run
+# `brew trust …`"). `brew trust` only records the tap name in trust.json (no
+# clone needed), so it's safe before the tap is added; guarded on the
+# subcommand, so it's a no-op on older Homebrew (verified against 6.0.2).
+# Scans only the base brewfile: per-machine overlays carry no `tap` lines by
+# convention (Applications/Mas only, per .claude/rules/brewfile.md). A failed
+# trust is non-fatal (`|| true`) — it just degrades to the gate `brew bundle`
+# would have hit anyway, never aborts the caller.
+_trust-taps:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if brew trust --help >/dev/null 2>&1; then
+        taps="$(grep -E '^tap "' "{{brewfile}}" | sed -E 's/^tap "([^"]+)".*/\1/' || true)"
+        for tap in $taps; do brew trust "$tap" || true; done
+    fi
+
 # Update Homebrew packages and clean up
-update-brew:
+update-brew: _trust-taps
     brew update
     brew bundle install --file={{brewfile}}
     brew upgrade

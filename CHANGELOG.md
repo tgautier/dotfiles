@@ -28,6 +28,8 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Bump mise deno 2.9.2 → 2.9.3
+  ([#198](https://github.com/tgautier/dotfiles/pull/198)).
 - Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
   (`vfox-flutter`) 3.44.6, go 1.26.5, helm 4.2.3, ruby 4.0.6, yarn 4.17.1.
 - Rename the roborev Homebrew tap `roborev-dev/tap` → `kenn-io/tap` in
@@ -60,6 +62,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `just update` now trusts the Brewfile's declared taps before `brew bundle`,
+  the same fix `just setup` received: Homebrew 6's trusted-taps gate aborted
+  `update-brew` with "Refusing to load formula kenn-io/tap/roborev from
+  untrusted tap". The trust logic moved from the `setup` recipe body into a
+  shared `_trust-taps` recipe that both `setup` and `update-brew` run.
 - `just setup` now runs `brew bundle install --no-upgrade`, matching its
   documented "install only" contract (`just update` owns upgrades). Previously
   `brew bundle` upgraded every outdated cask/formula, so a single failing

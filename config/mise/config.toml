@@ -4,7 +4,7 @@ trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
 dart = { version = "3.12.2", url = "https://storage.googleapis.com/dart-archive/channels/stable/release/{{ version }}/sdk/dartsdk-{{ os() }}-{{ arch() }}-release.zip", version_list_url = "https://storage.googleapis.com/storage/v1/b/dart-archive/o?prefix=channels/stable/release/&delimiter=/", version_regex = 'channels/stable/release/(\d+\.\d+\.\d+)/' }
-deno = "2.9.2"
+deno = "2.9.3"
 # elixir's -otp-N suffix must match erlang's OTP major. Bump these two as a
 # pair, never independently.
 elixir = "1.20.2-otp-29"

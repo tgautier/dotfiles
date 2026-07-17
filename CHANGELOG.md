@@ -28,6 +28,16 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Tap trust is now declared in the Brewfiles: `trusted: true` on
+  `kenn-io/tap/roborev` and `terror/tap/just-lsp` (formula-level trust, as
+  Homebrew recommends), in both `Brewfile` and `Brewfile.linux`. This replaces
+  the `_trust-taps` recipe: `brew bundle cleanup --force` (run by
+  `just update-brew`) resets the trust store to exactly the Brewfile-declared
+  `trusted:` entries, so trust recorded imperatively with `brew trust` was
+  wiped on every update and `brew doctor` kept warning about untrusted taps.
+  `brew bundle install` applies the declared trust before fetching, so fresh
+  bootstraps need no separate trust step either
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
 - Bump mise deno 2.9.2 → 2.9.3
   ([#198](https://github.com/tgautier/dotfiles/pull/198)).
 - Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
@@ -35,8 +45,9 @@ grouped by **date** rather than by semantic version. Newest first.
 - Rename the roborev Homebrew tap `roborev-dev/tap` → `kenn-io/tap` in
   `Brewfile` and `Brewfile.linux` (upstream GitHub org rename; the old name
   now redirects). Stops the "Redirected tap … Not trusted tap" warning on
-  `brew update`. Homebrew 6's trusted-taps gate still needs a one-time
-  `brew trust kenn-io/tap` (and `brew trust terror/tap`) per machine.
+  `brew update`. Trust for these taps' formulae is declared in the Brewfiles
+  via `trusted:` options (see the entry above) — no per-machine `brew trust`
+  step is needed.
 - Bump mise tool versions: dart 3.12.2, deno 2.8.3, elixir 1.20.1-otp-29,
   Flutter (`vfox-flutter`) 3.44.2, helm 4.2.1, python 3.14.6, yarn 4.17.0,
   yq 4.53.3.
@@ -60,6 +71,24 @@ grouped by **date** rather than by semantic version. Newest first.
   then installs packages, links dotfiles, installs mise runtimes, and enables
   git hooks and tools — so a fresh machine is one command after `brew install just`.
 
+### Removed
+
+- `gemini-cli` from `Brewfile` and `Brewfile.linux` — deprecated in
+  homebrew-core (unsupported upstream; disable scheduled for 2026-12-18);
+  superseded on macOS by the `antigravity-cli` cask already in `Brewfile`.
+  Linux/WSL gets no brew replacement (the cask is macOS-only) — the
+  `# Native installers` block in `Brewfile.linux` points at Google's own
+  install channel ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- `pcre` from `Brewfile` — deprecated in homebrew-core (unmaintained
+  upstream); no installed formula depends on it, and `pcre2` arrives as a
+  dependency where needed ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- `codex-app` cask from `Brewfile` — discontinued upstream (the Codex desktop
+  app merged into the ChatGPT app); the `codex` CLI cask stays
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- `_trust-taps` recipe from the `Justfile` — superseded by the Brewfile
+  `trusted:` options (see Changed)
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+
 ### Fixed
 
 - `just update` now trusts the Brewfile's declared taps before `brew bundle`,
@@ -67,6 +96,9 @@ grouped by **date** rather than by semantic version. Newest first.
   `update-brew` with "Refusing to load formula kenn-io/tap/roborev from
   untrusted tap". The trust logic moved from the `setup` recipe body into a
   shared `_trust-taps` recipe that both `setup` and `update-brew` run.
+  Superseded later in this release: trust is now declared in the Brewfiles
+  via `trusted:` options and the `_trust-taps` recipe is removed (see
+  Changed).
 - `just setup` now runs `brew bundle install --no-upgrade`, matching its
   documented "install only" contract (`just update` owns upgrades). Previously
   `brew bundle` upgraded every outdated cask/formula, so a single failing
@@ -76,6 +108,8 @@ grouped by **date** rather than by semantic version. Newest first.
   guarded on Homebrew 6+) before `brew bundle`, so the trusted-taps gate
   ($HOMEBREW_REQUIRE_TAP_TRUST) no longer aborts a fresh-machine bootstrap with
   "Refusing to load formula … from untrusted tap". A no-op on older Homebrew.
+  Superseded later in this release by Brewfile-declared `trusted:` options
+  (see Changed).
 - `just set-default-editor` no longer hijacks the macOS web-browser role. Web
   content types (`html`/`htm`/`xhtml`/`svg`) and the root `public.data` UTI are
   now excluded — registering VS Code as their handler cascaded into the browser

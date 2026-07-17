@@ -28,6 +28,15 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Tap trust is now declared in the Brewfiles: `trusted: true` on
+  `kenn-io/tap/roborev` and `terror/tap/just-lsp` (formula-level trust, as
+  Homebrew recommends), in both `Brewfile` and `Brewfile.linux`. This replaces
+  the `_trust-taps` recipe: `brew bundle cleanup --force` (run by
+  `just update-brew`) resets the trust store to exactly the Brewfile-declared
+  `trusted:` entries, so trust recorded imperatively with `brew trust` was
+  wiped on every update and `brew doctor` kept warning about untrusted taps.
+  `brew bundle install` applies the declared trust before fetching, so fresh
+  bootstraps need no separate trust step either.
 - Bump mise deno 2.9.2 → 2.9.3
   ([#198](https://github.com/tgautier/dotfiles/pull/198)).
 - Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
@@ -59,6 +68,19 @@ grouped by **date** rather than by semantic version. Newest first.
 - `just setup` is now a full idempotent bootstrap — selects the machine profile,
   then installs packages, links dotfiles, installs mise runtimes, and enables
   git hooks and tools — so a fresh machine is one command after `brew install just`.
+
+### Removed
+
+- `gemini-cli` from `Brewfile` and `Brewfile.linux` — deprecated in
+  homebrew-core (unsupported upstream, disabled on 2026-12-18); superseded by
+  the `antigravity-cli` cask already in `Brewfile`.
+- `pcre` from `Brewfile` — deprecated in homebrew-core (unmaintained
+  upstream); no installed formula depends on it, and `pcre2` arrives as a
+  dependency where needed.
+- `codex-app` cask from `Brewfile` — discontinued upstream (the Codex desktop
+  app merged into the ChatGPT app); the `codex` CLI cask stays.
+- `_trust-taps` recipe from the `Justfile` — superseded by the Brewfile
+  `trusted:` options (see Changed).
 
 ### Fixed
 

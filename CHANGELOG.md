@@ -73,6 +73,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- `telnet` from `Brewfile.linux`: the Homebrew formula is now source-only
+  (`bottle: false`), a Tier 3 config on Linux that `brew bundle` refuses to
+  build, which aborted `just setup`. On Linux, install it from the distro
+  (`apt install telnet`); documented in the `Brewfile.linux` native-installers
+  block.
 - `gemini-cli` from `Brewfile` and `Brewfile.linux` — deprecated in
   homebrew-core (unsupported upstream; disable scheduled for 2026-12-18);
   superseded on macOS by the `antigravity-cli` cask already in `Brewfile`.
@@ -91,6 +96,23 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `compinit` no longer prints `no such file or directory:
+  /usr/share/zsh/vendor-completions/_docker` on WSL when Docker Desktop is
+  stopped. Docker Desktop's integration leaves a root-owned symlink into its
+  cli-tools mount, which dangles while it's off. `zprofile` now shadows any
+  dangling completion symlink with an empty file earlier in `fpath` (rebuilt
+  each login) so `compinit` skips the broken one; the shadow disappears once
+  the real target returns.
+- `just update` (and any `brew` command) no longer fails on Linux/WSL with
+  `libcrypto.so.3: version OPENSSL_3.4.0 not found`. Homebrew was adopting
+  mise's PATH-resident ruby, whose `openssl.so` links a newer OpenSSL than the
+  system `libcrypto`, then dying during API JWS verification. `zshenv` now
+  exports `HOMEBREW_FORCE_VENDOR_RUBY=1` on Linux/WSL so brew uses its own
+  vendored portable ruby (the Linux default anyway); macOS is unaffected. The
+  `Justfile` also exports the same variable so `just` recipes don't depend on
+  the interactive shell having sourced `zshenv` — otherwise `just update` still
+  hit the crash whenever the shell predated the `zshenv` change. Empty (no-op)
+  on macOS.
 - `just update` now trusts the Brewfile's declared taps before `brew bundle`,
   the same fix `just setup` received: Homebrew 6's trusted-taps gate aborted
   `update-brew` with "Refusing to load formula kenn-io/tap/roborev from

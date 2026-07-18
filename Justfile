@@ -248,6 +248,14 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 # Platform-specific Brewfile
 brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
 
+# On Linux/WSL, mise's ruby sits ahead of Homebrew on PATH and its openssl.so
+# links a newer OpenSSL than the system libcrypto; Homebrew would otherwise adopt
+# that ruby and die loading openssl (e.g. during `brew bundle cleanup`). zshenv
+# exports this for interactive `brew`, but `just` recipes must not depend on the
+# interactive shell having sourced it — so force the vendored portable ruby here
+# too. Empty (and thus a no-op) on macOS, where vendored ruby is already default.
+export HOMEBREW_FORCE_VENDOR_RUBY := if os() == "macos" { "" } else { "1" }
+
 # Update Homebrew packages and clean up. Tap trust is declared in the
 # Brewfile (`trusted: true` on tap-prefixed formulae), never via an
 # imperative `brew trust` step: `brew bundle cleanup --force` resets the

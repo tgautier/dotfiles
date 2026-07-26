@@ -133,8 +133,14 @@ grouped by **date** rather than by semantic version. Newest first.
   "filesystem status" — it prints fs info to *stdout* and exits 1, so the
   fallback's day-of-year was appended to that output instead of replacing it
   and the comparison never matched. Every login ran a full `compinit` rather
-  than sourcing the cached dump. The two spellings are now selected on
-  non-empty output instead of exit status.
+  than sourcing the cached dump. Freshness is now read with zsh's own `zstat`
+  and `strftime` builtins (no external command, no fork), falling back to
+  external `stat`/`date` where those modules aren't built — and there the two
+  dialects are selected on non-empty output rather than exit status. Note the
+  now-visible consequence of the daily cache actually working: a completion
+  installed today no longer shows up in the next shell on Linux/WSL: it appears
+  at the next day's first login, or immediately after `rm ~/.zcompdump` plus a
+  new login shell.
 - `just update` (and any `brew` command) no longer fails on Linux/WSL with
   `libcrypto.so.3: version OPENSSL_3.4.0 not found`. Homebrew was adopting
   mise's PATH-resident ruby, whose `openssl.so` links a newer OpenSSL than the

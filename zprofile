@@ -13,24 +13,36 @@ fi
 # Day-of-year the completion dump was written, or empty if there is none.
 # Consumed twice below: it gates the shadow scan and picks the compinit branch.
 #
-# Prefer zsh's own stat builtin — platform-independent and forks nothing on the
-# startup path. zsh/stat is optional at build time, so fall back to external
-# stat, choosing the GNU/BSD spelling on non-empty *output* rather than exit
-# status: GNU `stat -f` means "filesystem status", so it prints fs info to
-# stdout and exits 1. Chaining the two spellings with `||` therefore glued that
-# output onto the real value and the comparison never matched, which silently
-# disabled compinit -C on Linux/WSL. Re-probe BSD whenever the GNU path yields
-# nothing, including when `stat -c` works but a non-GNU `date` can't convert.
+# Prefer zsh's own builtins: no external command, no platform dialects, and
+# no fork at all on this path. Both modules are optional at build time, so an
+# external fallback follows.
+#
+# In the fallback the two stat dialects must NOT be chained on exit status.
+# GNU `stat -f` means --file-system: given the BSD format args it treats them
+# as filenames, prints terse fs info to *stdout*, and exits 1 — so `a || b`
+# glued that output onto the real value and the comparison never matched,
+# silently disabling compinit -C on Linux/WSL. Branch on whether the GNU
+# spelling produced anything instead. The BSD line is therefore unreachable on
+# a GNU system by construction; it is not a recovery path for a working
+# `stat -c` paired with a `date` that cannot convert an epoch (busybox). That
+# combination yields an empty day and falls back to a full compinit — correct,
+# if slower, and it does not arise where zsh/datetime is present.
 _zcompdump_day=
-if zmodload -F zsh/stat b:zstat 2>/dev/null; then
-  _zcompdump_day=$(zstat -F '%j' +mtime ~/.zcompdump 2>/dev/null)
+_zcompdump_today=
+if zmodload -F zsh/stat b:zstat 2>/dev/null && zmodload zsh/datetime 2>/dev/null; then
+  zstat -F '%j' -A _zcompdump_a +mtime ~/.zcompdump 2>/dev/null && _zcompdump_day=${_zcompdump_a[1]}
+  strftime -s _zcompdump_today '%j' "$EPOCHSECONDS"
 else
   _zcompdump_epoch=$(stat -c '%Y' ~/.zcompdump 2>/dev/null)
-  [[ -n $_zcompdump_epoch ]] && _zcompdump_day=$(date -d "@${_zcompdump_epoch}" +'%j' 2>/dev/null)
-  [[ -n $_zcompdump_day ]] || _zcompdump_day=$(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null)
+  if [[ -n $_zcompdump_epoch ]]; then
+    _zcompdump_day=$(date -d "@${_zcompdump_epoch}" +'%j' 2>/dev/null)
+  else
+    _zcompdump_day=$(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null)
+  fi
+  _zcompdump_today=$(date +'%j')
 fi
 _zcompdump_fresh=0
-[[ -f ~/.zcompdump && -n $_zcompdump_day && $(date +'%j') == "$_zcompdump_day" ]] && _zcompdump_fresh=1
+[[ -f ~/.zcompdump && -n $_zcompdump_day && $_zcompdump_today == "$_zcompdump_day" ]] && _zcompdump_fresh=1
 
 # Neutralize dangling completion symlinks before compinit scans fpath.
 # Docker Desktop's WSL integration drops a root-owned
@@ -62,7 +74,9 @@ _zcompdump_fresh=0
 # liveness alone can strand a dir forever behind an unrelated process. The
 # backstop can prune a live shell's dir out from under it, which only matters
 # if that shell re-runs compinit by hand a day later — it would see the
-# dangling symlink again; the recovery above applies.
+# dangling symlink again. The dump-removal recovery above does not apply here
+# (the dump isn't the problem, and a new shell builds a dir under its own PID):
+# that one shell is affected until its next login, and new shells are fine.
 #
 # Only a *symlink* can dangle, so glob symlinks rather than every completion.
 # The (@) qualifier still lstats each _* entry, so the syscall count is
@@ -93,8 +107,8 @@ if [[ $PLATFORM == wsl || $PLATFORM == linux ]]; then
   for _old in "$_compinit_root"/compinit-shadows.*(N/); do
     kill -0 ${_old:t:e} 2>/dev/null || rm -rf "$_old"
   done
-  # m+0 is "age over one day"; m+1 truncates to whole days and so would not
-  # fire until ~48 h.
+  # Both m+0 and m+1 truncate age to whole days; +n is strictly-greater *after*
+  # that truncation, so m+0 fires at ~24 h and m+1 would not until ~48 h.
   for _old in "$_compinit_root"/compinit-shadows.*(Nm+0/); do
     rm -rf "$_old"
   done
@@ -133,7 +147,7 @@ if (( _zcompdump_fresh )); then
 else
   compinit
 fi
-unset _zcompdump_fresh _zcompdump_day _zcompdump_epoch
+unset _zcompdump_fresh _zcompdump_day _zcompdump_today _zcompdump_epoch _zcompdump_a
 
 # Add mise to PATH (needed by non-interactive shells, e.g. VSCode extensions)
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"

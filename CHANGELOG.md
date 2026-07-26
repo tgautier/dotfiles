@@ -38,6 +38,7 @@ grouped by **date** rather than by semantic version. Newest first.
   `brew bundle install` applies the declared trust before fetching, so fresh
   bootstraps need no separate trust step either
   ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- Bump mise deno 2.9.3 → 2.9.4 and Flutter (`vfox-flutter`) 3.44.6 → 3.44.7.
 - Bump mise deno 2.9.2 → 2.9.3
   ([#198](https://github.com/tgautier/dotfiles/pull/198)).
 - Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
@@ -73,6 +74,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- `telnet` from `Brewfile.linux`: the Homebrew formula is now source-only
+  (`bottle: false`), a Tier 3 config on Linux that `brew bundle` refuses to
+  build, which aborted `just setup`. On Linux, install it from the distro
+  (`apt install telnet`); documented in the `Brewfile.linux` native-installers
+  block.
 - `gemini-cli` from `Brewfile` and `Brewfile.linux` — deprecated in
   homebrew-core (unsupported upstream; disable scheduled for 2026-12-18);
   superseded on macOS by the `antigravity-cli` cask already in `Brewfile`.
@@ -91,6 +97,60 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `zlogin` no longer prints `zcompile:4: can't write zwc file:
+  ~/.zcompdump.zwc` when several login shells start together (tmux panes,
+  session restore). Each backgrounded the same `zcompile ~/.zcompdump`, and
+  `zcompile` does `unlink()` + `open(O_CREAT, 0444)` on the shared `.zwc`, so
+  the loser reopened the winner's fresh read-only file and aborted. The
+  precompile now takes a non-blocking `zsystem flock` before compiling, so
+  exactly one shell writes the `.zwc`; the lock auto-releases on process exit.
+  Where `zsh/system` isn't built, the precompile still runs unserialized rather
+  than being skipped entirely. Either way `zcompile`'s stderr is dropped —
+  precompilation is best-effort and the block is a disowned background job, so
+  a failure would otherwise surface asynchronously in an unrelated prompt.
+- `compinit` no longer prints `no such file or directory:
+  /usr/share/zsh/vendor-completions/_docker` on WSL when Docker Desktop is
+  stopped. Docker Desktop's integration leaves a root-owned symlink into its
+  cli-tools mount, which dangles while it's off. `zprofile` now shadows the
+  dangling symlink with an empty file earlier in `fpath` so `compinit` skips
+  it, keyed on each completion's *first* `fpath` occurrence to match
+  `compinit`'s own earliest-wins dedupe. Shadows live in a per-shell
+  `~/.cache/zsh/compinit-shadows.<pid>`, pruned when the owning shell is gone
+  or the directory is over a day old; a single shared directory would let one
+  login wipe it while another was mid-`compinit`. The shadow stops being
+  created on the next login once the real target returns, but the completion
+  itself only comes back when the dump is rebuilt (`compinit -C` reuses the
+  cached dump for the rest of the day) — to force it sooner, `rm ~/.zcompdump`
+  and then start a new login shell; neither step alone is enough. The scan runs
+  only when the dump is stale, keeping it off the common startup path, since
+  `compinit -C` never walks `fpath` and so cannot hit the dangling symlink.
+  The trade: on a same-day login after a target starts dangling, that
+  completion is left unshadowed, so invoking it reports `function definition
+  file not found` instead of doing nothing. It clears at the next dump rebuild.
+  Shadow-directory pruning stays unconditional.
+- `compinit -C` now actually engages on Linux/WSL. The daily-cache test
+  chained the BSD and GNU `stat` spellings with `||`, but GNU `stat -f` means
+  "filesystem status" — it prints fs info to *stdout* and exits 1, so the
+  fallback's day-of-year was appended to that output instead of replacing it
+  and the comparison never matched. Every login ran a full `compinit` rather
+  than sourcing the cached dump. Freshness is now read with zsh's own `zstat`
+  and `strftime` builtins (no external command, no fork), falling back to
+  external `stat`/`date` where those modules aren't built — and there the two
+  dialects are selected on non-empty output rather than exit status. Note the
+  now-visible consequence of the daily cache actually working: a completion
+  installed today no longer shows up in the next shell on Linux/WSL: it appears
+  at the next day's first login, or immediately after `rm ~/.zcompdump` plus a
+  new login shell.
+- `just update` (and any `brew` command) no longer fails on Linux/WSL with
+  `libcrypto.so.3: version OPENSSL_3.4.0 not found`. Homebrew was adopting
+  mise's PATH-resident ruby, whose `openssl.so` links a newer OpenSSL than the
+  system `libcrypto`, then dying during API JWS verification. `zshenv` now
+  exports `HOMEBREW_FORCE_VENDOR_RUBY=1` on Linux/WSL so brew uses its own
+  vendored portable ruby (the Linux default anyway); macOS is unaffected. The
+  `Justfile` also exports the same variable so `just` recipes don't depend on
+  the interactive shell having sourced `zshenv` — otherwise `just update` still
+  hit the crash whenever the shell predated the `zshenv` change. Empty (no-op)
+  on macOS.
 - `just update` now trusts the Brewfile's declared taps before `brew bundle`,
   the same fix `just setup` received: Homebrew 6's trusted-taps gate aborted
   `update-brew` with "Refusing to load formula kenn-io/tap/roborev from

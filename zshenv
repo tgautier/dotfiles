@@ -41,11 +41,18 @@ case $PLATFORM in
     export GIT_SSH_COMMAND="/mnt/c/Windows/System32/OpenSSH/ssh.exe"
     export SSH_AUTH_SOCK=~/.1password/agent.sock
     export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile.linux
+    # mise's ruby sits on PATH and its openssl.so links a newer OpenSSL than the
+    # system libcrypto; Homebrew on Linux would otherwise adopt that ruby and die
+    # loading openssl. Force its vendored portable ruby (the Linux default anyway).
+    export HOMEBREW_FORCE_VENDOR_RUBY=1
     ;;
   linux)
     export DISPLAY=:0
     export SSH_AUTH_SOCK=~/.1password/agent.sock
     export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile.linux
+    # See the wsl case above: force Homebrew's vendored portable ruby so mise's
+    # PATH ruby doesn't hijack brew and break openssl-backed API verification.
+    export HOMEBREW_FORCE_VENDOR_RUBY=1
     ;;
 esac
 

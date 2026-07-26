@@ -96,6 +96,13 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `zlogin` no longer prints `zcompile:4: can't write zwc file:
+  ~/.zcompdump.zwc` when several login shells start together (tmux panes,
+  session restore). Each backgrounded the same `zcompile ~/.zcompdump`, and
+  `zcompile` does `unlink()` + `open(O_CREAT, 0444)` on the shared `.zwc`, so
+  the loser reopened the winner's fresh read-only file and aborted. The
+  precompile now takes a non-blocking `zsystem flock` before compiling, so
+  exactly one shell writes the `.zwc`; the lock auto-releases on process exit.
 - `compinit` no longer prints `no such file or directory:
   /usr/share/zsh/vendor-completions/_docker` on WSL when Docker Desktop is
   stopped. Docker Desktop's integration leaves a root-owned symlink into its

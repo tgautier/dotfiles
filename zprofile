@@ -20,7 +20,8 @@ fi
 # it skip the broken one. Rebuilt each login, so the shadow stops being created
 # once the real target is back — but the shadowed completion only returns when
 # the dump is next rebuilt, since the compinit -C below reuses the cached dump
-# for the rest of the day. `rm ~/.zcompdump` forces it back immediately.
+# for the rest of the day. Starting a fresh login shell forces it back
+# immediately; `rm ~/.zcompdump` alone only takes effect at the next login.
 #
 # Mirror compinit's own rule rather than asking "does a valid copy exist
 # anywhere": only a basename's FIRST fpath occurrence is ever read, so that is
@@ -34,14 +35,18 @@ fi
 # sharing one path would let shell B wipe the dir between shell A prepending it
 # to fpath and A's compinit reading it — reintroducing this very error. Prune
 # only dirs whose owning shell is gone, plus an age backstop: PIDs recycle, so
-# liveness alone can strand a dir forever behind an unrelated process. A live
-# shell ran compinit at login, so a day-old dir is spent either way.
+# liveness alone can strand a dir forever behind an unrelated process. The
+# backstop can prune a live shell's dir out from under it, which only matters
+# if that shell re-runs compinit by hand after a day — it would see the
+# dangling symlink again. A new login shell is the fix, as above.
 #
-# Only a *symlink* can dangle, so scan symlinks rather than every completion —
-# the default fpath here holds ~2000 completions but only ~45 symlinks, and
-# this runs per login shell ahead of the compinit -C fast path (CLAUDE.md:
-# "Avoid adding slow operations to shell init files"). Work scales with broken
-# links, not with how many completions exist.
+# Only a *symlink* can dangle, so glob symlinks rather than every completion.
+# The (@) qualifier still lstats each _* entry, so the syscall count is
+# similar; what collapses is the shell loop body — ~45 iterations instead of
+# ~2000 on the default fpath here, measured at ~2.3 ms versus ~9 ms. That runs
+# per login shell ahead of the compinit -C fast path, which exists precisely to
+# skip this walk (CLAUDE.md: "Avoid adding slow operations to shell init
+# files").
 #
 # Linux-family only: the dangling-mount symlink is a WSL/Docker-Desktop (and
 # plausibly native-Linux) failure. macOS never hits it, so skip the scan there.

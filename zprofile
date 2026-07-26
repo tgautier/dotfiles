@@ -33,35 +33,50 @@ fi
 # The directory is per-shell: concurrent logins (tmux panes, session restore)
 # sharing one path would let shell B wipe the dir between shell A prepending it
 # to fpath and A's compinit reading it — reintroducing this very error. Prune
-# only dirs whose owning shell is gone; a live shell's fpath still points at its
-# own.
+# only dirs whose owning shell is gone, plus an age backstop: PIDs recycle, so
+# liveness alone can strand a dir forever behind an unrelated process. A live
+# shell ran compinit at login, so a day-old dir is spent either way.
+#
+# Only a *symlink* can dangle, so scan symlinks rather than every completion —
+# the default fpath here holds ~2000 completions but only ~45 symlinks, and
+# this runs per login shell ahead of the compinit -C fast path (CLAUDE.md:
+# "Avoid adding slow operations to shell init files"). Work scales with broken
+# links, not with how many completions exist.
 #
 # Linux-family only: the dangling-mount symlink is a WSL/Docker-Desktop (and
-# plausibly native-Linux) failure. macOS never hits it, so skip the fpath scan
-# there — a login shell runs per terminal tab and the scan stats every _* file
-# in the default system fpath.
+# plausibly native-Linux) failure. macOS never hits it, so skip the scan there.
 if [[ $PLATFORM == wsl || $PLATFORM == linux ]]; then
   _compinit_root="${HOME}/.cache/zsh"
   for _old in "$_compinit_root"/compinit-shadows.*(N/); do
     kill -0 ${_old:t:e} 2>/dev/null || rm -rf "$_old"
   done
+  for _old in "$_compinit_root"/compinit-shadows.*(Nm+1/); do
+    rm -rf "$_old"
+  done
   _compinit_shadow="${_compinit_root}/compinit-shadows.$$"
   rm -rf "$_compinit_shadow"
-  # Walk fpath in order, keeping only each basename's first occurrence — the
-  # one compinit will actually read.
-  typeset -A _compinit_first
   for _d in $fpath; do
-    for _f in "$_d"/_*(N); do
-      [[ -n "${_compinit_first[${_f:t}]}" ]] || _compinit_first[${_f:t}]="$_f"
+    for _f in "$_d"/_*(N@); do
+      # compinit ignores backups and compiled siblings (its own glob is
+      # ^([^_]*|*~|*.zwc)); match that without needing extendedglob here.
+      [[ $_f == *'~' || $_f == *.zwc ]] && continue
+      [[ -e "$_f" ]] && continue
+      # Shadow only the name's FIRST fpath occurrence — that is the only one
+      # compinit reads, so an earlier same-named entry means this one is
+      # already unreachable and needs no shadow.
+      _n=${_f:t}
+      _dup=0
+      for _e in $fpath; do
+        [[ $_e == "$_d" ]] && break
+        [[ -e "$_e/$_n" || -L "$_e/$_n" ]] && { _dup=1; break; }
+      done
+      (( _dup )) && continue
+      [[ -d "$_compinit_shadow" ]] || mkdir -p "$_compinit_shadow"
+      : > "$_compinit_shadow/$_n"
     done
   done
-  for _n in ${(k)_compinit_first}; do
-    [[ -e "${_compinit_first[$_n]}" ]] && continue
-    [[ -d "$_compinit_shadow" ]] || mkdir -p "$_compinit_shadow"
-    : > "$_compinit_shadow/$_n"
-  done
   [[ -d "$_compinit_shadow" ]] && fpath=("$_compinit_shadow" $fpath)
-  unset _compinit_root _compinit_shadow _old _d _f _n _compinit_first
+  unset _compinit_root _compinit_shadow _old _d _f _n _e _dup
 fi
 
 # Initialize completions (cached daily via zcompdump)

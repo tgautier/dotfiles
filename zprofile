@@ -45,14 +45,33 @@ fi
 # Only a *symlink* can dangle, so glob symlinks rather than every completion.
 # The (@) qualifier still lstats each _* entry, so the syscall count is
 # similar; what collapses is the shell loop body — ~45 iterations instead of
-# ~2000 on the default fpath here, measured at ~2.3 ms versus ~9 ms. This scan
-# is its own walk and runs unconditionally, ahead of a compinit -C whose whole
-# point is to avoid walking fpath at all — so it re-adds cost the fast path was
-# meant to remove (CLAUDE.md: "Avoid adding slow operations to shell init
-# files").
+# ~2000 on the default fpath here, measured at ~2.3 ms versus ~9 ms.
+#
+# Gated on the dump being stale, because only the full compinit below walks
+# fpath and can therefore hit the dangling symlink — compinit -C sources the
+# dump directly and never looks. On the fast path (every login but the first of
+# the day) the scan's whole result would be discarded, so skipping it keeps
+# this off the common startup path entirely (CLAUDE.md: "Avoid adding slow
+# operations to shell init files"). A completion whose target dangles fails at
+# autoload time instead, which a shadow would not have prevented either.
+# Pruning stays ungated so stale dirs are still reclaimed on fast-path logins.
 #
 # Linux-family only: the dangling-mount symlink is a WSL/Docker-Desktop (and
 # plausibly native-Linux) failure. macOS never hits it, so skip the scan there.
+# Day-of-year the dump was written, or empty. Select on non-empty output
+# rather than exit status: GNU `stat -f` means "filesystem status", so on Linux
+# it prints fs info to *stdout* and exits 1 — chaining the two forms with `||`
+# concatenates that garbage with the real value, and the comparison below can
+# then never match. That silently disabled -C on Linux/WSL entirely.
+_zcompdump_day=$(stat -c '%Y' ~/.zcompdump 2>/dev/null)   # GNU
+if [[ -n $_zcompdump_day ]]; then
+  _zcompdump_day=$(date -d "@${_zcompdump_day}" +'%j' 2>/dev/null)
+else
+  _zcompdump_day=$(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null)   # BSD
+fi
+_zcompdump_fresh=0
+[[ -f ~/.zcompdump && -n $_zcompdump_day && $(date +'%j') == "$_zcompdump_day" ]] && _zcompdump_fresh=1
+
 if [[ $PLATFORM == wsl || $PLATFORM == linux ]]; then
   _compinit_root="${HOME}/.cache/zsh"
   for _old in "$_compinit_root"/compinit-shadows.*(N/); do
@@ -63,39 +82,42 @@ if [[ $PLATFORM == wsl || $PLATFORM == linux ]]; then
   for _old in "$_compinit_root"/compinit-shadows.*(Nm+0/); do
     rm -rf "$_old"
   done
-  _compinit_shadow="${_compinit_root}/compinit-shadows.$$"
-  rm -rf "$_compinit_shadow"
-  for _d in $fpath; do
-    for _f in "$_d"/_*(N@); do
-      # compinit ignores backups and compiled siblings (its own glob is
-      # ^([^_]*|*~|*.zwc)); match that without needing extendedglob here.
-      [[ $_f == *'~' || $_f == *.zwc ]] && continue
-      [[ -e "$_f" ]] && continue
-      # Shadow only the name's FIRST fpath occurrence — that is the only one
-      # compinit reads, so an earlier same-named entry means this one is
-      # already unreachable and needs no shadow.
-      _n=${_f:t}
-      _dup=0
-      for _e in $fpath; do
-        [[ $_e == "$_d" ]] && break
-        [[ -e "$_e/$_n" || -L "$_e/$_n" ]] && { _dup=1; break; }
+  if (( ! _zcompdump_fresh )); then
+    _compinit_shadow="${_compinit_root}/compinit-shadows.$$"
+    rm -rf "$_compinit_shadow"
+    for _d in $fpath; do
+      for _f in "$_d"/_*(N@); do
+        # compinit ignores backups and compiled siblings (its own glob is
+        # ^([^_]*|*~|*.zwc)); match that without needing extendedglob here.
+        [[ $_f == *'~' || $_f == *.zwc ]] && continue
+        [[ -e "$_f" ]] && continue
+        # Shadow only the name's FIRST fpath occurrence — that is the only one
+        # compinit reads, so an earlier same-named entry means this one is
+        # already unreachable and needs no shadow.
+        _n=${_f:t}
+        _dup=0
+        for _e in $fpath; do
+          [[ $_e == "$_d" ]] && break
+          [[ -e "$_e/$_n" || -L "$_e/$_n" ]] && { _dup=1; break; }
+        done
+        (( _dup )) && continue
+        [[ -d "$_compinit_shadow" ]] || mkdir -p "$_compinit_shadow"
+        : > "$_compinit_shadow/$_n"
       done
-      (( _dup )) && continue
-      [[ -d "$_compinit_shadow" ]] || mkdir -p "$_compinit_shadow"
-      : > "$_compinit_shadow/$_n"
     done
-  done
-  [[ -d "$_compinit_shadow" ]] && fpath=("$_compinit_shadow" $fpath)
+    [[ -d "$_compinit_shadow" ]] && fpath=("$_compinit_shadow" $fpath)
+  fi
   unset _compinit_root _compinit_shadow _old _d _f _n _e _dup
 fi
 
 # Initialize completions (cached daily via zcompdump)
 autoload -Uz compinit
-if [[ -f ~/.zcompdump && $(date +'%j') == $(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null || stat -c '%Y' ~/.zcompdump 2>/dev/null | xargs -I{} date -d @{} +'%j' 2>/dev/null) ]]; then
+if (( _zcompdump_fresh )); then
   compinit -C
 else
   compinit
 fi
+unset _zcompdump_fresh _zcompdump_day
 
 # Add mise to PATH (needed by non-interactive shells, e.g. VSCode extensions)
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"

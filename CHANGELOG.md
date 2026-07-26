@@ -122,6 +122,13 @@ grouped by **date** rather than by semantic version. Newest first.
   itself only comes back when the dump is rebuilt (`compinit -C` reuses the
   cached dump for the rest of the day) — to force it sooner, `rm ~/.zcompdump`
   and then start a new login shell; neither step alone is enough.
+- `compinit -C` now actually engages on Linux/WSL. The daily-cache test
+  chained the BSD and GNU `stat` spellings with `||`, but GNU `stat -f` means
+  "filesystem status" — it prints fs info to *stdout* and exits 1, so the
+  fallback's day-of-year was appended to that output instead of replacing it
+  and the comparison never matched. Every login ran a full `compinit` rather
+  than sourcing the cached dump. The two spellings are now selected on
+  non-empty output instead of exit status.
 - `just update` (and any `brew` command) no longer fails on Linux/WSL with
   `libcrypto.so.3: version OPENSSL_3.4.0 not found`. Homebrew was adopting
   mise's PATH-resident ruby, whose `openssl.so` links a newer OpenSSL than the

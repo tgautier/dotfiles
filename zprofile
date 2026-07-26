@@ -20,8 +20,10 @@ fi
 # it skip the broken one. Rebuilt each login, so the shadow stops being created
 # once the real target is back — but the shadowed completion only returns when
 # the dump is next rebuilt, since the compinit -C below reuses the cached dump
-# for the rest of the day. Starting a fresh login shell forces it back
-# immediately; `rm ~/.zcompdump` alone only takes effect at the next login.
+# for the rest of the day. Both halves are needed to force it back sooner:
+# `rm ~/.zcompdump` AND then a new login shell. Neither alone works — the dump
+# is only consulted at login, and a same-day login still takes the -C branch
+# and sources the stale dump it just found.
 #
 # Mirror compinit's own rule rather than asking "does a valid copy exist
 # anywhere": only a basename's FIRST fpath occurrence is ever read, so that is
@@ -37,15 +39,16 @@ fi
 # only dirs whose owning shell is gone, plus an age backstop: PIDs recycle, so
 # liveness alone can strand a dir forever behind an unrelated process. The
 # backstop can prune a live shell's dir out from under it, which only matters
-# if that shell re-runs compinit by hand after a day — it would see the
-# dangling symlink again. A new login shell is the fix, as above.
+# if that shell re-runs compinit by hand a day later — it would see the
+# dangling symlink again; the recovery above applies.
 #
 # Only a *symlink* can dangle, so glob symlinks rather than every completion.
 # The (@) qualifier still lstats each _* entry, so the syscall count is
 # similar; what collapses is the shell loop body — ~45 iterations instead of
-# ~2000 on the default fpath here, measured at ~2.3 ms versus ~9 ms. That runs
-# per login shell ahead of the compinit -C fast path, which exists precisely to
-# skip this walk (CLAUDE.md: "Avoid adding slow operations to shell init
+# ~2000 on the default fpath here, measured at ~2.3 ms versus ~9 ms. This scan
+# is its own walk and runs unconditionally, ahead of a compinit -C whose whole
+# point is to avoid walking fpath at all — so it re-adds cost the fast path was
+# meant to remove (CLAUDE.md: "Avoid adding slow operations to shell init
 # files").
 #
 # Linux-family only: the dangling-mount symlink is a WSL/Docker-Desktop (and
@@ -55,7 +58,9 @@ if [[ $PLATFORM == wsl || $PLATFORM == linux ]]; then
   for _old in "$_compinit_root"/compinit-shadows.*(N/); do
     kill -0 ${_old:t:e} 2>/dev/null || rm -rf "$_old"
   done
-  for _old in "$_compinit_root"/compinit-shadows.*(Nm+1/); do
+  # m+0 is "age over one day"; m+1 truncates to whole days and so would not
+  # fire until ~48 h.
+  for _old in "$_compinit_root"/compinit-shadows.*(Nm+0/); do
     rm -rf "$_old"
   done
   _compinit_shadow="${_compinit_root}/compinit-shadows.$$"

@@ -120,8 +120,8 @@ grouped by **date** rather than by semantic version. Newest first.
   login wipe it while another was mid-`compinit`. The shadow stops being
   created on the next login once the real target returns, but the completion
   itself only comes back when the dump is rebuilt (`compinit -C` reuses the
-  cached dump for the rest of the day) — start a fresh login shell to get it
-  back immediately.
+  cached dump for the rest of the day) — to force it sooner, `rm ~/.zcompdump`
+  and then start a new login shell; neither step alone is enough.
 - `just update` (and any `brew` command) no longer fails on Linux/WSL with
   `libcrypto.so.3: version OPENSSL_3.4.0 not found`. Homebrew was adopting
   mise's PATH-resident ruby, whose `openssl.so` links a newer OpenSSL than the

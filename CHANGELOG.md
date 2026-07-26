@@ -38,6 +38,7 @@ grouped by **date** rather than by semantic version. Newest first.
   `brew bundle install` applies the declared trust before fetching, so fresh
   bootstraps need no separate trust step either
   ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- Bump mise deno 2.9.3 → 2.9.4 and Flutter (`vfox-flutter`) 3.44.6 → 3.44.7.
 - Bump mise deno 2.9.2 → 2.9.3
   ([#198](https://github.com/tgautier/dotfiles/pull/198)).
 - Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter

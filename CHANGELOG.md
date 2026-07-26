@@ -28,6 +28,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Bump mise Flutter (`vfox-flutter`) 3.44.7 → 3.44.8.
 - Tap trust is now declared in the Brewfiles: `trusted: true` on
   `kenn-io/tap/roborev` and `terror/tap/just-lsp` (formula-level trust, as
   Homebrew recommends), in both `Brewfile` and `Brewfile.linux`. This replaces

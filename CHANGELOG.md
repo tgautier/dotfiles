@@ -121,7 +121,13 @@ grouped by **date** rather than by semantic version. Newest first.
   created on the next login once the real target returns, but the completion
   itself only comes back when the dump is rebuilt (`compinit -C` reuses the
   cached dump for the rest of the day) — to force it sooner, `rm ~/.zcompdump`
-  and then start a new login shell; neither step alone is enough.
+  and then start a new login shell; neither step alone is enough. The scan runs
+  only when the dump is stale, keeping it off the common startup path, since
+  `compinit -C` never walks `fpath` and so cannot hit the dangling symlink.
+  The trade: on a same-day login after a target starts dangling, that
+  completion is left unshadowed, so invoking it reports `function definition
+  file not found` instead of doing nothing. It clears at the next dump rebuild.
+  Shadow-directory pruning stays unconditional.
 - `compinit -C` now actually engages on Linux/WSL. The daily-cache test
   chained the BSD and GNU `stat` spellings with `||`, but GNU `stat -f` means
   "filesystem status" — it prints fs info to *stdout* and exits 1, so the

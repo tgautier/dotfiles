@@ -10,6 +10,28 @@ fi
 # Add Docker completions to fpath (if available)
 [[ -d "${HOME}/.docker/completions" ]] && fpath=(${HOME}/.docker/completions $fpath)
 
+# Day-of-year the completion dump was written, or empty if there is none.
+# Consumed twice below: it gates the shadow scan and picks the compinit branch.
+#
+# Prefer zsh's own stat builtin — platform-independent and forks nothing on the
+# startup path. zsh/stat is optional at build time, so fall back to external
+# stat, choosing the GNU/BSD spelling on non-empty *output* rather than exit
+# status: GNU `stat -f` means "filesystem status", so it prints fs info to
+# stdout and exits 1. Chaining the two spellings with `||` therefore glued that
+# output onto the real value and the comparison never matched, which silently
+# disabled compinit -C on Linux/WSL. Re-probe BSD whenever the GNU path yields
+# nothing, including when `stat -c` works but a non-GNU `date` can't convert.
+_zcompdump_day=
+if zmodload -F zsh/stat b:zstat 2>/dev/null; then
+  _zcompdump_day=$(zstat -F '%j' +mtime ~/.zcompdump 2>/dev/null)
+else
+  _zcompdump_epoch=$(stat -c '%Y' ~/.zcompdump 2>/dev/null)
+  [[ -n $_zcompdump_epoch ]] && _zcompdump_day=$(date -d "@${_zcompdump_epoch}" +'%j' 2>/dev/null)
+  [[ -n $_zcompdump_day ]] || _zcompdump_day=$(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null)
+fi
+_zcompdump_fresh=0
+[[ -f ~/.zcompdump && -n $_zcompdump_day && $(date +'%j') == "$_zcompdump_day" ]] && _zcompdump_fresh=1
+
 # Neutralize dangling completion symlinks before compinit scans fpath.
 # Docker Desktop's WSL integration drops a root-owned
 # /usr/share/zsh/vendor-completions/_docker symlink into its cli-tools mount;
@@ -52,26 +74,20 @@ fi
 # dump directly and never looks. On the fast path (every login but the first of
 # the day) the scan's whole result would be discarded, so skipping it keeps
 # this off the common startup path entirely (CLAUDE.md: "Avoid adding slow
-# operations to shell init files"). A completion whose target dangles fails at
-# autoload time instead, which a shadow would not have prevented either.
-# Pruning stays ungated so stale dirs are still reclaimed on fast-path logins.
+# operations to shell init files"). Pruning stays ungated so stale dirs are
+# still reclaimed on fast-path logins.
+#
+# The gate is a trade, not free. The shadow dir stays on fpath for the life of
+# the shell, so it also absorbs *autoload*-time failure: with it, invoking a
+# dangling completion is a silent no-op; without it, zsh reports "function
+# definition file not found". So on a same-day login after the target starts
+# dangling, the dump still lists the completion and Tab-completing it errors.
+# Accepted: the once-per-login startup error is the noisy one being fixed, this
+# one fires only if you invoke that specific completion, and it clears at the
+# next dump rebuild.
 #
 # Linux-family only: the dangling-mount symlink is a WSL/Docker-Desktop (and
 # plausibly native-Linux) failure. macOS never hits it, so skip the scan there.
-# Day-of-year the dump was written, or empty. Select on non-empty output
-# rather than exit status: GNU `stat -f` means "filesystem status", so on Linux
-# it prints fs info to *stdout* and exits 1 — chaining the two forms with `||`
-# concatenates that garbage with the real value, and the comparison below can
-# then never match. That silently disabled -C on Linux/WSL entirely.
-_zcompdump_day=$(stat -c '%Y' ~/.zcompdump 2>/dev/null)   # GNU
-if [[ -n $_zcompdump_day ]]; then
-  _zcompdump_day=$(date -d "@${_zcompdump_day}" +'%j' 2>/dev/null)
-else
-  _zcompdump_day=$(stat -f '%Sm' -t '%j' ~/.zcompdump 2>/dev/null)   # BSD
-fi
-_zcompdump_fresh=0
-[[ -f ~/.zcompdump && -n $_zcompdump_day && $(date +'%j') == "$_zcompdump_day" ]] && _zcompdump_fresh=1
-
 if [[ $PLATFORM == wsl || $PLATFORM == linux ]]; then
   _compinit_root="${HOME}/.cache/zsh"
   for _old in "$_compinit_root"/compinit-shadows.*(N/); do
@@ -117,7 +133,7 @@ if (( _zcompdump_fresh )); then
 else
   compinit
 fi
-unset _zcompdump_fresh _zcompdump_day
+unset _zcompdump_fresh _zcompdump_day _zcompdump_epoch
 
 # Add mise to PATH (needed by non-interactive shells, e.g. VSCode extensions)
 [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"

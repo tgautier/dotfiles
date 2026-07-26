@@ -11,15 +11,20 @@
 # background shell exits, so no stale lock can wedge future recompiles.
 #
 # zsh/system is optional at build time. When it is missing we still compile —
-# unserialized, with stderr dropped — rather than skip precompilation forever:
-# the race is cosmetic, losing the .zwc entirely is a permanent startup cost.
+# unserialized — rather than skip precompilation forever: the race is cosmetic,
+# losing the .zwc entirely is a permanent startup cost.
+#
+# Both branches drop zcompile's stderr. Precompilation is a best-effort
+# optimization and this whole block is a disowned background job, so any
+# failure (unwritable $HOME, full disk) would otherwise surface as async noise
+# in an unrelated interactive prompt — the exact thing this change removes.
 {
   zcompdump="${HOME}/.zcompdump"
   if [[ -s "$zcompdump" && (! -s "${zcompdump}.zwc" || "$zcompdump" -nt "${zcompdump}.zwc") ]]; then
     if zmodload zsh/system 2>/dev/null; then
       lock="${zcompdump}.zwc.lock"
       : >> "$lock" 2>/dev/null
-      zsystem flock -t 0 "$lock" 2>/dev/null && zcompile "$zcompdump"
+      zsystem flock -t 0 "$lock" 2>/dev/null && zcompile "$zcompdump" 2>/dev/null
     else
       zcompile "$zcompdump" 2>/dev/null
     fi

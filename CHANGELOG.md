@@ -104,13 +104,18 @@ grouped by **date** rather than by semantic version. Newest first.
   the loser reopened the winner's fresh read-only file and aborted. The
   precompile now takes a non-blocking `zsystem flock` before compiling, so
   exactly one shell writes the `.zwc`; the lock auto-releases on process exit.
+  Where `zsh/system` isn't built, the precompile still runs — unserialized,
+  with `zcompile`'s stderr dropped — rather than being skipped entirely.
 - `compinit` no longer prints `no such file or directory:
   /usr/share/zsh/vendor-completions/_docker` on WSL when Docker Desktop is
   stopped. Docker Desktop's integration leaves a root-owned symlink into its
-  cli-tools mount, which dangles while it's off. `zprofile` now shadows any
-  dangling completion symlink with an empty file earlier in `fpath` (rebuilt
-  each login) so `compinit` skips the broken one; the shadow disappears once
-  the real target returns.
+  cli-tools mount, which dangles while it's off. `zprofile` now shadows the
+  dangling symlink with an empty file earlier in `fpath` so `compinit` skips
+  it, keyed on each completion's *first* `fpath` occurrence to match
+  `compinit`'s own earliest-wins dedupe. The shadow stops being created on the
+  next login once the real target returns, but the completion itself only
+  comes back when the dump is rebuilt (`compinit -C` reuses the cached dump for
+  the rest of the day) — `rm ~/.zcompdump` forces it back immediately.
 - `just update` (and any `brew` command) no longer fails on Linux/WSL with
   `libcrypto.so.3: version OPENSSL_3.4.0 not found`. Homebrew was adopting
   mise's PATH-resident ruby, whose `openssl.so` links a newer OpenSSL than the

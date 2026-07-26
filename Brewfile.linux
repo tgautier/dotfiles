@@ -96,5 +96,5 @@ brew "zsh-completions"
 # - gemini-cli: npm install -g @google/gemini-cli (Homebrew formula deprecated
 #   upstream; the brew replacement, antigravity-cli, is a macOS-only cask)
 # - Ghostty: https://ghostty.org/docs/install/binary
-# - VS Code: https://code.visualstudio.com/docs/setup/linux
 # - telnet: apt install telnet (Homebrew formula is source-only / Tier 3 on Linux)
+# - VS Code: https://code.visualstudio.com/docs/setup/linux

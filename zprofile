@@ -16,45 +16,52 @@ fi
 # when Docker Desktop is stopped the mount disappears and compinit fails with
 # "no such file or directory" while reading the file's #compdef tag. We can't
 # remove the root-owned symlink, but compinit dedupes completions by basename
-# with the earliest fpath entry winning, so an empty shadow file earlier in
-# fpath makes it skip the broken one. Rebuilt each login, so the shadow dir
-# itself vanishes once the real target is back — but the shadowed completion
-# only returns when the dump is next rebuilt, since the compinit -C below
-# reuses the cached dump for the rest of the day. `rm ~/.zcompdump` forces it.
+# and the EARLIEST fpath entry wins, so an empty shadow file at the front makes
+# it skip the broken one. Rebuilt each login, so the shadow stops being created
+# once the real target is back — but the shadowed completion only returns when
+# the dump is next rebuilt, since the compinit -C below reuses the cached dump
+# for the rest of the day. `rm ~/.zcompdump` forces it back immediately.
 #
-# The shadow is basename-keyed and sits at the front of fpath, so it masks
-# *every* completion of that name — including a valid same-named one elsewhere
-# in fpath (e.g. a working ~/.docker/completions/_docker prepended above). Only
-# shadow a name that has no valid completion anywhere, so we suppress the broken
-# symlink without disabling a good copy.
+# Mirror compinit's own rule rather than asking "does a valid copy exist
+# anywhere": only a basename's FIRST fpath occurrence is ever read, so that is
+# the only one that can error. Shadow a name iff its first occurrence dangles.
+# A valid copy later in fpath is unreachable either way — compinit marks the
+# name seen and skips it — so shadowing costs nothing, while the anywhere-valid
+# test wrongly declined to shadow (dangling ~/.docker/completions/_docker
+# prepended above, real vendor-completions copy later) and left the error.
+#
+# The directory is per-shell: concurrent logins (tmux panes, session restore)
+# sharing one path would let shell B wipe the dir between shell A prepending it
+# to fpath and A's compinit reading it — reintroducing this very error. Prune
+# only dirs whose owning shell is gone; a live shell's fpath still points at its
+# own.
 #
 # Linux-family only: the dangling-mount symlink is a WSL/Docker-Desktop (and
-# plausibly native-Linux) failure. macOS never hits it, so skip the two fpath
-# scans there — a login shell runs per terminal tab and the scan stats every
-# _* file in the default system fpath.
+# plausibly native-Linux) failure. macOS never hits it, so skip the fpath scan
+# there — a login shell runs per terminal tab and the scan stats every _* file
+# in the default system fpath.
 if [[ $PLATFORM == wsl || $PLATFORM == linux ]]; then
-  _compinit_shadow="${HOME}/.cache/zsh/compinit-shadows"
+  _compinit_root="${HOME}/.cache/zsh"
+  for _old in "$_compinit_root"/compinit-shadows.*(N/); do
+    kill -0 ${_old:t:e} 2>/dev/null || rm -rf "$_old"
+  done
+  _compinit_shadow="${_compinit_root}/compinit-shadows.$$"
   rm -rf "$_compinit_shadow"
-  # Pass 1: record every completion basename that resolves to a real file
-  # (regular file or non-dangling symlink) somewhere in fpath.
-  typeset -A _compinit_valid
+  # Walk fpath in order, keeping only each basename's first occurrence — the
+  # one compinit will actually read.
+  typeset -A _compinit_first
   for _d in $fpath; do
     for _f in "$_d"/_*(N); do
-      [[ -e "$_f" ]] && _compinit_valid[${_f:t}]=1
+      [[ -n "${_compinit_first[${_f:t}]}" ]] || _compinit_first[${_f:t}]="$_f"
     done
   done
-  # Pass 2: shadow a dangling completion symlink only when no valid completion of
-  # the same basename exists — otherwise the shadow would mask the working copy.
-  for _d in $fpath; do
-    for _l in "$_d"/_*(N@); do
-      [[ -e "$_l" ]] && continue
-      [[ -n "${_compinit_valid[${_l:t}]}" ]] && continue
-      [[ -d "$_compinit_shadow" ]] || mkdir -p "$_compinit_shadow"
-      : > "$_compinit_shadow/${_l:t}"
-    done
+  for _n in ${(k)_compinit_first}; do
+    [[ -e "${_compinit_first[$_n]}" ]] && continue
+    [[ -d "$_compinit_shadow" ]] || mkdir -p "$_compinit_shadow"
+    : > "$_compinit_shadow/$_n"
   done
   [[ -d "$_compinit_shadow" ]] && fpath=("$_compinit_shadow" $fpath)
-  unset _compinit_shadow _d _l _f _compinit_valid
+  unset _compinit_root _compinit_shadow _old _d _f _n _compinit_first
 fi
 
 # Initialize completions (cached daily via zcompdump)

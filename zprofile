@@ -17,8 +17,10 @@ fi
 # "no such file or directory" while reading the file's #compdef tag. We can't
 # remove the root-owned symlink, but compinit dedupes completions by basename
 # with the earliest fpath entry winning, so an empty shadow file earlier in
-# fpath makes it skip the broken one. Rebuilt each login so shadows vanish once
-# the real target is back.
+# fpath makes it skip the broken one. Rebuilt each login, so the shadow dir
+# itself vanishes once the real target is back — but the shadowed completion
+# only returns when the dump is next rebuilt, since the compinit -C below
+# reuses the cached dump for the rest of the day. `rm ~/.zcompdump` forces it.
 #
 # The shadow is basename-keyed and sits at the front of fpath, so it masks
 # *every* completion of that name — including a valid same-named one elsewhere

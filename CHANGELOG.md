@@ -10,6 +10,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `python@3.13` in `Brewfile` (macOS) — satisfies the `gcloud-cli` cask's
+  declared dependency, clearing the `brew missing` warning. macOS-only:
+  `gcloud-cli` is a cask, so `Brewfile.linux` (native gcloud installer) is
+  unaffected.
 - `antigravity` and `cursor` casks in `Brewfile` (macOS, all profiles).
 - `antigravity-cli` and `antigravity-ide` casks in `Brewfile` (macOS, all
   profiles).

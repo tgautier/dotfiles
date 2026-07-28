@@ -54,7 +54,7 @@ Error: <cask>: It seems there is already an App at
 ```
 
 **Cause** — an earlier cask upgrade was interrupted (Ctrl-C, sleep, crash, or a
-self-updating app racing brew) and left a partial app bundle in the Caskroom
+self-updating app racing brew) and left something behind in the Caskroom
 staging directory. Before swapping in the new version, Homebrew backs the live
 app up into that exact path:
 
@@ -66,58 +66,43 @@ An unforced upgrade refuses to overwrite what is already sitting there, so
 every subsequent `just update` fails the same way until the leftover is
 cleared.
 
-**Which branch you are in** turns on one question: does the live app still
-exist? Homebrew stages the *live* app into this same path when it backs one up,
-so the Caskroom copy is only disposable while `/Applications` still has its
-own.
+**Fix** — reinstall the cask:
+
+```sh
+brew reinstall --cask <cask>
+```
+
+That is the whole remedy in nearly every case. Three properties make it the
+default rather than a fallback:
+
+- Its internal uninstall is **forced**, so the backup step overwrites the
+  wedged staging directory instead of refusing — which is exactly what a plain
+  `brew upgrade` cannot do.
+- It **fetches before it uninstalls**, so a failed or interrupted download
+  leaves the current install untouched.
+- It yields a known-good bundle regardless of what the leftover was, and the
+  leftover can be any of three shapes: a truncated partial, a *complete* backup
+  of the live app, or a wrapper directory holding a nested `<App>.app` from an
+  earlier bad move. Inspecting which one you have is exactly the step this
+  avoids.
+
+**If `/Applications/<App>.app` is missing**, the leftover may be your only copy
+of the app — the interruption landed after the backup. Reinstall still fixes
+it, but do not delete the Caskroom directory by hand until it succeeds.
+
+**Only if the download is prohibitively large**, clear the staging directory
+manually instead and upgrade in place:
 
 ```sh
 CASKROOM="$(brew --prefix)/Caskroom/<cask>/<old-version>"
-ls -d "$CASKROOM/<App>.app" "/Applications/<App>.app"
-```
-
-Everything else — a missing `Contents/Info.plist`, a much smaller `du -sh` — is
-corroboration that the leftover is a partial, not the decision itself.
-
-**Branch A — `/Applications/<App>.app` exists.** The usual case, and the live
-app is intact, so the Caskroom copy is disposable whether it is a partial or a
-completed backup. Move it aside rather than deleting it, then re-run the
-upgrade. The timestamped destination keeps a second occurrence from nesting
-inside the first, and `${CASKROOM:?}` aborts loudly rather than building a path
-rooted at `/` if the variable is unset:
-
-```sh
-CASKROOM="$(brew --prefix)/Caskroom/<cask>/<old-version>"   # repeated: do not rely on the block above
-STALE="$HOME/Desktop/stale-<cask>-$(date +%Y%m%d%H%M%S).app"
-mv "${CASKROOM:?set CASKROOM first}/<App>.app" "$STALE"
+mv "${CASKROOM:?set CASKROOM first}/<App>.app" "$HOME/Desktop/stale-<cask>.app"
 brew upgrade --cask <cask>
 ```
 
-Once the upgrade succeeds, delete `$STALE`. If it fails instead, restore with:
-
-```sh
-mkdir -p "${CASKROOM:?set CASKROOM first}"   # a partial upgrade may have purged it
-mv "$STALE" "${CASKROOM:?set CASKROOM first}/<App>.app"
-```
-
-Or skip the hand-move entirely: `brew reinstall --cask <cask>` clears the
-leftover on its own, because reinstall always *forces* its internal uninstall
-and a forced backup overwrites the staging directory instead of refusing. It
-re-downloads the whole cask, so prefer the move above when the download is
-large. Branch A only — if the live app is missing, use Branch B instead, which
-recovers it without a download.
-
-**Branch B — `/Applications/<App>.app` is missing.** The interruption landed
-after the backup, so the Caskroom copy is the only app you have. Do **not**
-move it to the Desktop. Put it back where it belongs:
-
-```sh
-mv "${CASKROOM:?set CASKROOM first}/<App>.app" "/Applications/<App>.app"
-```
-
-Never run that `mv` when `/Applications/<App>.app` already exists — `mv` onto
-an existing bundle nests the copy *inside* it and corrupts the working app.
-That is why the branch is gated on absence.
+Leave the moved copy on the Desktop as evidence and delete it once the upgrade
+succeeds. Do **not** move it back into the Caskroom if the upgrade fails —
+that restores the precise state that raises the error and re-arms the wedge.
+Fall back to `brew reinstall --cask <cask>` instead.
 
 **Finish the update either way.** The failure aborted `update-brew` at its
 second step, so `brew upgrade`, both cleanups, and `brew doctor` never ran.

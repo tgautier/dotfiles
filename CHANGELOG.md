@@ -10,6 +10,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `opencode` in `Brewfile` and `Brewfile.linux` — terminal AI coding agent from
+  homebrew-core. Same shape as the existing `openclaw-cli` entry (npm-tarball
+  formula, `node` dependency), so it is brew-managed on both platforms rather
+  than a native-installer tool: `just setup` installs it and `just update`
+  upgrades it.
 - `python@3.13` in `Brewfile` (macOS) — satisfies the `gcloud-cli` cask's
   declared dependency, clearing the `brew missing` warning. macOS-only:
   `gcloud-cli` is a cask, so `Brewfile.linux` (native gcloud installer) is

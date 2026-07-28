@@ -179,6 +179,7 @@ Or run individual update steps:
 
 Detailed guides live in the `docs/` folder:
 
+- [Homebrew](docs/homebrew.md) — update flow, cask-upgrade recovery, and `just update` troubleshooting
 - [tmux](docs/tmux.md) — configuration overview, cheat sheet, and troubleshooting
 
 ## Structure

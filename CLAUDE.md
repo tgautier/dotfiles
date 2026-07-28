@@ -113,4 +113,5 @@ entries not yet dated.
 
 Detailed guides live in `docs/`:
 
+- `docs/homebrew.md` — update flow, cask-upgrade recovery, `just update` troubleshooting
 - `docs/tmux.md` — configuration overview, cheat sheet, troubleshooting

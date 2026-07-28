@@ -17,10 +17,10 @@ grouped by **date** rather than by semantic version. Newest first.
   --prune=all` dropped the cached download, and `brew bundle cleanup --force`
   uninstalled the undeclared cask — a direct demonstration of why
   `.claude/rules/brewfile.md` says tools enter a machine through a `brew` entry,
-  applied by `just`, never raw `brew install`.
+  applied by `just`, never raw `brew install` ([#212](https://github.com/tgautier/dotfiles/pull/212)).
 - `.claude/worktrees/` in `.gitignore` — `git worktree add` under `.claude/`
   otherwise leaves the checkout showing as untracked, one `git add .` away from
-  committing a whole worktree. `.claude/rules/` stays tracked.
+  committing a whole worktree. `.claude/rules/` stays tracked ([#212](https://github.com/tgautier/dotfiles/pull/212)).
 - `opencode` in `Brewfile` and `Brewfile.linux` — terminal AI coding agent from
   homebrew-core. Same shape as the existing `openclaw-cli` entry (npm-tarball
   formula, `node` dependency), so it is brew-managed on both platforms rather

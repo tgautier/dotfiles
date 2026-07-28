@@ -93,13 +93,25 @@ Caskroom copy is the only copy of the app you have. Reinstall covers that case
 by construction: it fetches before it uninstalls, so nothing is removed until
 the replacement is already on disk.
 
+**If you want a rollback copy**, take one before reinstalling — `cp -R`, never
+`mv`, so the staging directory is left exactly as it is and the reinstall path
+is unchanged:
+
+```sh
+cp -R "$(brew --prefix)/Caskroom/<cask>/<old-version>/<App>.app" "$HOME/Desktop/"
+```
+
+Casks generally serve only the current version, so once the forced uninstall
+runs the old bundle is not recoverable from Homebrew. Delete the copy once the
+new version is verified.
+
 Hand-moving the leftover buys nothing. `brew upgrade --cask` fetches the same
 artifact `brew reinstall --cask` does, and the aborted upgrade already
 downloaded it — `brew cleanup --prune=all` never ran, so it is still cached.
 The manual route costs the same download and adds every failure mode reinstall
 avoids.
 
-**Finish the update either way.** The failure aborted `update-brew` at its
+**Finish the update.** The failure aborted `update-brew` at its
 second step, so `brew upgrade`, both cleanups, and `brew doctor` never ran.
 Re-run the pipeline so the direct `brew` call stays a one-off:
 

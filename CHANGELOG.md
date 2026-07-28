@@ -13,10 +13,11 @@ grouped by **date** rather than by semantic version. Newest first.
 - `libreoffice` in `Brewfile.work` — headless `soffice` is the renderer that
   converts generated `.pptx` decks to PDF for visual verification, so it belongs
   on the work laptop only. It had been installed by hand with `brew install
-  --cask`, which `brew bundle cleanup --force` (in `just update-brew`) then
-  uninstalled, taking the cached download with it via `brew cleanup --prune=all`
-  — a direct demonstration of why `.claude/rules/brewfile.md` says tools enter a
-  machine through a `brew` entry, applied by `just`, never raw `brew install`.
+  --cask`, and `just update-brew` then removed it in two steps: `brew cleanup
+  --prune=all` dropped the cached download, and `brew bundle cleanup --force`
+  uninstalled the undeclared cask — a direct demonstration of why
+  `.claude/rules/brewfile.md` says tools enter a machine through a `brew` entry,
+  applied by `just`, never raw `brew install`.
 - `.claude/worktrees/` in `.gitignore` — `git worktree add` under `.claude/`
   otherwise leaves the checkout showing as untracked, one `git add .` away from
   committing a whole worktree. `.claude/rules/` stays tracked.

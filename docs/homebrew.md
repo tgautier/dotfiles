@@ -93,27 +93,29 @@ Caskroom copy is the only copy of the app you have. Reinstall covers that case
 by construction: it fetches before it uninstalls, so nothing is removed until
 the replacement is already on disk.
 
-**If you want a rollback copy**, take one before reinstalling — `cp -R`, never
-`mv`, so the staging directory is left exactly as it is and the reinstall path
-is unchanged:
+**Reinstall lands the current version, and does not preserve the old one.** A
+cask tap generally serves only the current version, so once the forced
+uninstall runs there is no Homebrew route back to what was installed before.
+That is the same version `just update` was trying to install, so it is normally
+what you want. If keeping the *old* version specifically matters, stop — that
+is a downgrade, a separate task with its own procedure, and this runbook will
+not get you there.
 
-```sh
-cp -R "$(brew --prefix)/Caskroom/<cask>/<old-version>/<App>.app" "$HOME/Desktop/"
-```
+Do not improvise a rollback by copying the Caskroom leftover aside. It is one
+of the three shapes above, only one of which is a working app, so the copy may
+be unlaunchable — and restoring it is not symmetric: Homebrew's metadata would
+still record the new version, leaving `brew list --cask --versions` and the
+next `just update` disagreeing with what is on disk.
 
-Casks generally serve only the current version, so once the forced uninstall
-runs the old bundle is not recoverable from Homebrew. Delete the copy once the
-new version is verified.
-
-Hand-moving the leftover buys nothing. `brew upgrade --cask` fetches the same
-artifact `brew reinstall --cask` does, and the aborted upgrade already
+Hand-moving the leftover buys nothing either. `brew upgrade --cask` fetches the
+same artifact `brew reinstall --cask` does, and the aborted upgrade already
 downloaded it — `brew cleanup --prune=all` never ran, so it is still cached.
 The manual route costs the same download and adds every failure mode reinstall
 avoids.
 
-**Finish the update.** The failure aborted `update-brew` at its
-second step, so `brew upgrade`, both cleanups, and `brew doctor` never ran.
-Re-run the pipeline so the direct `brew` call stays a one-off:
+**Finish the update.** The failure aborted `update-brew` at its second step, so
+`brew upgrade`, both cleanups, and `brew doctor` never ran. Re-run the pipeline
+so the direct `brew` call stays a one-off:
 
 ```sh
 just update

@@ -86,8 +86,15 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 ### Git Configuration
 
 - SSH key signing via 1Password (`op-ssh-sign`)
-- `gh` credential helper for GitHub HTTPS
+- `gh` credential helper for GitHub HTTPS — declared as `!gh auth git-credential`,
+  resolved via `PATH`. Never hardcode an absolute path here: `gh` lives in
+  `/opt/homebrew/bin` on macOS and `/usr/bin` on Linux, and this file is
+  symlinked to all three platforms
 - Rebase-based pulls with fast-forward only
+- Isolated worktrees go in `.claude/worktrees/<name>` (per the global
+  `git-conventions.md` §Branching). That path is gitignored **and** excluded from
+  the markdownlint globs, so a nested checkout can neither be swept into a commit
+  nor linted as this branch's content
 
 ## Project-Local Rules
 

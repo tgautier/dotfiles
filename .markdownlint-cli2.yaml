@@ -1,2 +1,6 @@
 globs:
   - "**/*.md"
+  # Nested worktrees are agent scratch space: a checkout of this repo at a
+  # different commit. Lint failures there belong to that commit, not to the
+  # working branch. Gitignored too — see .gitignore.
+  - "!.claude/worktrees/**"

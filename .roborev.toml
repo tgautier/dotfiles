@@ -1,4 +1,23 @@
-agent = "copilot"
+# claude-code is the only review agent, because it is the only one with a paid
+# subscription behind it. copilot, codex and gemini/antigravity are all installed
+# — this is not an availability problem. They have no API credit: codex fails with
+# `401 Unauthorized: Missing bearer or basic authentication`, and copilot/gemini
+# are not exposed on PATH under those names. So a second agent is not one install
+# away, and "cross-model convergence" is not a goal to engineer toward here.
+#
+# This previously read `agent = "copilot"`. roborev could not invoke it, so every
+# review silently fell through to backup_agent: 112 of 112 jobs on record ran
+# claude-code. Naming claude-code directly removes the fallback and makes the
+# ledger match the config.
+#
+# The `codex` and `copilot-cli` casks in Brewfile stay — those tools are wanted
+# for interactive use. They are deliberately not review agents, so do not
+# "reconcile" the Brewfile against this file.
+#
+# Do not run `roborev check-agents` to inspect any of this: it invokes every
+# configured agent and launches auth/login flows for the uncredentialed ones.
+# Read this file and use `command -v` instead.
+agent = "claude-code"
 backup_agent = "claude-code"
 review_reasoning = "thorough"
 

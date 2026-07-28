@@ -97,9 +97,11 @@ the replacement is already on disk.
 cask tap generally serves only the current version, so once the forced
 uninstall runs there is no Homebrew route back to what was installed before.
 That is the same version `just update` was trying to install, so it is normally
-what you want. If keeping the *old* version specifically matters, stop — that
-is a downgrade, a separate task with its own procedure, and this runbook will
-not get you there.
+what you want. If keeping the *old* version specifically matters, note that
+Homebrew has no supported cask downgrade — it means checking out an older tap
+revision, which is out of scope here. Until you run the reinstall your current
+install is untouched, but the wedge stays in place and every `just update`
+keeps failing, so this branch has no resting state: decide, then reinstall.
 
 Do not improvise a rollback by copying the Caskroom leftover aside. It is one
 of the three shapes above, only one of which is a working app, so the copy may

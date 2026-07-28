@@ -41,6 +41,9 @@ something else breaks.
 macOS only — `Brewfile.linux` declares no casks, so there is no Caskroom
 staging directory to wedge.
 
+Paths below are shown for the Apple Silicon prefix `/opt/homebrew`; Intel Macs
+use `/usr/local`. The commands all derive it via `$(brew --prefix)`.
+
 **Symptom** — `just update` dies in `update-brew` with a single failed cask:
 
 ```text
@@ -73,22 +76,43 @@ ls -la "$CASKROOM/<App>.app/Contents/"
 du -sh "$CASKROOM/<App>.app" "/Applications/<App>.app"
 ```
 
-**Fix** — move the leftover aside rather than deleting it outright, so the step
-is reversible, then re-run the upgrade. The timestamped destination keeps a
-second occurrence from nesting inside the first:
+**Stop if it is not a partial.** Homebrew puts the *live* app in this same
+path when it backs one up, so a complete bundle here may be the only copy you
+have. Abort and do not move anything if any of these hold:
+
+- `Contents/Info.plist` **is** present
+- the two `du -sh` sizes are within a few MB of each other
+- `du -sh` on `/Applications/<App>.app` errors with "No such file or directory"
+
+That combination means the interruption happened *after* the backup, so the
+Caskroom copy is a working app and `/Applications` is missing it. Move that
+copy back to `/Applications` (or reinstall the cask) instead — clearing the
+staging directory here would discard the only good bundle.
+
+**Fix** — once confirmed stale, move the leftover aside rather than deleting it
+outright, so the step is reversible, then re-run the upgrade. The timestamped
+destination keeps a second occurrence from nesting inside the first, and
+`${CASKROOM:?}` aborts loudly rather than building a path rooted at `/` if the
+variable is unset:
 
 ```sh
 CASKROOM="$(brew --prefix)/Caskroom/<cask>/<old-version>"   # repeated: do not rely on the block above
 STALE="$HOME/Desktop/stale-<cask>-$(date +%Y%m%d%H%M%S).app"
-mv "$CASKROOM/<App>.app" "$STALE"
+mv "${CASKROOM:?set CASKROOM first}/<App>.app" "$STALE"
 brew upgrade --cask <cask>
 brew list --cask --versions <cask>   # verify the new version landed
 ```
 
 Once the upgrade succeeds, delete `$STALE`. If the upgrade fails instead,
-restore with `mv "$STALE" "$CASKROOM/<App>.app"` — run it in the same shell, or
-re-assign `CASKROOM` first. With `CASKROOM` unset that command expands to the
-volume root, so never run the restore against a bare `/<App>.app`.
+restore with:
+
+```sh
+mv "$STALE" "${CASKROOM:?set CASKROOM first}/<App>.app"
+```
+
+The `:?` guard matters because both directions build a path from `$CASKROOM`.
+Pasted into a fresh shell where it is unset, an unguarded expansion would
+target the volume root.
 
 `brew reinstall --cask <cask>` also clears the leftover, because reinstall
 always *forces* its internal uninstall and a forced backup overwrites the

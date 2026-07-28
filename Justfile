@@ -136,7 +136,11 @@ _ensure-profile:
         exit 0
     fi
     if [[ ! -t 0 ]]; then
-        echo "No valid machine profile (got '${current:-<absent>}') and stdin is not a terminal." >&2
+        # Distinguish a missing marker from one that exists but is empty or
+        # invalid — reporting both as "<absent>" is the conflation this message
+        # exists to avoid.
+        if [[ -f "$marker" ]]; then got="'$current'"; else got="<absent>"; fi
+        echo "No valid machine profile (got $got) and stdin is not a terminal." >&2
         echo "Run 'just set-profile work|personal' first, then re-run 'just setup'." >&2
         exit 1
     fi
@@ -258,8 +262,12 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 # derived from dotfiles_dir on purpose: inside a nested worktree dotfiles_dir is
 # .claude/worktrees/<name>, whose sibling is not the private repo, so a
 # sibling-derived path would silently skip the guard exactly when working on a
-# branch. Mirrors rcrc's PRIVATE_DIR — keep the two in step; override per machine
-# with DOTFILES_PRIVATE_DIR.
+# branch. Override per machine with DOTFILES_PRIVATE_DIR.
+#
+# rcrc declares the same path as PRIVATE_DIR and cannot read just variables (rcm
+# sources it as shell), so the two must be edited together. `cleanup-symlinks`
+# consumes this variable; it still anchors the *public* repo to $HOME rather than
+# dotfiles_dir, because inside a worktree dotfiles_dir is the worktree itself.
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
 private_justfile := private_dir / "justfile"
 
@@ -373,7 +381,7 @@ set-default-editor:
 cleanup-symlinks:
     #!/usr/bin/env zsh
     # Derive nested dirs from the dotfiles repos themselves
-    dotfiles_repos=("$HOME/Workspace/tgautier/dotfiles" "$HOME/Workspace/tgautier/dotfiles-private")
+    dotfiles_repos=("$HOME/Workspace/tgautier/dotfiles" "{{ private_dir }}")
     nested=()
     for repo in "${dotfiles_repos[@]}"; do
         [[ -d "$repo" ]] || continue

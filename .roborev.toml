@@ -7,8 +7,9 @@
 #
 # This previously read `agent = "copilot"`. roborev could not invoke it, so every
 # review silently fell through to backup_agent: 112 of 112 jobs on record ran
-# claude-code. Naming claude-code directly removes the fallback and makes the
-# ledger match the config.
+# claude-code. Naming claude-code directly makes the ledger match the config;
+# backup_agent stays set, so the fallback is now a no-op duplicate of the primary
+# rather than a silent substitution.
 #
 # The `codex` and `copilot-cli` casks in Brewfile stay — those tools are wanted
 # for interactive use. They are deliberately not review agents, so do not

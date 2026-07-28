@@ -89,7 +89,10 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 - `gh` credential helper for GitHub HTTPS — declared as `!gh auth git-credential`,
   resolved via `PATH`. Never hardcode an absolute path here: `gh` lives in
   `/opt/homebrew/bin` on macOS and `/usr/bin` on Linux, and this file is
-  symlinked to all three platforms
+  symlinked to all three platforms. Caveat: being PATH-resolved, git invoked from
+  a minimal-`PATH` context on macOS (a GUI client launched from Finder,
+  `launchd`, `cron`) needs `/opt/homebrew/bin` on its `PATH` for the helper to
+  resolve
 - Rebase-based pulls with fast-forward only
 - Isolated worktrees go in `.claude/worktrees/<name>` (per the global
   `git-conventions.md` §Branching). That path is gitignored **and** excluded from

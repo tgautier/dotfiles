@@ -14,9 +14,10 @@ grouped by **date** rather than by semantic version. Newest first.
   worktree hygiene begun in [#212](https://github.com/tgautier/dotfiles/pull/212).
   The path was already gitignored, but `markdownlint-cli2` globs are not
   gitignore-aware, so a nested worktree's Markdown was linted as the working
-  branch's content. Verified live: from the private repo's main tree the lint
-  reads 36 files, from inside a worktree 37 — the difference being the checkout
-  itself. Markdown is the only exposed lint; `lint-shell`, `lint-brewfile` and
+  branch's content. Measured in this repo with one worktree present: **14 files
+  before the exclusion, 7 after** — the repo tracks 7 `.md` files and a nested
+  worktree is a full second checkout of them. Markdown is the only exposed lint;
+  `lint-shell`, `lint-brewfile` and
   `lint-mise` all use explicit paths that cannot recurse into it. `CLAUDE.md` now
   documents the `.claude/worktrees/<name>` convention, which the global
   `git-conventions.md` rule deliberately leaves to each project

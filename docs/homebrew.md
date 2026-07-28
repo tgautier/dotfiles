@@ -99,17 +99,13 @@ uninstall runs there is no Homebrew route back to what was installed before.
 That is the same version `just update` was trying to install, so it is normally
 what you want.
 
-If keeping the *old* version specifically matters, check
-`brew search --cask '<cask>@'` first — homebrew-cask maintains versioned tokens
-for a subset of apps (`1password@7`, `ableton-live-suite@10`), which is a
-supported route to an older version. Without one, downgrading means checking
-out an older tap revision, which is out of scope here.
+Needing a *different* version is a separate task: pinning or downgrading a cask
+has its own constraints and is out of scope here.
 
 The reinstall is not what puts your install at risk, though: the interrupted
 upgrade may have stripped `/Applications/<App>.app` already, so confirm it is
-present and non-empty before treating it as an old version you still have to
-weigh. Either way the wedge stays in place and every `just update` keeps
-failing until you reinstall — this branch has no resting state.
+present and non-empty before treating it as a version you still have. Until the
+wedge is cleared, every `just update` keeps failing on this cask.
 
 Do not improvise a rollback by copying the Caskroom leftover aside. It is one
 of the three shapes above, only one of which is a working app, so the copy may

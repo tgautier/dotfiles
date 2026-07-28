@@ -15,11 +15,12 @@ grouped by **date** rather than by semantic version. Newest first.
   on the work laptop only. It had been installed by hand with `brew install
   --cask`, which `brew bundle cleanup --force` (in `just update-brew`) then
   uninstalled, taking the cached download with it via `brew cleanup --prune=all`
-  — a direct demonstration of why `docs/homebrew.md` says packages are declared
-  in the Brewfiles and applied through `just` recipes, never raw `brew install`.
+  — a direct demonstration of why `.claude/rules/brewfile.md` says tools enter a
+  machine through a `brew` entry, applied by `just`, never raw `brew install`.
 - `.claude/worktrees/` in `.gitignore` — `git worktree add` under `.claude/`
   otherwise leaves the checkout showing as untracked, one `git add .` away from
   committing a whole worktree. `.claude/rules/` stays tracked.
+- `opencode` in `Brewfile` and `Brewfile.linux` — terminal AI coding agent from
   homebrew-core. Same shape as the existing `openclaw-cli` entry (npm-tarball
   formula, `node` dependency), so it is brew-managed on both platforms rather
   than a native-installer tool: `just setup` installs it and `just update`

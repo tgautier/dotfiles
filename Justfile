@@ -17,7 +17,7 @@ lint-via-private:
     @if [ -f {{ quote(private_justfile) }} ]; then \
         just -f {{ quote(private_justfile) }} lint-public-no-arr; \
     else \
-        echo "⚠ lint-via-private: no private justfile at {{ private_justfile }} — keyword guard SKIPPED"; \
+        echo "⚠ lint-via-private: keyword guard SKIPPED — no private justfile at" {{ quote(private_justfile) }}; \
     fi
 
 # Bootstrap this machine: profile, packages, symlinks, runtimes, hooks, tools (idempotent)
@@ -264,18 +264,14 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 # sibling-derived path would silently skip the guard exactly when working on a
 # branch. Override per machine with DOTFILES_PRIVATE_DIR.
 #
-# rcrc declares the same path as PRIVATE_DIR and cannot read just variables (rcm
-# sources it as shell), so the two must be edited together. `cleanup-symlinks`
-# consumes this variable; it still anchors the *public* repo to $HOME rather than
-# dotfiles_dir, because inside a worktree dotfiles_dir is the worktree itself.
+# Scope: `lint-via-private` only. `rcrc` declares the same path as PRIVATE_DIR and
+# `cleanup-symlinks` hardcodes both repo paths, so neither honours this override
+# yet — see the tracking issue before widening it. rcm sources `rcrc` as shell, so
+# it *could* read the env var; wiring all three together needs the symlink sweep
+# to keep matching links into a *former* checkout path, which rcm records as an
+# absolute target and a path-prefix match cannot see.
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
 private_justfile := private_dir / "justfile"
-
-# Canonical public checkout, for `cleanup-symlinks`. Distinct from dotfiles_dir
-# on purpose: dotfiles_dir is wherever *this* justfile lives, which inside a
-# worktree is the worktree, whereas rcm's symlinks always point at the canonical
-# checkout. Override with DOTFILES_DIR.
-public_dir := env("DOTFILES_DIR", env("HOME") / "Workspace/tgautier/dotfiles")
 
 # Platform-specific Brewfile
 brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
@@ -386,20 +382,8 @@ set-default-editor:
 # Remove stale symlinks in $HOME that point into dotfiles dirs
 cleanup-symlinks:
     #!/usr/bin/env zsh
-    # Derive nested dirs from the dotfiles repos themselves. quote() so a value
-    # from DOTFILES_DIR / DOTFILES_PRIVATE_DIR containing $, backtick, quote or
-    # backslash stays inert data (same reason set-profile quotes its argument).
-    dotfiles_repos=({{ quote(public_dir) }} {{ quote(private_dir) }})
-    # Match on the repo paths, never on their basenames: an override pointing at
-    # a directory not called "dotfiles"/"dotfiles-private" must still be swept,
-    # otherwise discovery finds candidates and the filter silently drops them all.
-    points_into_repo() {
-        local target=$1 repo
-        for repo in "${dotfiles_repos[@]}"; do
-            [[ "$target" == "$repo"/* ]] && return 0
-        done
-        return 1
-    }
+    # Derive nested dirs from the dotfiles repos themselves
+    dotfiles_repos=("$HOME/Workspace/tgautier/dotfiles" "$HOME/Workspace/tgautier/dotfiles-private")
     nested=()
     for repo in "${dotfiles_repos[@]}"; do
         [[ -d "$repo" ]] || continue
@@ -416,7 +400,7 @@ cleanup-symlinks:
     for f in $HOME/.[!.]*(N@); do
         [[ -e "$f" ]] && continue
         target=$(readlink "$f")
-        points_into_repo "$target" && stale+=("$f -> $target")
+        [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
     done
     # Nested dirs (recursive)
     for dir in "${nested[@]}"; do
@@ -424,7 +408,7 @@ cleanup-symlinks:
         for f in "$dir"/**/*(N@); do
             [[ -e "$f" ]] && continue
             target=$(readlink "$f")
-            points_into_repo "$target" && stale+=("$f -> $target")
+            [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
         done
     done
     if (( ${#stale} == 0 )); then

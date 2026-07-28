@@ -86,23 +86,18 @@ default rather than a fallback:
   earlier bad move. Inspecting which one you have is exactly the step this
   avoids.
 
-**If `/Applications/<App>.app` is missing**, the leftover may be your only copy
-of the app — the interruption landed after the backup. Reinstall still fixes
-it, but do not delete the Caskroom directory by hand until it succeeds.
+**Do not clear the staging directory by hand first.** If `/Applications/<App>.app`
+is missing — or present but *empty*, which Homebrew can leave behind when an
+upgrade strips a bundle's contents without removing its directory — then the
+Caskroom copy is the only copy of the app you have. Reinstall covers that case
+by construction: it fetches before it uninstalls, so nothing is removed until
+the replacement is already on disk.
 
-**Only if the download is prohibitively large**, clear the staging directory
-manually instead and upgrade in place:
-
-```sh
-CASKROOM="$(brew --prefix)/Caskroom/<cask>/<old-version>"
-mv "${CASKROOM:?set CASKROOM first}/<App>.app" "$HOME/Desktop/stale-<cask>.app"
-brew upgrade --cask <cask>
-```
-
-Leave the moved copy on the Desktop as evidence and delete it once the upgrade
-succeeds. Do **not** move it back into the Caskroom if the upgrade fails —
-that restores the precise state that raises the error and re-arms the wedge.
-Fall back to `brew reinstall --cask <cask>` instead.
+Hand-moving the leftover buys nothing. `brew upgrade --cask` fetches the same
+artifact `brew reinstall --cask` does, and the aborted upgrade already
+downloaded it — `brew cleanup --prune=all` never ran, so it is still cached.
+The manual route costs the same download and adds every failure mode reinstall
+avoids.
 
 **Finish the update either way.** The failure aborted `update-brew` at its
 second step, so `brew upgrade`, both cleanups, and `brew doctor` never ran.

@@ -87,9 +87,12 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 - SSH key signing via 1Password (`op-ssh-sign`)
 - `gh` credential helper for GitHub HTTPS — declared as `!gh auth git-credential`,
-  resolved via `PATH`. Never hardcode an absolute path here: `gh` lives in
-  `/opt/homebrew/bin` on macOS and `/usr/bin` on Linux, and this file is
-  symlinked to all three platforms. Caveat: being PATH-resolved, git invoked from
+  resolved via `PATH`. Never hardcode an absolute path here: `gh` comes from
+  Homebrew on every platform — `/opt/homebrew/bin` on macOS,
+  `/home/linuxbrew/.linuxbrew/bin` on Linux/WSL (`Brewfile.linux` declares
+  `brew "gh"`, and `zshenv` puts that directory on `PATH`) — never `/usr/bin`,
+  and this file is symlinked to all three platforms. Caveat: being PATH-resolved,
+  git invoked from
   a minimal-`PATH` context on macOS (a GUI client launched from Finder,
   `launchd`, `cron`) needs `/opt/homebrew/bin` on its `PATH` for the helper to
   resolve

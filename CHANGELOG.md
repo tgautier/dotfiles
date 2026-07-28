@@ -165,6 +165,19 @@ grouped by **date** rather than by semantic version. Newest first.
   two pre-commit hooks, making a skip a defence-in-depth gap rather than an
   unguarded invariant, but it now says so out loud
   ([#162](https://github.com/tgautier/dotfiles/issues/162)).
+- `cleanup-symlinks` honours the same overrides instead of hardcoding both repo
+  paths, and its stale-symlink filter now matches on the repo **paths** rather
+  than on the literal basenames `/dotfiles/` and `/dotfiles-private/`. Previously
+  an override pointing at a differently-named directory would have its nested
+  dirs discovered and then every candidate rejected by the filter — a silently
+  empty sweep, which is the failure mode the override exists to prevent. Verified
+  with a fixture whose private repo is called `private-dots`: detected now,
+  silently dropped before. The public checkout gained a matching `DOTFILES_DIR`
+  knob; it is deliberately separate from `dotfiles_dir`, which is wherever the
+  running justfile lives and inside a worktree is the worktree, not the checkout
+  rcm links against. All interpolations of these values use `quote()` so a value
+  containing shell metacharacters stays inert, matching `set-profile`'s existing
+  precedent.
 - `_ensure-profile`'s non-interactive error reports the value it actually saw
   (`got '<absent>'` / `got 'Work'`) instead of always claiming no profile is set,
   which conflated a missing marker with an invalid one. Its trim comment no longer

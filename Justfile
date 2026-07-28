@@ -14,8 +14,8 @@ ci: lint-shell lint-markdown lint-brewfile lint-mise lint-via-private
 # defence-in-depth gap, not an unguarded invariant. Announce it either way: a
 # silent no-op reads as a pass.
 lint-via-private:
-    @if [ -f "{{ private_justfile }}" ]; then \
-        just -f "{{ private_justfile }}" lint-public-no-arr; \
+    @if [ -f {{ quote(private_justfile) }} ]; then \
+        just -f {{ quote(private_justfile) }} lint-public-no-arr; \
     else \
         echo "⚠ lint-via-private: no private justfile at {{ private_justfile }} — keyword guard SKIPPED"; \
     fi
@@ -271,6 +271,12 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
 private_justfile := private_dir / "justfile"
 
+# Canonical public checkout, for `cleanup-symlinks`. Distinct from dotfiles_dir
+# on purpose: dotfiles_dir is wherever *this* justfile lives, which inside a
+# worktree is the worktree, whereas rcm's symlinks always point at the canonical
+# checkout. Override with DOTFILES_DIR.
+public_dir := env("DOTFILES_DIR", env("HOME") / "Workspace/tgautier/dotfiles")
+
 # Platform-specific Brewfile
 brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
 
@@ -380,8 +386,20 @@ set-default-editor:
 # Remove stale symlinks in $HOME that point into dotfiles dirs
 cleanup-symlinks:
     #!/usr/bin/env zsh
-    # Derive nested dirs from the dotfiles repos themselves
-    dotfiles_repos=("$HOME/Workspace/tgautier/dotfiles" "{{ private_dir }}")
+    # Derive nested dirs from the dotfiles repos themselves. quote() so a value
+    # from DOTFILES_DIR / DOTFILES_PRIVATE_DIR containing $, backtick, quote or
+    # backslash stays inert data (same reason set-profile quotes its argument).
+    dotfiles_repos=({{ quote(public_dir) }} {{ quote(private_dir) }})
+    # Match on the repo paths, never on their basenames: an override pointing at
+    # a directory not called "dotfiles"/"dotfiles-private" must still be swept,
+    # otherwise discovery finds candidates and the filter silently drops them all.
+    points_into_repo() {
+        local target=$1 repo
+        for repo in "${dotfiles_repos[@]}"; do
+            [[ "$target" == "$repo"/* ]] && return 0
+        done
+        return 1
+    }
     nested=()
     for repo in "${dotfiles_repos[@]}"; do
         [[ -d "$repo" ]] || continue
@@ -398,7 +416,7 @@ cleanup-symlinks:
     for f in $HOME/.[!.]*(N@); do
         [[ -e "$f" ]] && continue
         target=$(readlink "$f")
-        [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
+        points_into_repo "$target" && stale+=("$f -> $target")
     done
     # Nested dirs (recursive)
     for dir in "${nested[@]}"; do
@@ -406,7 +424,7 @@ cleanup-symlinks:
         for f in "$dir"/**/*(N@); do
             [[ -e "$f" ]] && continue
             target=$(readlink "$f")
-            [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
+            points_into_repo "$target" && stale+=("$f -> $target")
         done
     done
     if (( ${#stale} == 0 )); then

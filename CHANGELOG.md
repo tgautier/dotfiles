@@ -15,6 +15,10 @@ grouped by **date** rather than by semantic version. Newest first.
   formula, `node` dependency), so it is brew-managed on both platforms rather
   than a native-installer tool: `just setup` installs it and `just update`
   upgrades it.
+- `docs/homebrew.md` — Homebrew update flow plus troubleshooting for the
+  recurring `just update` failure where an interrupted cask upgrade leaves a
+  partial app bundle in the Caskroom staging directory ("It seems there is
+  already an App at ..."). Indexed from `README.md` and `CLAUDE.md`.
 - `python@3.13` in `Brewfile` (macOS) — satisfies the `gcloud-cli` cask's
   declared dependency, clearing the `brew missing` warning. macOS-only:
   `gcloud-cli` is a cask, so `Brewfile.linux` (native gcloud installer) is

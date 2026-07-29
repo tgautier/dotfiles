@@ -83,10 +83,10 @@ lint-rcrc:
     # are each pinned, but by DIFFERENT assertions — don't delete either one
     # believing the other covers it:
     #
-    #   fixture ingredient      pins                caught by
-    #   ----------------------  ------------------  ---------------------------
-    #   two patterns            the `tr` join       expect_has (joined needle)
-    #   blank line, mid-list    the `$` alternative expect_has (joined needle)
+    #   fixture ingredient      pins                      caught by
+    #   ----------------------  ------------------------  ---------------------------
+    #   two patterns            the `tr` join             expect_has (joined needle)
+    #   blank line, mid-list    the `$` alternative       expect_has (joined needle)
     #   indented comment        `#` alt + `[[:space:]]*`  expect_lacks "comment"
     #
     # Boundary, so the table isn't read as totality over the whole pipeline.

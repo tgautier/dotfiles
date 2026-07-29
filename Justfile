@@ -79,16 +79,25 @@ lint-rcrc:
     # comment/blank-line filter together.
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
-    # All four parts of rcrc's `grep -hvE '^[[:space:]]*(#|$)' | tr '\n' ' '` are
-    # pinned, but by DIFFERENT assertions — don't delete either one believing the
-    # other covers it:
+    # The regex's two alternatives, its `[[:space:]]*` tolerance and the `tr` join
+    # are each pinned, but by DIFFERENT assertions — don't delete either one
+    # believing the other covers it:
     #
     #   fixture ingredient      pins                caught by
     #   ----------------------  ------------------  ---------------------------
     #   two patterns            the `tr` join       expect_has (joined needle)
     #   blank line, mid-list    the `$` alternative expect_has (joined needle)
-    #   column-0 comment        the `#` alternative expect_lacks "comment"
     #   indented comment        `[[:space:]]*`      expect_lacks "comment"
+    #                           and the `#` alt.
+    #   column-0 comment        nothing on its own  — belt and braces; the
+    #                                                 indented line already
+    #                                                 pins both
+    #
+    # Boundary, so the table isn't read as totality over the whole pipeline:
+    # `-v` is pinned incidentally (drop it and BOTH assertions fire, since only
+    # the comment and blank lines survive). `-h` is NOT pinned and structurally
+    # cannot be here — grep only prefixes filenames for multiple inputs or `-H`,
+    # and rcrc passes exactly one file, so dropping it changes nothing observable.
     #
     # The blank line sits BETWEEN the patterns on purpose: a leaked blank then
     # breaks the contiguity of "sentinel-pattern second-pattern". Before the first

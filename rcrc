@@ -14,6 +14,26 @@
 PUBLIC_DIR="${DOTFILES_DIR:-${HOME}/Workspace/tgautier/dotfiles}"
 PRIVATE_DIR="${DOTFILES_PRIVATE_DIR:-${HOME}/Workspace/tgautier/dotfiles-private}"
 
+# Strip trailing slashes (shell completion appends one routinely). rcm derives
+# each link's destination name by stripping the configured dir from the
+# discovered path, so a trailing slash here would feed it a doubled separator —
+# and the symptom would be a wrongly-named link in the operator's real $HOME.
+# The scanner normalises with zsh's `:a`; this is the same guarantee for rcm, so
+# "a trailing slash is fine" holds for every consumer rather than just one.
+#
+# Loops rather than a single `${VAR%/}`, which strips only ONE slash and would
+# leave `…/dots//` as `…/dots/`. Stops at `/` so a pathological root value can't
+# be reduced to the empty string, which would make DOTFILES_DIRS match anything.
+_rcrc_strip_slashes() {
+    _v="$1"
+    while [ "$_v" != "/" ] && [ "$_v" != "${_v%/}" ]; do _v="${_v%/}"; done
+    printf '%s' "$_v"
+}
+PUBLIC_DIR="$(_rcrc_strip_slashes "$PUBLIC_DIR")"
+PRIVATE_DIR="$(_rcrc_strip_slashes "$PRIVATE_DIR")"
+unset _v
+unset -f _rcrc_strip_slashes 2>/dev/null || true
+
 # Base excludes plus any private-only exclude patterns appended from
 # ${PRIVATE_DIR}/rcm-excludes. Sourced here (rcm reads rcrc as shell) so
 # bare `rcup` and `just setup` both honor them; an absent private repo is a

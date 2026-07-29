@@ -192,6 +192,11 @@ The `cd` matters: `~/.justfile` is a symlink to the private repo's justfile, so
 `just setup` also re-links, but it is the whole bootstrap — `just link` is the
 one step.
 
+Prefer it over a bare `rcup`. This repo's `rcrc` lives in-tree, and the recipe
+passes `RCRC=` explicitly, so it works on any machine — including one that has
+never been bootstrapped. A bare `rcup` reads the same config only *after* the
+first bootstrap, because `~/.rcrc` is itself one of the symlinks rcm creates.
+
 ### Custom checkout locations
 
 Both repos default to `~/Workspace/tgautier/`. Override per machine with two
@@ -205,12 +210,8 @@ consumer moves together:
 
 Export them before `just link` / `just setup` so `rcrc` sees them — rcm sources
 `rcrc` as shell, which is what lets it read the environment at all. A trailing
-slash is fine. An absent private repo is skipped, not fatal.
-
-Prefer it over a bare `rcup`. This repo's `rcrc` lives in-tree, and the recipe
-passes `RCRC=` explicitly, so it works on any machine — including one that has
-never been bootstrapped. A bare `rcup` reads the same config only *after* the
-first bootstrap, because `~/.rcrc` is itself one of the symlinks rcm creates.
+slash is fine: `rcrc` strips it and the scanner normalises with zsh's `:a`. An
+absent private repo is skipped, not fatal.
 
 ## Documentation
 

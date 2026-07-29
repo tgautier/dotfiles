@@ -22,8 +22,11 @@ grouped by **date** rather than by semantic version. Newest first.
   stale-symlink scanner, which previously had no coverage at all despite ending
   in `rm`. Covers both halves of the predicate, the trailing-slash case, an
   absent configured dir, and — the one that matters most — a **survival** case:
-  an unrelated broken symlink must not be swept. Every assertion was verified to
-  fail when the corresponding logic is sabotaged, so none of them is vacuous
+  an unrelated broken symlink must not be swept. Every scan assertion was
+  verified to fail when the corresponding logic is sabotaged, so none of them is
+  vacuous. The sweep half can't be driven against a fixture tree (it refuses
+  `CLEANUP_HOME` by design), so what is covered there is the line parsing that
+  decides which path `rm` receives, including a target containing ` -> `
   ([#215](https://github.com/tgautier/dotfiles/issues/215)).
 - `just link` — re-applies the rcm symlinks on their own, so an edit to a
   symlinked dotfile (`gitconfig`, `zshrc`, `zshenv`, `tmux.conf`, …) can take

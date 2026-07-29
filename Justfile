@@ -560,7 +560,23 @@ lint-cleanup-symlinks:
         echo "ERROR: an absent configured dir widened the predicate past the survival case" >&2
         echo "$out" >&2; exit 1
     fi
-    echo "cleanup-symlinks scanner OK (union predicate, trailing slash, absent dir, survival case)"
+    # The sweep half can't be driven against a fixture tree — it deliberately
+    # refuses CLEANUP_HOME so nothing can redirect its `rm`. But the line parsing
+    # that decides WHICH path gets removed is pure string work, so pin it here
+    # using the same expansion `cleanup-symlinks` applies.
+    extract() { local entry=$1; printf '%s' "${entry%% ->*}"; }
+    got=$(extract "$fake_home/.zshrc -> $override/zshrc")
+    if [[ "$got" != "$fake_home/.zshrc" ]]; then
+        echo "ERROR: link extraction returned '$got'" >&2; exit 1
+    fi
+    # A target may itself contain ' -> ' (a link to a link's printed form).
+    # `%%` strips the LONGEST match, so the link must survive intact; `%` would
+    # have kept part of the target and fed `rm` a path that does not exist.
+    got=$(extract "$fake_home/.zshrc -> $override/a -> b")
+    if [[ "$got" != "$fake_home/.zshrc" ]]; then
+        echo "ERROR: link extraction broke on a target containing ' -> ': '$got'" >&2; exit 1
+    fi
+    echo "cleanup-symlinks scanner OK (union predicate, trailing slash, absent dir, survival case, link parsing)"
 
 # Print every stale symlink (broken, and pointing into a dotfiles checkout) as
 # a `link -> target` line. No removal — `cleanup-symlinks` owns that, so this
@@ -593,7 +609,11 @@ _scan-stale-symlinks:
     # that matches nothing while glob-based discovery still succeeds. NOT `:A`,
     # which also resolves symlinks: rcm recorded whatever DOTFILES_DIRS said, so
     # resolving could stop matching the targets actually on disk.
-    repos=("{{ public_dir }}"(N:a) "{{ private_dir }}"(N:a))
+    # quote() not "…": double quotes protect spaces but not `$`, backtick or
+    # backslash, and this value gates an `rm`. Matches the convention already
+    # used for private_justfile and set-profile's argument. A glob qualifier
+    # after a single-quoted word is valid zsh.
+    repos=({{ quote(public_dir) }}(N:a) {{ quote(private_dir) }}(N:a))
     # (N) above drops a configured dir that doesn't exist on this machine, so an
     # absent private repo contributes no prefix. Without it zsh aborts the whole
     # scan with "no matches found" (verified), making an absent private repo

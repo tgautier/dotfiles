@@ -276,6 +276,7 @@ Individual targets:
 | `just lint-brewfile`           | Ruby syntax check on Brewfiles                 |
 | `just lint-mise`               | Validate mise config                           |
 | `just lint-just`               | Check in-body `just <recipe>` calls resolve    |
+| `just lint-rcrc`               | Check `rcrc` resolves + normalises the paths   |
 | `just lint-cleanup-symlinks`   | Fixture-test the stale-symlink scanner         |
 | `just lint-via-private`        | Keyword guard, delegated to the private repo   |
 

@@ -24,6 +24,11 @@ PRIVATE_DIR="${DOTFILES_PRIVATE_DIR:-${HOME}/Workspace/tgautier/dotfiles-private
 # Loops rather than a single `${VAR%/}`, which strips only ONE slash and would
 # leave `…/dots//` as `…/dots/`. Stops at `/` so a pathological root value can't
 # be reduced to the empty string, which would make DOTFILES_DIRS match anything.
+#
+# The `$( … )` call sites are what confine `_v` to a subshell — it never exists
+# in the shell that sources this file, so there is nothing to unset. Keep the
+# calls in command-substitution form; a rewrite to a plain call would start
+# leaking it. Covered by `just lint-rcrc`.
 _rcrc_strip_slashes() {
     _v="$1"
     while [ "$_v" != "/" ] && [ "$_v" != "${_v%/}" ]; do _v="${_v%/}"; done
@@ -31,7 +36,6 @@ _rcrc_strip_slashes() {
 }
 PUBLIC_DIR="$(_rcrc_strip_slashes "$PUBLIC_DIR")"
 PRIVATE_DIR="$(_rcrc_strip_slashes "$PRIVATE_DIR")"
-unset _v
 unset -f _rcrc_strip_slashes 2>/dev/null || true
 
 # Base excludes plus any private-only exclude patterns appended from

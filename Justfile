@@ -3,7 +3,61 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-cleanup-symlinks lint-via-private
+ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks lint-via-private
+
+# Assert `rcrc` resolves DOTFILES_DIRS the way README documents. This is the one
+# half of the override contract that reaches the operator's real $HOME through
+# rcm — a stray trailing slash becomes a doubled separator and rcm derives a
+# wrongly-named link from it — so the documented cases are pinned rather than
+# asserted. Sourcing rcrc is side-effect-free: it only assigns, and its one
+# external touch is a `2>/dev/null`-guarded grep.
+[doc("Check rcrc resolves DOTFILES_DIRS and normalises the override paths")]
+lint-rcrc:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    resolve() {
+        env -u DOTFILES_DIR -u DOTFILES_PRIVATE_DIR ${1:+"$@"} \
+            sh -c '. ./rcrc; printf "%s" "$DOTFILES_DIRS"'
+    }
+    expect() {
+        local label=$1 want=$2 got=$3
+        if [[ "$got" != "$want" ]]; then
+            echo "ERROR [$label]: want [$want] got [$got]" >&2
+            exit 1
+        fi
+    }
+
+    home_default="$HOME/Workspace/tgautier/dotfiles"
+    priv_default="$HOME/Workspace/tgautier/dotfiles-private"
+
+    expect "no override" \
+        "$home_default $priv_default" "$(resolve)"
+    expect "both overridden" \
+        "/tmp/pub /tmp/priv" "$(resolve DOTFILES_DIR=/tmp/pub DOTFILES_PRIVATE_DIR=/tmp/priv)"
+    expect "private only" \
+        "$home_default /tmp/priv" "$(resolve DOTFILES_PRIVATE_DIR=/tmp/priv)"
+    # One trailing slash, and several — `${VAR%/}` alone strips only one, which
+    # is why rcrc loops.
+    expect "single trailing slash" \
+        "/tmp/pub $priv_default" "$(resolve DOTFILES_DIR=/tmp/pub/)"
+    expect "multiple trailing slashes" \
+        "/tmp/pub $priv_default" "$(resolve DOTFILES_DIR=/tmp/pub///)"
+    # A root value must survive as `/`, never collapse to empty — an empty entry
+    # in DOTFILES_DIRS would make the derived prefix match anything.
+    expect "root value not emptied" \
+        "$home_default /" "$(resolve DOTFILES_PRIVATE_DIR=/)"
+
+    # The strip helper and its temp var must not leak into the sourcing shell.
+    leaked=$(sh -c '. ./rcrc; printf "%s" "${_v-unset}"')
+    if [[ "$leaked" != "unset" ]]; then
+        echo "ERROR: rcrc leaked \$_v into the sourcing shell as [$leaked]" >&2
+        exit 1
+    fi
+    if sh -c '. ./rcrc; command -v _rcrc_strip_slashes' >/dev/null 2>&1; then
+        echo "ERROR: rcrc left _rcrc_strip_slashes defined in the sourcing shell" >&2
+        exit 1
+    fi
+    echo "rcrc OK (defaults, both overrides, slash normalisation, root value, no leaks)"
 
 # Assert every in-body `just <recipe>` call names a recipe that exists here.
 # Those calls are opaque shell strings to just, so nothing else catches a typo:
@@ -260,6 +314,12 @@ _ensure-profile:
 # Lint shell scripts with ShellCheck
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
+    # rcrc is POSIX sh sourced by rcm — checked with --shell=sh, not the zsh
+    # group below, since it must stay portable to whatever shell rcm uses.
+    # SC2034 (appears unused) is excluded for this file ONLY: setting variables
+    # for rcm to read IS its purpose, so every assignment is consumed
+    # externally. Scoped to rcrc rather than added to the shared exclude list.
+    shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 
 # Lint markdown files
@@ -561,9 +621,24 @@ lint-cleanup-symlinks:
         echo "$out" >&2; exit 1
     fi
     # The sweep half can't be driven against a fixture tree — it deliberately
-    # refuses CLEANUP_HOME so nothing can redirect its `rm`. But the line parsing
-    # that decides WHICH path gets removed is pure string work, so pin it here
-    # using the same expansion `cleanup-symlinks` applies.
+    # refuses CLEANUP_HOME so nothing can redirect its `rm`. So bind the
+    # assertion to `cleanup-symlinks`' ACTUAL body instead: the two behaviour
+    # cases below would otherwise only prove a fact about zsh expansion, leaving
+    # a weakened `%%` in the real recipe green. Same convention as `lint-just`'s
+    # `check()` — exercise the real logic, never a copy of it.
+    #
+    # Comment lines are stripped first so the match can't be satisfied by a
+    # comment that merely mentions the expansion.
+    body=$(just --dump --dump-format json \
+              | jq -r '.recipes["cleanup-symlinks"].body | flatten | .[]' \
+              | grep -vE '^[[:space:]]*#')
+    if ! grep -qF 'link="${entry%% ->*}"' <<<"$body"; then
+        echo "ERROR: cleanup-symlinks no longer extracts the link with \${entry%% ->*}." >&2
+        echo "       A single % strips the SHORTEST match, so a target containing ' -> '" >&2
+        echo "       would feed rm a path that does not exist. Update this lint only if" >&2
+        echo "       the replacement is equivalent." >&2
+        exit 1
+    fi
     extract() { local entry=$1; printf '%s' "${entry%% ->*}"; }
     got=$(extract "$fake_home/.zshrc -> $override/zshrc")
     if [[ "$got" != "$fake_home/.zshrc" ]]; then

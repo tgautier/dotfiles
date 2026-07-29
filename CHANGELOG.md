@@ -18,6 +18,16 @@ grouped by **date** rather than by semantic version. Newest first.
   who set the override pointed that guard at a private repo `rcup` never merged.
   Documented in `README.md` → Custom checkout locations
   ([#215](https://github.com/tgautier/dotfiles/issues/215)).
+- `just lint-rcrc`, wired into `just ci` — pins how `rcrc` resolves
+  `DOTFILES_DIRS`: defaults with no override, each override alone and both
+  together, one *and* several trailing slashes stripped, a root value surviving
+  as `/` rather than collapsing to an empty entry (which would make the derived
+  prefix match anything), and no helper or temp var leaking into the sourcing
+  shell. `rcrc` is also now shellchecked (`--shell=sh`, since rcm sources it as
+  POSIX shell), which it never was — `lint-shell` covered `bin/*` and the zsh
+  files only. `SC2034` is excluded for that file alone, because setting
+  variables for rcm to read is precisely its purpose
+  ([#215](https://github.com/tgautier/dotfiles/issues/215)).
 - `just lint-cleanup-symlinks`, wired into `just ci` — fixture-tests the
   stale-symlink scanner, which previously had no coverage at all despite ending
   in `rm`. Covers both halves of the predicate, the trailing-slash case, an

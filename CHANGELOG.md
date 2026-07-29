@@ -10,6 +10,18 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `!.claude/worktrees/**` to the `markdownlint-cli2` globs, completing the
+  worktree hygiene begun in [#212](https://github.com/tgautier/dotfiles/pull/212).
+  The path was already gitignored, but `markdownlint-cli2` globs are not
+  gitignore-aware, so a nested worktree's Markdown was linted as the working
+  branch's content. Measured in this repo with one worktree present: **14 files
+  before the exclusion, 7 after** — the repo tracks 7 `.md` files and a nested
+  worktree is a full second checkout of them. Markdown is the only exposed lint;
+  `lint-shell`, `lint-brewfile` and
+  `lint-mise` all use explicit paths that cannot recurse into it. `CLAUDE.md` now
+  documents the `.claude/worktrees/<name>` convention, which the global
+  `git-conventions.md` rule deliberately leaves to each project
+  ([#211](https://github.com/tgautier/dotfiles/issues/211)).
 - `libreoffice` in `Brewfile.work` — headless `soffice` is the renderer that
   converts generated `.pptx` decks to PDF for visual verification, so it belongs
   on the work laptop only. It had been installed by hand with `brew install
@@ -56,6 +68,14 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- `.roborev.toml` now names `claude-code` directly instead of `copilot`. roborev
+  could not invoke `copilot`, so every review silently fell through to
+  `backup_agent` — 112 of 112 jobs on record ran `claude-code`. claude-code is the
+  only agent with a paid subscription behind it: copilot, codex and
+  gemini/antigravity are all installed but have no API credit (codex returns
+  `401 Unauthorized`), so a second reviewer is not one install away. The `codex`
+  and `copilot-cli` casks stay in the Brewfile for interactive use and are
+  deliberately not review agents.
 - Bump mise Flutter (`vfox-flutter`) 3.44.7 → 3.44.8.
 - Tap trust is now declared in the Brewfiles: `trusted: true` on
   `kenn-io/tap/roborev` and `terror/tap/just-lsp` (formula-level trust, as
@@ -126,6 +146,40 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- The `gh` credential helper in `gitconfig` no longer hardcodes an absolute path.
+  Both `[credential]` blocks read `!/usr/bin/gh auth git-credential`, which is
+  where `gh` lives on Linux but **not** on macOS (Homebrew installs to
+  `/opt/homebrew/bin`), so on a Mac every HTTPS git operation invoked a missing
+  binary and `git clone` of a private repo failed with `could not read Username`.
+  Now `!gh auth git-credential`, resolved via `PATH`, which is correct on all
+  three target platforms — this file is symlinked to macOS, Linux and WSL alike
+  and carries no `includeIf` guards.
+- `lint-via-private` announces a skip instead of passing silently, and derives the
+  private repo path from `$HOME` (overridable with `DOTFILES_PRIVATE_DIR`) rather
+  than hardcoding one operator's layout. The path is anchored to `$HOME` rather
+  than derived from `dotfiles_dir` deliberately: inside a nested worktree
+  `dotfiles_dir` is `.claude/worktrees/<name>`, whose sibling is not the private
+  repo, so a sibling-derived default would have skipped the guard precisely when
+  working on a branch. On a CI runner the private repo is never present, so this
+  leg of the keyword guard has never executed there — the enforcing copies are the
+  two pre-commit hooks, making a skip a defence-in-depth gap rather than an
+  unguarded invariant, but it now says so out loud
+  ([#162](https://github.com/tgautier/dotfiles/issues/162)).
+  Every interpolation of the path uses `quote()`, so a value containing `$`,
+  a backtick, a quote or a backslash stays inert data rather than being expanded
+  — matching `set-profile`'s existing precedent. `DOTFILES_PRIVATE_DIR` is scoped
+  to this recipe only, tracked in
+  [#215](https://github.com/tgautier/dotfiles/issues/215) rather than
+  half-applied. `rcrc` is a one-line change left out purely to keep this PR
+  scoped; `cleanup-symlinks` is the genuinely hard one, because rcm records
+  absolute symlink targets, so links into a *former* checkout path must keep
+  matching and a prefix built from current paths cannot see them.
+- `_ensure-profile`'s non-interactive error reports the value it actually saw
+  (`got '<absent>'` / `got 'Work'`) instead of always claiming no profile is set,
+  which conflated a missing marker with an invalid one. Its trim comment no longer
+  overstates equivalence with the Brewfile's Ruby `String#strip` — `sed` trims
+  per line, so a multi-line marker re-prompts; stricter than the guard, and safe
+  in that direction ([#181](https://github.com/tgautier/dotfiles/issues/181)).
 - `zlogin` no longer prints `zcompile:4: can't write zwc file:
   ~/.zcompdump.zwc` when several login shells start together (tmux panes,
   session restore). Each backgrounded the same `zcompile ~/.zcompdump`, and

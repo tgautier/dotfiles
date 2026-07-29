@@ -4,5 +4,7 @@
 .githooks/post-commit
 .githooks/post-rewrite
 
-# Claude Code worktrees (git worktree checkouts, not repo content)
+# Claude Code worktrees (git worktree checkouts, not repo content).
+# Untracked by design, so a `git add -A` can't sweep in a whole second
+# checkout. Also excluded from lint globs in .markdownlint-cli2.yaml.
 .claude/worktrees/

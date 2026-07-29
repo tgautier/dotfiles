@@ -5,11 +5,19 @@ zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,
 # Run all CI checks
 ci: lint-shell lint-markdown lint-brewfile lint-mise lint-via-private
 
-# Delegate to the private repo's justfile for checks that must not be
-# defined here (keyword lists etc.). No-op when private repo is absent.
+# Delegate to the private repo's justfile for checks that must not be defined
+# here (keyword lists etc.). Skips loudly when the private repo is absent —
+# notably on a CI runner, where it is never present, so this leg of the keyword
+# guard has never executed there. The enforcing copies are the two pre-commit
+# hooks (this repo's runs `just ci` with the private repo present; the private
+# repo's `ci-lint` includes `lint-public-no-arr`), so a skip here is a
+# defence-in-depth gap, not an unguarded invariant. Announce it either way: a
+# silent no-op reads as a pass.
 lint-via-private:
-    if [ -f ~/Workspace/tgautier/dotfiles-private/justfile ]; then \
-        just -f ~/Workspace/tgautier/dotfiles-private/justfile lint-public-no-arr; \
+    @if [ -f {{ quote(private_justfile) }} ]; then \
+        just -f {{ quote(private_justfile) }} lint-public-no-arr; \
+    else \
+        echo "⚠ lint-via-private: keyword guard SKIPPED — no private justfile at" {{ quote(private_justfile) }}; \
     fi
 
 # Bootstrap this machine: profile, packages, symlinks, runtimes, hooks, tools (idempotent)
@@ -120,14 +128,19 @@ _ensure-profile:
     fi
     marker="${HOME}/.config/dotfiles/profile"
     current=""
-    # Trim-only (ends), mirroring the Brewfile's String#strip on the same file.
+    # Trim-only (ends), approximating the Brewfile's String#strip (sed is
+    # per-line, so a multi-line marker re-prompts — stricter than the guard, safe).
     [[ -f "$marker" ]] && current="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$marker")"
     if [[ "$current" == "work" || "$current" == "personal" ]]; then
         echo "Machine profile already set: $current"
         exit 0
     fi
     if [[ ! -t 0 ]]; then
-        echo "No machine profile set and stdin is not a terminal." >&2
+        # Distinguish a missing marker from one that exists but is empty or
+        # invalid — reporting both as "<absent>" is the conflation this message
+        # exists to avoid.
+        if [[ -f "$marker" ]]; then got="'$current'"; else got="<absent>"; fi
+        echo "No valid machine profile (got $got) and stdin is not a terminal." >&2
         echo "Run 'just set-profile work|personal' first, then re-run 'just setup'." >&2
         exit 1
     fi
@@ -244,6 +257,23 @@ update: update-brew update-mas update-mise update-rust
 
 # Resolve through symlink so this works when just finds ~/.justfile
 dotfiles_dir := parent_directory(canonicalize(justfile()))
+
+# Private companion repo, for `lint-via-private`. Anchored to $HOME rather than
+# derived from dotfiles_dir on purpose: inside a nested worktree dotfiles_dir is
+# .claude/worktrees/<name>, whose sibling is not the private repo, so a
+# sibling-derived path would silently skip the guard exactly when working on a
+# branch. Override per machine with DOTFILES_PRIVATE_DIR.
+#
+# Scope: `lint-via-private` only — see #215 before widening it. `rcrc` and
+# `cleanup-symlinks` still hardcode the paths, for two unrelated reasons:
+#   - `rcrc` is a one-liner. rcm sources it as shell, so it can read the env var
+#     directly. It is unwired only to keep #214 scoped, so until then setting the
+#     override points the keyword guard at a private repo `rcup` never merges.
+#   - `cleanup-symlinks` is the hard one: rcm records absolute symlink targets, so
+#     links into a *former* checkout path must keep matching, and a prefix built
+#     from the current paths cannot see them.
+private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
+private_justfile := private_dir / "justfile"
 
 # Platform-specific Brewfile
 brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }

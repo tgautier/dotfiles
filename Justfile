@@ -44,10 +44,11 @@ setup: _ensure-profile
     #    package upgrading cleanly.
     brew bundle install --no-upgrade --file="{{brewfile}}"
 
-    # 2. Symlink dotfiles. RCRC points rcm at the repo config so a fresh machine
-    #    (no ~/.rcrc yet) links every DOTFILES_DIRS entry; a missing private repo
-    #    is skipped, not fatal.
-    RCRC="{{dotfiles_dir}}/rcrc" rcup
+    # 2. Symlink dotfiles. Delegated to `link` so the RCRC-prefixed invocation
+    #    lives in exactly one place. Called here rather than declared as a
+    #    dependency because dependencies run before the recipe body, and rcm
+    #    itself comes from the `brew bundle` in step 1.
+    just link
 
     # 3. Language runtimes from the pinned mise config. Install mise first if the
     #    machine doesn't have it yet (matches the README curl bootstrap).
@@ -76,6 +77,18 @@ setup: _ensure-profile
 
     # 7. Linux/WSL: symlink libsqlite3 for Dart/Flutter FFI (no-op on macOS).
     {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
+
+# Run this after editing any dotfile rcm links into $HOME (gitconfig, zshrc,
+# zshenv, tmux.conf, …) — the edit lands in this repo, but the running machine
+# only picks it up once the links are re-applied. `just update` does NOT
+# re-link: it upgrades installed software, not local config. RCRC points rcm at
+# this repo's in-tree config rather than ~/.rcrc, so every DOTFILES_DIRS entry
+# is linked; this is the authoritative invocation, and `setup` calls it rather
+# than repeating it. The [doc] attribute carries the summary because `just
+# --list` would otherwise show only the last line of this comment.
+[doc("Re-apply the rcm symlinks (run after editing a symlinked dotfile)")]
+link:
+    RCRC="{{dotfiles_dir}}/rcrc" rcup
 
 # Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for
 # Dart/Flutter (Drift) FFI, which dlopen()s the unversioned 'libsqlite3.so' the

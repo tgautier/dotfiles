@@ -175,6 +175,20 @@ Or run individual update steps:
 | `just update-mise` | Show outdated mise tools and upgrade them         |
 | `just update-rust` | Update Rust toolchain                             |
 
+### Applying config changes
+
+`just update` upgrades installed software — it does **not** re-apply symlinks.
+After editing a dotfile that rcm links into `$HOME` (`gitconfig`, `zshrc`,
+`zshenv`, `tmux.conf`, …), re-link so the running machine picks the change up:
+
+```sh
+just link
+```
+
+`just setup` also re-links, but it is the whole bootstrap — `just link` is the
+one step. Run neither as a bare `rcup`: this repo keeps its `rcrc` in-tree, and
+the recipe carries the `RCRC=` that points rcm at it.
+
 ## Documentation
 
 Detailed guides live in the `docs/` folder:

@@ -10,6 +10,17 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `just link` — re-applies the rcm symlinks on their own, so an edit to a
+  symlinked dotfile (`gitconfig`, `zshrc`, `zshenv`, `tmux.conf`, …) can take
+  effect without running the full `just setup` bootstrap. Previously the only
+  `rcup` invocation lived inline in `setup`, and the recipe reached for far more
+  often — `just update` — does not re-link at all, so the natural "apply my
+  changes" command was the wrong one. `setup` now calls `just link` instead of
+  repeating the command, making the `RCRC=`-prefixed form (required because this
+  repo keeps its `rcrc` in-tree rather than at `~/.rcrc`) exist in exactly one
+  place. `README.md` and `CLAUDE.md` now point at `just link` rather than a bare
+  `rcup`, and state that `just update` does not re-link
+  ([#213](https://github.com/tgautier/dotfiles/issues/213)).
 - `!.claude/worktrees/**` to the `markdownlint-cli2` globs, completing the
   worktree hygiene begun in [#212](https://github.com/tgautier/dotfiles/pull/212).
   The path was already gitignored, but `markdownlint-cli2` globs are not

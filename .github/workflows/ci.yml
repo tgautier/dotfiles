@@ -18,7 +18,11 @@ jobs:
 
       - name: Install tools
         run: |
-          sudo apt-get install -y shellcheck jq
+          # zsh: `lint-cleanup-symlinks` and the scanner it tests are zsh
+          # shebang recipes (the sweeper globs with zsh qualifiers). Not
+          # preinstalled on ubuntu-latest — verified by a 127 from
+          # `lint-cleanup-symlinks` in the "Run all checks" step below.
+          sudo apt-get install -y shellcheck jq zsh
           npm install -g markdownlint-cli2
 
       - name: Run all checks

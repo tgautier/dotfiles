@@ -3,7 +3,127 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-via-private
+ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks lint-via-private
+
+# Assert `rcrc` resolves the way README documents, on both halves of the
+# override contract: DOTFILES_DIRS, which reaches the operator's real $HOME
+# through rcm (a stray trailing slash becomes a doubled separator and rcm derives
+# a wrongly-named link from it), and EXCLUDES, whose private sourcing fails
+# silently behind a `2>/dev/null` when PRIVATE_DIR drifts. Both are pinned rather
+# than asserted. Sourcing rcrc is side-effect-free: it only assigns, and its one
+# external touch is that guarded grep.
+[doc("Check rcrc resolves DOTFILES_DIRS + EXCLUDES and normalises the paths")]
+lint-rcrc:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # One place that sources rcrc under a clean environment. `var` picks which
+    # resolved variable to read, so the DOTFILES_DIRS and EXCLUDES cases share
+    # this rather than each hand-rolling its own `env -u … sh -c`.
+    #
+    # The `-u` pair is a clean-slate default, not a contradiction with a caller's
+    # `NAME=value` operand: env processes options before operands, so an operand
+    # deliberately re-supplies what `-u` cleared.
+    read_var() {
+        local var=$1; shift
+        env -u DOTFILES_DIR -u DOTFILES_PRIVATE_DIR ${1:+"$@"} \
+            sh -c 'set -e; . ./rcrc; eval "printf %s \"\${$1}\""' sh "$var"
+    }
+    resolve() { read_var DOTFILES_DIRS ${1:+"$@"}; }
+    expect() {
+        local label=$1 want=$2 got=$3
+        if [[ "$got" != "$want" ]]; then
+            echo "ERROR [$label]: want [$want] got [$got]" >&2
+            exit 1
+        fi
+    }
+    expect_has() {
+        local label=$1 needle=$2 got=$3
+        if [[ "$got" != *"$needle"* ]]; then
+            echo "ERROR [$label]: expected to contain [$needle], got [$got]" >&2
+            exit 1
+        fi
+    }
+    expect_lacks() {
+        local label=$1 needle=$2 got=$3
+        if [[ "$got" == *"$needle"* ]]; then
+            echo "ERROR [$label]: expected NOT to contain [$needle], got [$got]" >&2
+            exit 1
+        fi
+    }
+
+    home_default="$HOME/Workspace/tgautier/dotfiles"
+    priv_default="$HOME/Workspace/tgautier/dotfiles-private"
+
+    expect "no override" \
+        "$home_default $priv_default" "$(resolve)"
+    expect "both overridden" \
+        "/tmp/pub /tmp/priv" "$(resolve DOTFILES_DIR=/tmp/pub DOTFILES_PRIVATE_DIR=/tmp/priv)"
+    expect "private only" \
+        "$home_default /tmp/priv" "$(resolve DOTFILES_PRIVATE_DIR=/tmp/priv)"
+    # One trailing slash, and several — `${VAR%/}` alone strips only one, which
+    # is why rcrc loops.
+    expect "single trailing slash" \
+        "/tmp/pub $priv_default" "$(resolve DOTFILES_DIR=/tmp/pub/)"
+    expect "multiple trailing slashes" \
+        "/tmp/pub $priv_default" "$(resolve DOTFILES_DIR=/tmp/pub///)"
+    # A root value must survive as `/`, never collapse to empty — an empty entry
+    # in DOTFILES_DIRS would make the derived prefix match anything.
+    expect "root value not emptied" \
+        "$home_default /" "$(resolve DOTFILES_PRIVATE_DIR=/)"
+
+    # EXCLUDES is the other half of the contract, and the one rcrc's own header
+    # names as the silent-failure path: if PRIVATE_DIR drifts, the exclude
+    # sourcing no-ops behind `2>/dev/null` and rcup resumes hanging on the
+    # excluded directory — a well-formed DOTFILES_DIRS with an EXCLUDES quietly
+    # missing every private pattern. Pin the path derivation and the
+    # comment/blank-line filter together.
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+    # The regex's two alternatives, its `[[:space:]]*` tolerance and the `tr` join
+    # are each pinned, but by DIFFERENT assertions — don't delete either one
+    # believing the other covers it:
+    #
+    #   fixture ingredient      pins                caught by
+    #   ----------------------  ------------------  ---------------------------
+    #   two patterns            the `tr` join       expect_has (joined needle)
+    #   blank line, mid-list    the `$` alternative expect_has (joined needle)
+    #   indented comment        `[[:space:]]*`      expect_lacks "comment"
+    #                           and the `#` alt.
+    #   column-0 comment        nothing on its own  — belt and braces; the
+    #                                                 indented line already
+    #                                                 pins both
+    #
+    # Boundary, so the table isn't read as totality over the whole pipeline:
+    # `-v` is pinned incidentally (drop it and BOTH assertions fire, since only
+    # the comment and blank lines survive). `-h` is NOT pinned and structurally
+    # cannot be here — grep only prefixes filenames for multiple inputs or `-H`,
+    # and rcrc passes exactly one file, so dropping it changes nothing observable.
+    #
+    # The blank line sits BETWEEN the patterns on purpose: a leaked blank then
+    # breaks the contiguity of "sentinel-pattern second-pattern". Before the first
+    # pattern it would only add a space outside the needle and slip through.
+    # A leaked comment, by contrast, survives as leading tokens that don't break
+    # that contiguity, which is why it needs expect_lacks rather than the needle.
+    printf '# a comment line\n\t  # indented comment\nsentinel-pattern\n\nsecond-pattern\n' \
+        > "$tmp/rcm-excludes"
+    excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp")
+    expect_has   "EXCLUDES sources the private file" "sentinel-pattern second-pattern" "$excludes"
+    expect_lacks "EXCLUDES drops comment lines"      "comment"                         "$excludes"
+    # An absent private repo must leave the base excludes intact, not blank.
+    excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp/nope")
+    expect_has   "absent private repo keeps base EXCLUDES" "CHANGELOG.md" "$excludes"
+
+    # The strip helper and its temp var must not leak into the sourcing shell.
+    leaked=$(sh -c '. ./rcrc; printf "%s" "${_v-unset}"')
+    if [[ "$leaked" != "unset" ]]; then
+        echo "ERROR: rcrc leaked \$_v into the sourcing shell as [$leaked]" >&2
+        exit 1
+    fi
+    if sh -c '. ./rcrc; command -v _rcrc_strip_slashes' >/dev/null 2>&1; then
+        echo "ERROR: rcrc left _rcrc_strip_slashes defined in the sourcing shell" >&2
+        exit 1
+    fi
+    echo "rcrc OK (defaults, both overrides, slash normalisation, root value, EXCLUDES sourcing, no leaks)"
 
 # Assert every in-body `just <recipe>` call names a recipe that exists here.
 # Those calls are opaque shell strings to just, so nothing else catches a typo:
@@ -257,9 +377,20 @@ _ensure-profile:
     read -r reply
     just set-profile "${reply:-work}"
 
-# Lint shell scripts with ShellCheck
+# Lint shell scripts with ShellCheck.
+#
+# Rationale lives here rather than in the body: this is a LINEWISE recipe, so
+# every indented line — comments included — is echoed and handed to a shell.
+#
+# `rcrc` is checked with --shell=sh, not in the zsh group below, because rcm
+# sources it and it must stay portable to whatever shell rcm uses. SC2034
+# (appears unused) is excluded for that file ONLY: setting variables for rcm to
+# read IS its purpose, so every assignment is consumed externally. Scoped to the
+# file rather than added to the shared zsh_excludes list.
+[doc("Lint shell scripts with ShellCheck")]
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
+    shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 
 # Lint markdown files
@@ -367,20 +498,21 @@ update: update-brew update-mas update-mise update-rust
 # Resolve through symlink so this works when just finds ~/.justfile
 dotfiles_dir := parent_directory(canonicalize(justfile()))
 
-# Private companion repo, for `lint-via-private`. Anchored to $HOME rather than
-# derived from dotfiles_dir on purpose: inside a nested worktree dotfiles_dir is
-# .claude/worktrees/<name>, whose sibling is not the private repo, so a
-# sibling-derived path would silently skip the guard exactly when working on a
-# branch. Override per machine with DOTFILES_PRIVATE_DIR.
+# Companion repo paths. Anchored to $HOME rather than derived from dotfiles_dir
+# on purpose: inside a nested worktree dotfiles_dir is .claude/worktrees/<name>,
+# whose sibling is not the private repo, so a sibling-derived path would
+# silently skip the keyword guard exactly when working on a branch.
 #
-# Scope: `lint-via-private` only — see #215 before widening it. `rcrc` and
-# `cleanup-symlinks` still hardcode the paths, for two unrelated reasons:
-#   - `rcrc` is a one-liner. rcm sources it as shell, so it can read the env var
-#     directly. It is unwired only to keep #214 scoped, so until then setting the
-#     override points the keyword guard at a private repo `rcup` never merges.
-#   - `cleanup-symlinks` is the hard one: rcm records absolute symlink targets, so
-#     links into a *former* checkout path must keep matching, and a prefix built
-#     from the current paths cannot see them.
+# DOTFILES_DIR / DOTFILES_PRIVATE_DIR are the shared contract across all three
+# consumers — `lint-via-private` here, `DOTFILES_DIRS` + `EXCLUDES` in `rcrc`,
+# and the repo list in `_scan-stale-symlinks`. Setting one moves all three
+# together; previously it moved only this one, so an operator who set it pointed
+# the keyword guard at a private repo `rcup` never merged.
+#
+# The two defaults below live in three places on purpose — here, `rcrc`, and
+# `lint-rcrc`'s expected values (which run under `env -u`, so they cannot
+# inherit these). Change one, change all three; see the note in `rcrc`.
+public_dir := env("DOTFILES_DIR", env("HOME") / "Workspace/tgautier/dotfiles")
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
 private_justfile := private_dir / "justfile"
 
@@ -490,28 +622,181 @@ set-default-editor:
     echo "Word (.doc/.docx), Pages (.pages), and web content (.html/.svg)"
     echo "intentionally left untouched so the browser keeps http/https links."
 
-# Remove stale symlinks in $HOME that point into dotfiles dirs
-cleanup-symlinks:
+# Exercise `_scan-stale-symlinks` against a fixture tree. The recipe it tests
+# ends in `rm` (via `cleanup-symlinks`), so both halves of the union predicate
+# and — critically — the SURVIVAL case get pinned: a broken symlink that points
+# nowhere near a dotfiles checkout must NOT be reported. A deletion test without
+# a survival case only proves the sweeper deletes something.
+#
+# Each case re-invokes `just` as a subprocess because public_dir/private_dir are
+# `env()` variables resolved at justfile load, so varying them requires a fresh
+# process rather than an in-recipe assignment.
+[doc("Test the stale-symlink scanner against fixtures (positive and negative)")]
+lint-cleanup-symlinks:
     #!/usr/bin/env zsh
-    # Derive nested dirs from the dotfiles repos themselves
-    dotfiles_repos=("$HOME/Workspace/tgautier/dotfiles" "$HOME/Workspace/tgautier/dotfiles-private")
+    set -eu
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+    fake_home="$tmp/home"
+    # An override whose basename is deliberately NOT `dotfiles*`, which is the
+    # case the segment predicate alone cannot see.
+    override="$tmp/dots-private"
+    mkdir -p "$fake_home" "$override" "$tmp/public"
+
+    # 1. broken link into the override checkout -> prefix predicate must fire
+    ln -s "$override/zshrc" "$fake_home/.zshrc"
+    # 2. broken link into a FORMER checkout path -> segment predicate must fire.
+    #    Nothing configured points here; only `*/dotfiles/*` matches it.
+    ln -s "$tmp/former/checkout/dotfiles/gitconfig" "$fake_home/.gitconfig"
+    # 3. an unrelated broken link -> must SURVIVE (the boundary case)
+    ln -s "$tmp/somewhere-else/thing" "$fake_home/.unrelated"
+
+    scan() {
+        DOTFILES_DIR="$tmp/public" DOTFILES_PRIVATE_DIR="$1" \
+            CLEANUP_HOME="$fake_home" just _scan-stale-symlinks
+    }
+
+    assert_scan() {
+        local label=$1 out=$2
+        if ! grep -q '/.zshrc ->' <<<"$out"; then
+            echo "ERROR [$label]: prefix predicate missed a link into a non-dotfiles-named override" >&2
+            echo "$out" >&2; exit 1
+        fi
+        if ! grep -q '/.gitconfig ->' <<<"$out"; then
+            echo "ERROR [$label]: segment predicate missed a link into a former checkout path" >&2
+            echo "$out" >&2; exit 1
+        fi
+        if grep -q '/.unrelated ->' <<<"$out"; then
+            echo "ERROR [$label]: swept an unrelated broken symlink — the survival case failed" >&2
+            echo "$out" >&2; exit 1
+        fi
+    }
+
+    assert_scan "plain override" "$(scan "$override")"
+    # Shell completion appends a trailing slash routinely; `:a` must absorb it,
+    # or the derived prefix becomes `…//*` and matches no single-slash target.
+    assert_scan "trailing-slash override" "$(scan "$override/")"
+
+    # An absent configured dir must be a no-op, not fatal — `rcrc` already
+    # treats a missing private repo that way. Dropping `(N)` from the repos glob
+    # makes zsh abort the scan with "no matches found" instead, which this case
+    # catches: the scan must still run, still fire the segment predicate, and
+    # still spare the unrelated link.
+    out=$(scan "$tmp/nonexistent-private")
+    if ! grep -q '/.gitconfig ->' <<<"$out"; then
+        echo "ERROR: an absent configured dir broke the scan or the segment predicate" >&2
+        echo "$out" >&2; exit 1
+    fi
+    if grep -q '/.unrelated ->' <<<"$out"; then
+        echo "ERROR: an absent configured dir widened the predicate past the survival case" >&2
+        echo "$out" >&2; exit 1
+    fi
+    # The sweep half can't be driven against a fixture tree — it deliberately
+    # refuses CLEANUP_HOME so nothing can redirect its `rm`. So bind the
+    # assertion to `cleanup-symlinks`' ACTUAL body instead: the two behaviour
+    # cases below would otherwise only prove a fact about zsh expansion, leaving
+    # a weakened `%%` in the real recipe green. Same convention as `lint-just`'s
+    # `check()` — exercise the real logic, never a copy of it.
+    #
+    # Comment lines are stripped first so the match can't be satisfied by a
+    # comment that merely mentions the expansion.
+    body=$(just --dump --dump-format json \
+              | jq -r '.recipes["cleanup-symlinks"].body | flatten | .[]' \
+              | grep -vE '^[[:space:]]*#')
+    if ! grep -qF 'link="${entry%% ->*}"' <<<"$body"; then
+        echo "ERROR: cleanup-symlinks no longer extracts the link with \${entry%% ->*}." >&2
+        echo "       A single % strips the SHORTEST match, so a target containing ' -> '" >&2
+        echo "       would feed rm a path that does not exist. Update this lint only if" >&2
+        echo "       the replacement is equivalent." >&2
+        exit 1
+    fi
+    extract() { local entry=$1; printf '%s' "${entry%% ->*}"; }
+    got=$(extract "$fake_home/.zshrc -> $override/zshrc")
+    if [[ "$got" != "$fake_home/.zshrc" ]]; then
+        echo "ERROR: link extraction returned '$got'" >&2; exit 1
+    fi
+    # A target may itself contain ' -> ' (a link to a link's printed form).
+    # `%%` strips the LONGEST match, so the link must survive intact; `%` would
+    # have kept part of the target and fed `rm` a path that does not exist.
+    got=$(extract "$fake_home/.zshrc -> $override/a -> b")
+    if [[ "$got" != "$fake_home/.zshrc" ]]; then
+        echo "ERROR: link extraction broke on a target containing ' -> ': '$got'" >&2; exit 1
+    fi
+    echo "cleanup-symlinks scanner OK (union predicate, trailing slash, absent dir, survival case, link parsing)"
+
+# Print every stale symlink (broken, and pointing into a dotfiles checkout) as
+# a `link -> target` line. No removal — `cleanup-symlinks` owns that, so this
+# recipe is safe to drive from the fixtures in `lint-cleanup-symlinks`.
+#
+# CLEANUP_HOME overrides the tree to scan (default $HOME). It is honoured HERE
+# ONLY, never by `cleanup-symlinks`: a stray export must not be able to redirect
+# an `rm` into an unexpected tree.
+#
+# The predicate is a UNION of two matches, because neither subsumes the other:
+#
+#   1. Basename-segment match on the literal `dotfiles` / `dotfiles-private`
+#      path components. rcm records ABSOLUTE targets, so after a checkout is
+#      moved or renamed the leftover links still name the OLD path — which is
+#      the main thing a stale sweeper is for. A prefix built from the CURRENT
+#      paths cannot see those, and setting the override to the new location
+#      does not help, because the stale targets name the old one.
+#   2. Prefix match against the configured dirs, which is what catches a
+#      checkout whose basename is not `dotfiles*` at all (DOTFILES_PRIVATE_DIR
+#      pointed at e.g. ~/dev/dots-private).
+#
+# #214 replaced (1) with (2) and lost the moved-checkout case; this keeps both.
+[doc("Print stale $HOME symlinks pointing into a dotfiles checkout (no removal)")]
+_scan-stale-symlinks:
+    #!/usr/bin/env zsh
+    set -u
+    scan_home="${CLEANUP_HOME:-$HOME}"
+
+    # `:a` absolutises and cleans, so a trailing slash (shell completion adds
+    # one routinely), a doubled slash, or a `..` segment can't produce a prefix
+    # that matches nothing while glob-based discovery still succeeds. NOT `:A`,
+    # which also resolves symlinks: rcm recorded whatever DOTFILES_DIRS said, so
+    # resolving could stop matching the targets actually on disk.
+    # quote() not "…": double quotes protect spaces but not `$`, backtick or
+    # backslash, and this value gates an `rm`. Matches the convention already
+    # used for private_justfile and set-profile's argument. A glob qualifier
+    # after a single-quoted word is valid zsh.
+    repos=({{ quote(public_dir) }}(N:a) {{ quote(private_dir) }}(N:a))
+    # (N) above drops a configured dir that doesn't exist on this machine, so an
+    # absent private repo contributes no prefix. Without it zsh aborts the whole
+    # scan with "no matches found" (verified), making an absent private repo
+    # fatal rather than the no-op `rcrc` already treats it as.
+
+    # Discovery of nested link dirs needs the repos to exist; the prefix
+    # predicate does not. Keep them independent so a moved checkout is still
+    # swept even when no configured dir is present.
     nested=()
-    for repo in "${dotfiles_repos[@]}"; do
-        [[ -d "$repo" ]] || continue
+    for repo in "${repos[@]}"; do
         for d in "$repo"/*(N/); do
             name=${d:t}
             # Skip repo-only dirs that rcm doesn't symlink
             [[ "$name" == .* || "$name" == README* || "$name" == CLAUDE* ]] && continue
-            candidate="$HOME/.$name"
+            candidate="$scan_home/.$name"
             [[ -d "$candidate" ]] && nested+=("$candidate")
         done
     done
+
+    is_stale() {
+        local target=$1 repo
+        # (1) former-or-current checkout, matched by path segment
+        [[ "$target" == */dotfiles/* || "$target" == */dotfiles-private/* ]] && return 0
+        # (2) configured checkout under any basename
+        for repo in "${repos[@]}"; do
+            [[ "$target" == "$repo"/* ]] && return 0
+        done
+        return 1
+    }
+
     stale=()
     # Top-level dotfiles (non-recursive)
-    for f in $HOME/.[!.]*(N@); do
+    for f in $scan_home/.[^.]*(N@); do
         [[ -e "$f" ]] && continue
         target=$(readlink "$f")
-        [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
+        is_stale "$target" && stale+=("$f -> $target")
     done
     # Nested dirs (recursive)
     for dir in "${nested[@]}"; do
@@ -519,9 +804,30 @@ cleanup-symlinks:
         for f in "$dir"/**/*(N@); do
             [[ -e "$f" ]] && continue
             target=$(readlink "$f")
-            [[ "$target" == *"/dotfiles/"* || "$target" == *"/dotfiles-private/"* ]] && stale+=("$f -> $target")
+            is_stale "$target" && stale+=("$f -> $target")
         done
     done
+    (( ${#stale} == 0 )) && exit 0
+    printf '%s\n' "${stale[@]}"
+
+# Remove stale symlinks in $HOME that point into dotfiles dirs
+[doc("Remove stale $HOME symlinks pointing into a dotfiles checkout")]
+cleanup-symlinks:
+    #!/usr/bin/env zsh
+    set -u
+    # Always the real $HOME: CLEANUP_HOME is deliberately not forwarded, so no
+    # environment setting can point this recipe's `rm` at another tree.
+    #
+    # Check the scan's status explicitly. A bare `stale=("${(@f)$(scan)}")` would
+    # turn a failed scan into empty output and then report "No stale symlinks
+    # found" — announcing a clean tree on the strength of a crash.
+    if ! out=$(CLEANUP_HOME= just _scan-stale-symlinks); then
+        echo "cleanup-symlinks: the stale-symlink scan failed; nothing removed." >&2
+        exit 1
+    fi
+    stale=("${(@f)out}")
+    # A single empty element is what $(…) yields for no output; treat as none.
+    [[ ${#stale} -eq 1 && -z "${stale[1]}" ]] && stale=()
     if (( ${#stale} == 0 )); then
         echo "No stale symlinks found."
         exit 0

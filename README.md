@@ -197,6 +197,22 @@ passes `RCRC=` explicitly, so it works on any machine — including one that has
 never been bootstrapped. A bare `rcup` reads the same config only *after* the
 first bootstrap, because `~/.rcrc` is itself one of the symlinks rcm creates.
 
+### Custom checkout locations
+
+Both repos default to `~/Workspace/tgautier/`. Override per machine with two
+environment variables, which are a single shared contract — set one and every
+consumer moves together:
+
+| Variable | Default | Used by |
+| --- | --- | --- |
+| `DOTFILES_DIR` | `~/Workspace/tgautier/dotfiles` | `DOTFILES_DIRS` in `rcrc`, the stale-symlink scanner |
+| `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | the above, plus `EXCLUDES` in `rcrc` and `just lint-via-private` |
+
+Export them before `just link` / `just setup` so `rcrc` sees them — rcm sources
+`rcrc` as shell, which is what lets it read the environment at all. A trailing
+slash is fine: `rcrc` strips it and the scanner normalises with zsh's `:a`. An
+absent private repo is skipped, not fatal.
+
 ## Documentation
 
 Detailed guides live in the `docs/` folder:
@@ -253,14 +269,16 @@ just ci
 
 Individual targets:
 
-| Target                  | Description                                          |
-| ----------------------- | ---------------------------------------------------- |
-| `just lint-shell`       | ShellCheck on `bin/*` and zsh files                  |
-| `just lint-markdown`    | markdownlint-cli2                                    |
-| `just lint-brewfile`    | Ruby syntax check on Brewfiles                       |
-| `just lint-mise`        | Validate mise config                                 |
-| `just lint-just`        | Check in-body `just <recipe>` calls resolve          |
-| `just lint-via-private` | Keyword guard, delegated to the private repo         |
+| Target                         | Description                                    |
+| ------------------------------ | ---------------------------------------------- |
+| `just lint-shell`              | ShellCheck on `bin/*`, `rcrc`, and zsh files   |
+| `just lint-markdown`           | markdownlint-cli2                              |
+| `just lint-brewfile`           | Ruby syntax check on Brewfiles                 |
+| `just lint-mise`               | Validate mise config                           |
+| `just lint-just`               | Check in-body `just <recipe>` calls resolve    |
+| `just lint-rcrc`               | Check `rcrc` dirs, excludes, normalisation     |
+| `just lint-cleanup-symlinks`   | Fixture-test the stale-symlink scanner         |
+| `just lint-via-private`        | Keyword guard, delegated to the private repo   |
 
 The pre-commit hook is enabled by the bootstrap (idempotent — safe to re-run):
 

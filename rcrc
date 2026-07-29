@@ -1,7 +1,44 @@
-# Private repo path, used by both EXCLUDES and DOTFILES_DIRS below. Single
-# source of truth: if it drifts, the exclude-sourcing would silently no-op
+# Repo paths, used by EXCLUDES and DOTFILES_DIRS below. Single source of truth
+# for the private path: if it drifts, the exclude-sourcing would silently no-op
 # (2>/dev/null) and rcup would resume hanging on the excluded directory.
-PRIVATE_DIR="${HOME}/Workspace/tgautier/dotfiles-private"
+#
+# DOTFILES_DIR / DOTFILES_PRIVATE_DIR override the defaults per machine. rcm
+# sources this file as shell, which is exactly why it can read them — the same
+# two variables are the contract shared with the Justfile's `private_dir` and
+# `_scan-stale-symlinks`, so overriding one here moves all three together.
+#
+# The two DEFAULTS below live in three places on purpose: here, the Justfile's
+# `public_dir` / `private_dir`, and `lint-rcrc`'s expected values. This file is
+# shell evaluated by rcm, those are justfile-load-time variables, and `lint-rcrc`
+# runs under `env -u` precisely so it cannot inherit either — so none can read
+# another's without a fragile bridge. Change one, change all three; `lint-rcrc`
+# fails loudly if you miss it, but only after the other two are already edited.
+PUBLIC_DIR="${DOTFILES_DIR:-${HOME}/Workspace/tgautier/dotfiles}"
+PRIVATE_DIR="${DOTFILES_PRIVATE_DIR:-${HOME}/Workspace/tgautier/dotfiles-private}"
+
+# Strip trailing slashes (shell completion appends one routinely). rcm derives
+# each link's destination name by stripping the configured dir from the
+# discovered path, so a trailing slash here would feed it a doubled separator —
+# and the symptom would be a wrongly-named link in the operator's real $HOME.
+# The scanner normalises with zsh's `:a`; this is the same guarantee for rcm, so
+# "a trailing slash is fine" holds for every consumer rather than just one.
+#
+# Loops rather than a single `${VAR%/}`, which strips only ONE slash and would
+# leave `…/dots//` as `…/dots/`. Stops at `/` so a pathological root value can't
+# be reduced to the empty string, which would make DOTFILES_DIRS match anything.
+#
+# The `$( … )` call sites are what confine `_v` to a subshell — it never exists
+# in the shell that sources this file, so there is nothing to unset. Keep the
+# calls in command-substitution form; a rewrite to a plain call would start
+# leaking it. Covered by `just lint-rcrc`.
+_rcrc_strip_slashes() {
+    _v="$1"
+    while [ "$_v" != "/" ] && [ "$_v" != "${_v%/}" ]; do _v="${_v%/}"; done
+    printf '%s' "$_v"
+}
+PUBLIC_DIR="$(_rcrc_strip_slashes "$PUBLIC_DIR")"
+PRIVATE_DIR="$(_rcrc_strip_slashes "$PRIVATE_DIR")"
+unset -f _rcrc_strip_slashes 2>/dev/null || true
 
 # Base excludes plus any private-only exclude patterns appended from
 # ${PRIVATE_DIR}/rcm-excludes. Sourced here (rcm reads rcrc as shell) so
@@ -14,5 +51,5 @@ PRIVATE_DIR="${HOME}/Workspace/tgautier/dotfiles-private"
 # HOMEBREW_BUNDLE_FILE=~/.Brewfile[.linux], so excluding them breaks bare
 # `brew bundle`.
 EXCLUDES="README.md .githooks Justfile CHANGELOG.md rcm-excludes $( { grep -hvE '^[[:space:]]*(#|$)' "${PRIVATE_DIR}/rcm-excludes" 2>/dev/null || true; } | tr '\n' ' ')"
-DOTFILES_DIRS="${HOME}/Workspace/tgautier/dotfiles ${PRIVATE_DIR}"
+DOTFILES_DIRS="${PUBLIC_DIR} ${PRIVATE_DIR}"
 SYMLINK_DIRS="claude/skills claude/rules claude/hooks"

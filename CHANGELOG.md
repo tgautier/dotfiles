@@ -10,6 +10,41 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR` are now honoured by every consumer,
+  not just `lint-via-private`. `rcrc` reads them for both `DOTFILES_DIRS` and
+  `EXCLUDES` (it is sourced as shell by rcm, which is exactly why it can), and
+  the stale-symlink scanner derives its repo list from them. Setting one moves
+  all three together; previously it moved only the keyword guard, so an operator
+  who set the override pointed that guard at a private repo `rcup` never merged.
+  Documented in `README.md` → Custom checkout locations
+  ([#215](https://github.com/tgautier/dotfiles/issues/215)).
+- `just lint-rcrc`, wired into `just ci` — pins both halves of the override
+  contract. For `DOTFILES_DIRS`: defaults with no override, each override alone
+  and both together, one *and* several trailing slashes stripped, a root value
+  surviving as `/` rather than collapsing to an empty entry (which would make the
+  derived prefix match anything), and no helper or temp var leaking into the
+  sourcing shell. For `EXCLUDES`: the private `rcm-excludes` file is actually
+  sourced from the configured path, comment and blank lines are filtered out
+  (including *indented* comments, so the filter's whitespace tolerance is
+  exercised), multiple patterns are joined onto one line, and an absent private
+  repo leaves the base excludes intact rather than blank. `EXCLUDES` is the half
+  that fails silently — its sourcing hides behind a `2>/dev/null`, so a drifted
+  path yields a well-formed `DOTFILES_DIRS` and no private patterns at all.
+  `rcrc` is also now shellchecked (`--shell=sh`, since rcm sources it as
+  POSIX shell), which it never was — `lint-shell` covered `bin/*` and the zsh
+  files only. `SC2034` is excluded for that file alone, because setting
+  variables for rcm to read is precisely its purpose
+  ([#215](https://github.com/tgautier/dotfiles/issues/215)).
+- `just lint-cleanup-symlinks`, wired into `just ci` — fixture-tests the
+  stale-symlink scanner, which previously had no coverage at all despite ending
+  in `rm`. Covers both halves of the predicate, the trailing-slash case, an
+  absent configured dir, and — the one that matters most — a **survival** case:
+  an unrelated broken symlink must not be swept. Every scan assertion was
+  verified to fail when the corresponding logic is sabotaged, so none of them is
+  vacuous. The sweep half can't be driven against a fixture tree (it refuses
+  `CLEANUP_HOME` by design), so what is covered there is the line parsing that
+  decides which path `rm` receives, including a target containing ` -> `
+  ([#215](https://github.com/tgautier/dotfiles/issues/215)).
 - `just link` — re-applies the rcm symlinks on their own, so an edit to a
   symlinked dotfile (`gitconfig`, `zshrc`, `zshenv`, `tmux.conf`, …) can take
   effect without running the full `just setup` bootstrap. Previously the only
@@ -97,6 +132,21 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- The stale-symlink sweep is split in two: `_scan-stale-symlinks` finds and
+  prints stale links, `cleanup-symlinks` confirms and removes them. The scan
+  honours a `CLEANUP_HOME` override so fixtures can drive it against a temp
+  tree; `cleanup-symlinks` deliberately does **not**, so no environment setting
+  can redirect its `rm` at another tree. Its match is now a union — the
+  `dotfiles`/`dotfiles-private` path-segment match that catches links into a
+  *former* checkout path (rcm records absolute targets, so a moved checkout
+  leaves links naming the old location), plus prefixes derived from the
+  configured dirs, which catch a checkout whose basename isn't `dotfiles*` at
+  all. Neither subsumes the other, which is why
+  [#214](https://github.com/tgautier/dotfiles/pull/214) reverted after replacing
+  the first with the second. Paths are normalised with zsh's `:a` so a trailing
+  slash can't silently produce a prefix that matches nothing, and a failed scan
+  now aborts loudly instead of reporting a clean tree
+  ([#215](https://github.com/tgautier/dotfiles/issues/215)).
 - `.roborev.toml` now names `claude-code` directly instead of `copilot`. roborev
   could not invoke `copilot`, so every review silently fell through to
   `backup_agent` — 112 of 112 jobs on record ran `claude-code`. claude-code is the

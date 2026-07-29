@@ -23,6 +23,18 @@ grouped by **date** rather than by semantic version. Newest first.
   only after the first run. `README.md` and `CLAUDE.md` now point at `just link`
   rather than a bare `rcup`, and state that `just update` does not re-link
   ([#213](https://github.com/tgautier/dotfiles/issues/213)).
+- `just lint-just`, wired into `just ci` — asserts every in-body
+  `just <recipe>` call names a recipe that exists. Those calls are opaque shell
+  strings to `just`, so nothing caught a typo in one: `just --summary` and
+  `just --dry-run setup` both exit 0 on a misspelt call, and `just --fmt
+  --check` exits 1 on this file for formatting reasons alone. A typo would have
+  surfaced only mid-bootstrap on a fresh machine, after `brew bundle` had
+  already run. The recipe list comes from `just --dump` rather than
+  `--summary`, which omits the `_`-prefixed recipes — two of which are called
+  from bodies. The check fails loud when its own pattern matches nothing, so it
+  cannot silently rot into a no-op. `jq` is now installed explicitly in CI
+  rather than assumed present in the runner image
+  ([#213](https://github.com/tgautier/dotfiles/issues/213)).
 - `!.claude/worktrees/**` to the `markdownlint-cli2` globs, completing the
   worktree hygiene begun in [#212](https://github.com/tgautier/dotfiles/pull/212).
   The path was already gitignored, but `markdownlint-cli2` globs are not

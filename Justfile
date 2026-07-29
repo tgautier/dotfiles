@@ -3,7 +3,47 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise lint-via-private
+ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-via-private
+
+# Assert every in-body `just <recipe>` call names a recipe that exists here.
+# Those calls are opaque shell strings to just, so nothing else catches a typo:
+# `just --summary` and `just --dry-run setup` both exit 0 with a misspelt one,
+# and it would surface only mid-bootstrap on a fresh machine, after `brew
+# bundle` has already run. (`just --fmt --check` is no help either — it exits 1
+# on this file for formatting reasons alone.) The recipe list comes from
+# --dump rather than --summary because --summary omits `_`-prefixed recipes,
+# two of which are called from bodies. Calls carrying `-f` target another
+# justfile and are skipped by the pattern, which requires a recipe name
+# directly after `just`.
+[doc("Check that in-body `just <recipe>` calls name recipes that exist")]
+lint-just:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    known=" $(just --dump --dump-format json | jq -r '.recipes | keys[]' | tr '\n' ' ')"
+    # Recipe bodies only: indented, and not a comment line. Prose in comments
+    # ("so this works when just finds ~/.justfile") would otherwise match.
+    called=$(grep -E '^[[:space:]]' Justfile | grep -vE '^[[:space:]]*#' \
+                | grep -oE '(^|[^-[:alnum:]_])just +[a-z_][a-z0-9_-]*' \
+                | grep -oE '[a-z_][a-z0-9_-]*$' | sort -u)
+    # Fail loud if the pattern matches nothing: `setup` alone makes three such
+    # calls, so an empty result means the regex broke, not that the file is
+    # clean. Without this the lint would silently pass forever.
+    if [ -z "$called" ]; then
+        echo "lint-just: matched no \`just <recipe>\` calls — the pattern is broken" >&2
+        exit 1
+    fi
+    status=0
+    for name in $called; do
+        case "$known" in
+            *" $name "*) ;;
+            *) echo "lint-just: body calls \`just $name\`, which is not a recipe here" >&2
+               status=1 ;;
+        esac
+    done
+    if [ "$status" -eq 0 ]; then
+        echo "Justfile recipe calls OK ($(echo "$called" | wc -w | tr -d ' ') checked)"
+    fi
+    exit "$status"
 
 # Delegate to the private repo's justfile for checks that must not be defined
 # here (keyword lists etc.). Skips loudly when the private repo is absent —
@@ -86,8 +126,12 @@ setup: _ensure-profile
 # machine that has never been bootstrapped — `~/.rcrc` is itself one of the
 # symlinks rcm creates, so a bare `rcup` only finds the same config after the
 # first run. That makes this the authoritative invocation, and `setup` calls it
-# rather than repeating it. The [doc] attribute carries the summary because
-# `just --list` would otherwise show only the last line of this comment.
+# rather than repeating it. An absent private repo is skipped, not fatal.
+#
+# Must be run from this checkout: `~/.justfile` is a symlink to the PRIVATE
+# repo's justfile, so `just link` from $HOME resolves there and fails with an
+# unknown-recipe error. The [doc] attribute carries the summary because `just
+# --list` would otherwise show only the last line of this comment.
 [doc("Re-apply the rcm symlinks (run after editing a symlinked dotfile)")]
 link:
     RCRC="{{dotfiles_dir}}/rcrc" rcup

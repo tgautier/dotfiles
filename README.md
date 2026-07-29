@@ -182,16 +182,20 @@ After editing a dotfile that rcm links into `$HOME` (`gitconfig`, `zshrc`,
 `zshenv`, `tmux.conf`, …), re-link so the running machine picks the change up:
 
 ```sh
+cd ~/Workspace/tgautier/dotfiles
 just link
 ```
+
+The `cd` matters: `~/.justfile` is a symlink to the private repo's justfile, so
+`just link` from `$HOME` resolves there and fails with an unknown-recipe error.
 
 `just setup` also re-links, but it is the whole bootstrap — `just link` is the
 one step.
 
-Prefer it over a bare `rcup`. This repo keeps its `rcrc` in-tree rather than at
-`~/.rcrc`, and the recipe passes `RCRC=` explicitly, so it works on any machine.
-A bare `rcup` reads the same config only *after* the first bootstrap, because
-`~/.rcrc` is itself one of the symlinks rcm creates.
+Prefer it over a bare `rcup`. This repo's `rcrc` lives in-tree, and the recipe
+passes `RCRC=` explicitly, so it works on any machine — including one that has
+never been bootstrapped. A bare `rcup` reads the same config only *after* the
+first bootstrap, because `~/.rcrc` is itself one of the symlinks rcm creates.
 
 ## Documentation
 

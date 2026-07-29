@@ -1,8 +1,8 @@
 alias k=kubectl
 alias kctx=kubectx
-alias kfw=kubectl port-forward
+alias kfw='kubectl port-forward'
 alias kns=kubens
-alias kxec=kubectl exec -it
+alias kxec='kubectl exec -it'
 alias la='ls -lah'
 alias ll='ls -lh'
 

@@ -10,6 +10,32 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `README.md` reference tables for the executable and configuration surface,
+  which was previously discoverable only by `ls`: **Scripts (`bin/`)** (4),
+  **Shell functions (`zsh/functions/`)** (10), **Aliases (`zsh/zaliases`)**,
+  **Git hooks (`.githooks/`)** (3), **Configuration files**, and a **Shell load
+  order** block. Every row was enumerated from the tree at authoring time rather
+  than from memory — which caught two claims that would have shipped wrong: `bin/`
+  reaches `PATH` as `~/.bin` via `zshenv`, not `~/bin`, and the functions are
+  autoloaded because `zsh/zcompletion` prepends `~/.zsh/functions` to `fpath`.
+  Review of the tables then caught three more: `git_template/` is linked but
+  never wired to `init.templateDir`, `load_env_kops` exports AWS credentials
+  rather than merely checking a variable, and the load-order block omitted
+  `~/.zshrc.local` — the one hook a reader would use for machine-local config,
+  which matters more now that `CLAUDE.md` defers here instead of keeping its own
+  copy. `~/.zshrc.local`'s position is documented precisely: `zshrc` sources it
+  *near* the end, with zsh-syntax-highlighting and `mise activate zsh` after it,
+  so mise wins for any runtime it manages while a `PATH` entry for anything else
+  survives. Plus the two markdownlint configs, missing from a `Structure` block
+  whose commit message had claimed exhaustiveness; the block now states its own
+  exclusion rule so the two remaining omissions read as deliberate.
+  The `Structure` block is refreshed for everything it had drifted past —
+  `zlogin`, `.githooks/`, `.claude/`, `CLAUDE.md`, `Brewfile.work` /
+  `Brewfile.personal`, `CHANGELOG.md`, `.roborev.toml`, `gitignore`,
+  `git_template/`, `agignore`, `editorconfig`, `psqlrc` and `iterm2/`.
+  `CLAUDE.md`'s load-order line gains the missing `zlogin` step and now defers to
+  the README section instead of carrying a second partial copy
+  ([#219](https://github.com/tgautier/dotfiles/issues/219)).
 - `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR` are now honoured by every consumer,
   not just `lint-via-private`. `rcrc` reads them for both `DOTFILES_DIRS` and
   `EXCLUDES` (it is sourced as shell by rcm, which is exactly why it can), and
@@ -226,6 +252,16 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- **`kfw` and `kxec` were silently truncated to bare `kubectl`.** `zsh/zaliases`
+  defined them unquoted (`alias kfw=kubectl port-forward`), and zsh's `alias`
+  builtin treats each whitespace-separated token as its own `name[=value]`
+  argument — so it defined `kfw=kubectl` and then tried to *look up* aliases
+  named `port-forward`, `exec` and `-it`. `kfw` therefore ran bare `kubectl`
+  (printing help) instead of forwarding a port, and `kxec` likewise. Now quoted,
+  matching the already-quoted `ll` / `la` / `ls`. Found by writing the alias
+  reference table for [#219](https://github.com/tgautier/dotfiles/issues/219):
+  documenting the intended expansion is what exposed that zsh never produced it
+  ([#219](https://github.com/tgautier/dotfiles/issues/219)).
 - `docs/homebrew.md`'s cask-recovery runbook drops the bundle check instead of
   dressing it up. It asked the operator to confirm `/Applications/<App>.app` was
   "present and non-empty" while nothing branched on the answer — the prescribed

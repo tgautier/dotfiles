@@ -175,6 +175,28 @@ Or run individual update steps:
 | `just update-mise` | Show outdated mise tools and upgrade them         |
 | `just update-rust` | Update Rust toolchain                             |
 
+### Applying config changes
+
+`just update` upgrades installed software — it does **not** re-apply symlinks.
+After editing a dotfile that rcm links into `$HOME` (`gitconfig`, `zshrc`,
+`zshenv`, `tmux.conf`, …), re-link so the running machine picks the change up:
+
+```sh
+cd ~/Workspace/tgautier/dotfiles
+just link
+```
+
+The `cd` matters: `~/.justfile` is a symlink to the private repo's justfile, so
+`just link` from `$HOME` resolves there and fails with an unknown-recipe error.
+
+`just setup` also re-links, but it is the whole bootstrap — `just link` is the
+one step.
+
+Prefer it over a bare `rcup`. This repo's `rcrc` lives in-tree, and the recipe
+passes `RCRC=` explicitly, so it works on any machine — including one that has
+never been bootstrapped. A bare `rcup` reads the same config only *after* the
+first bootstrap, because `~/.rcrc` is itself one of the symlinks rcm creates.
+
 ## Documentation
 
 Detailed guides live in the `docs/` folder:
@@ -231,12 +253,14 @@ just ci
 
 Individual targets:
 
-| Target                 | Description                                          |
-| ---------------------- | ---------------------------------------------------- |
-| `just lint-shell`      | ShellCheck on `bin/*` and zsh files                  |
-| `just lint-markdown`   | markdownlint-cli2                                    |
-| `just lint-brewfile`   | Ruby syntax check on Brewfiles                       |
-| `just lint-mise`       | Validate mise config                                 |
+| Target                  | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| `just lint-shell`       | ShellCheck on `bin/*` and zsh files                  |
+| `just lint-markdown`    | markdownlint-cli2                                    |
+| `just lint-brewfile`    | Ruby syntax check on Brewfiles                       |
+| `just lint-mise`        | Validate mise config                                 |
+| `just lint-just`        | Check in-body `just <recipe>` calls resolve          |
+| `just lint-via-private` | Keyword guard, delegated to the private repo         |
 
 The pre-commit hook is enabled by the bootstrap (idempotent — safe to re-run):
 

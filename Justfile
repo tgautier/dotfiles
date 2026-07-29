@@ -3,7 +3,97 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise lint-via-private
+ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-via-private
+
+# Assert every in-body `just <recipe>` call names a recipe that exists here.
+# Those calls are opaque shell strings to just, so nothing else catches a typo:
+# `just --summary` and `just --dry-run setup` both exit 0 with a misspelt one,
+# and it would surface only mid-bootstrap on a fresh machine, after `brew
+# bundle` has already run. (`just --fmt --check` is no help either — it exits 1
+# on this file for formatting reasons alone.) The recipe list comes from
+# --dump rather than --summary because --summary omits `_`-prefixed recipes,
+# two of which are called from bodies. Calls carrying `-f` target another
+# justfile and are skipped by the pattern, which requires a recipe name
+# directly after `just`. Two negative fixtures run on every invocation, per the
+# guard-testing convention in .claude/rules/brewfile.md.
+[doc("Check that in-body `just <recipe>` calls name recipes that exist")]
+lint-just:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    known=" $(just --dump --dump-format json | jq -r '.recipes | keys[]' | tr '\n' ' ')"
+
+    # Recipe bodies only: indented, and not a comment line. Prose in comments
+    # ("so this works when just finds ~/.justfile") would otherwise match.
+    scan() {
+        grep -E '^[[:space:]]' "$1" | grep -vE '^[[:space:]]*#' \
+            | grep -oE '(^|[^-[:alnum:]_])just +[a-z_][a-z0-9_-]*' \
+            | grep -oE '[a-z_][a-z0-9_-]*$' | sort -u
+    }
+
+    # Factored out so the negative fixtures below exercise this exact logic
+    # rather than a copy of it.
+    check() {
+        local file=$1 called status=0 name
+        # `|| true` so a no-match pipeline yields an empty string instead of
+        # aborting under `pipefail`, in any caller's `-e` context.
+        called=$(scan "$file" || true)
+        # An empty result means the regex broke, not that the file is clean:
+        # `setup` alone makes three such calls. Without this the lint would
+        # silently pass forever.
+        if [ -z "$called" ]; then
+            echo "lint-just: no \`just <recipe>\` call matched in $file — the pattern is broken" >&2
+            return 1
+        fi
+        for name in $called; do
+            case "$known" in
+                *" $name "*) ;;
+                *) echo "lint-just: $file calls \`just $name\`, which is not a recipe here" >&2
+                   status=1 ;;
+            esac
+        done
+        if [ "$status" -eq 0 ]; then
+            echo "Justfile recipe calls OK ($(printf '%s\n' "$called" | wc -l | tr -d ' ') checked)"
+        fi
+        return "$status"
+    }
+
+    check Justfile || exit 1
+
+    # Negative fixtures, mirroring `lint-brewfile`: assert each guard fires on
+    # known-bad input AND that the failure came from that guard, not from any
+    # incidental error. A guard that never fires is worse than no guard.
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+
+    # The recipe names go through printf ARGUMENTS, never as literal text on
+    # these lines: this file is itself scanned, so an inline `just <name>` here
+    # would be picked up as a real call by the check under test.
+    printf 'real:\n    echo hi\n\ncaller:\n    just %s\n' nosuchrecipe > "$tmp/unknown"
+    if out=$(check "$tmp/unknown" 2>&1); then
+        echo "ERROR: lint-just did not fire on a call to a non-existent recipe" >&2
+        exit 1
+    fi
+    if ! grep -q 'is not a recipe here' <<<"$out"; then
+        echo "ERROR: unknown-recipe case did not come from the unknown-recipe guard:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "lint-just unknown-recipe detection OK"
+
+    # The comment is INDENTED so the emptiness comes from the comment filter
+    # rather than the indent filter — a column-0 comment would be dropped by the
+    # first filter and leave the comment-exclusion branch untested.
+    printf 'nothing:\n    # just %s in a comment must not match\n    echo hi\n' link > "$tmp/empty"
+    if out=$(check "$tmp/empty" 2>&1); then
+        echo "ERROR: lint-just did not fire when the pattern matched nothing" >&2
+        exit 1
+    fi
+    if ! grep -q 'the pattern is broken' <<<"$out"; then
+        echo "ERROR: empty-match case did not come from the empty-match guard:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "lint-just empty-match detection OK"
 
 # Delegate to the private repo's justfile for checks that must not be defined
 # here (keyword lists etc.). Skips loudly when the private repo is absent —
@@ -44,10 +134,11 @@ setup: _ensure-profile
     #    package upgrading cleanly.
     brew bundle install --no-upgrade --file="{{brewfile}}"
 
-    # 2. Symlink dotfiles. RCRC points rcm at the repo config so a fresh machine
-    #    (no ~/.rcrc yet) links every DOTFILES_DIRS entry; a missing private repo
-    #    is skipped, not fatal.
-    RCRC="{{dotfiles_dir}}/rcrc" rcup
+    # 2. Symlink dotfiles. Delegated to `link` so the RCRC-prefixed invocation
+    #    lives in exactly one place. Called here rather than declared as a
+    #    dependency because dependencies run before the recipe body, and rcm
+    #    itself comes from the `brew bundle` in step 1.
+    just link
 
     # 3. Language runtimes from the pinned mise config. Install mise first if the
     #    machine doesn't have it yet (matches the README curl bootstrap).
@@ -76,6 +167,24 @@ setup: _ensure-profile
 
     # 7. Linux/WSL: symlink libsqlite3 for Dart/Flutter FFI (no-op on macOS).
     {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
+
+# Run this after editing any dotfile rcm links into $HOME (gitconfig, zshrc,
+# zshenv, tmux.conf, …) — the edit lands in this repo, but the running machine
+# only picks it up once the links are re-applied. `just update` does NOT
+# re-link: it upgrades installed software, not local config. RCRC points rcm at
+# this repo's in-tree config, so every DOTFILES_DIRS entry is linked even on a
+# machine that has never been bootstrapped — `~/.rcrc` is itself one of the
+# symlinks rcm creates, so a bare `rcup` only finds the same config after the
+# first run. That makes this the authoritative invocation, and `setup` calls it
+# rather than repeating it. An absent private repo is skipped, not fatal.
+#
+# Must be run from this checkout: `~/.justfile` is a symlink to the PRIVATE
+# repo's justfile, so `just link` from $HOME resolves there and fails with an
+# unknown-recipe error. The [doc] attribute carries the summary because `just
+# --list` would otherwise show only the last line of this comment.
+[doc("Re-apply the rcm symlinks (run after editing a symlinked dotfile)")]
+link:
+    RCRC="{{dotfiles_dir}}/rcrc" rcup
 
 # Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for
 # Dart/Flutter (Drift) FFI, which dlopen()s the unversioned 'libsqlite3.so' the

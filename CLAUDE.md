@@ -19,8 +19,12 @@ Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** 
 ## Key Commands
 
 ```sh
-# Link/update dotfiles after changes (uses DOTFILES_DIRS from rcrc)
-rcup
+# Re-apply the rcm symlinks (uses DOTFILES_DIRS from rcrc). Required for an
+# edit to a symlinked dotfile — gitconfig, zshrc, zshenv, tmux.conf — to take
+# effect on this machine. `just update` does NOT re-link. Prefer this over a
+# bare `rcup`, which finds the same config only once ~/.rcrc is itself linked.
+# Run it from this checkout — ~/.justfile points at the private repo's justfile
+just link
 
 # Install packages (auto-selects the platform Brewfile and, on macOS, the
 # work/personal overlay). Never run raw `brew install` / `brew bundle` —
@@ -75,9 +79,12 @@ Shell startup is optimized with caching (kubectl context, environment vars). Avo
 
 The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
-- `just ci` — runs all checks (shell, markdown, Brewfile, mise)
-- `just lint-shell` — shellcheck on `bin/*` and zsh files
+- `just ci` — runs every lint (the individual targets are listed in
+  `README.md`'s CI / Linting table)
 - `just setup` — full machine bootstrap (profile, packages, symlinks, runtimes, hooks, tools)
+
+Duplicating that target list here has drifted from the table before — keep the
+single enumeration in `README.md`.
 
 ### tmux
 

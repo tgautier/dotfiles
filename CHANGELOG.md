@@ -10,6 +10,35 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `just link` — re-applies the rcm symlinks on their own, so an edit to a
+  symlinked dotfile (`gitconfig`, `zshrc`, `zshenv`, `tmux.conf`, …) can take
+  effect without running the full `just setup` bootstrap. Previously the only
+  `rcup` invocation lived inline in `setup`, and the recipe reached for far more
+  often — `just update` — does not re-link at all, so the natural "apply my
+  changes" command was the wrong one. `setup` now calls `just link` instead of
+  repeating the command, so the `RCRC=`-prefixed form exists in exactly one
+  place. That form points rcm at the in-tree `rcrc` explicitly, which is what
+  makes it work on a machine that has never been bootstrapped — `~/.rcrc` is
+  itself one of the symlinks rcm creates, so a bare `rcup` finds the same config
+  only after the first run. `README.md` and `CLAUDE.md` now point at `just link`
+  rather than a bare `rcup`, and state that `just update` does not re-link
+  ([#213](https://github.com/tgautier/dotfiles/issues/213)).
+- `just lint-just`, wired into `just ci` — asserts every in-body
+  `just <recipe>` call names a recipe that exists. Those calls are opaque shell
+  strings to `just`, so nothing caught a typo in one: `just --summary` and
+  `just --dry-run setup` both exit 0 on a misspelt call, and `just --fmt
+  --check` exits 1 on this file for formatting reasons alone. A typo would have
+  surfaced only mid-bootstrap on a fresh machine, after `brew bundle` had
+  already run. The recipe list comes from `just --dump` rather than
+  `--summary`, which omits the `_`-prefixed recipes — two of which are called
+  from bodies. Two negative fixtures run on every invocation (a call to a
+  non-existent recipe, and a scan that matches nothing), each asserting the
+  failure came from its own guard rather than from any incidental error — the
+  convention `.claude/rules/brewfile.md` sets for guard logic. `jq` is now
+  installed explicitly in CI rather than assumed present in the runner image.
+  The README lint table also gains the `lint-via-private` row it was missing
+  ([#213](https://github.com/tgautier/dotfiles/issues/213),
+  partially [#219](https://github.com/tgautier/dotfiles/issues/219)).
 - `!.claude/worktrees/**` to the `markdownlint-cli2` globs, completing the
   worktree hygiene begun in [#212](https://github.com/tgautier/dotfiles/pull/212).
   The path was already gitignored, but `markdownlint-cli2` globs are not

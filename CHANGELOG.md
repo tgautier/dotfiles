@@ -146,20 +146,19 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
-- `docs/homebrew.md`'s cask-recovery runbook: the bundle check now feeds a
-  decision and carries a command. It previously asked the operator to confirm
-  `/Applications/<App>.app` was "present and non-empty" with nothing branching on
-  the answer — the prescribed action was `brew reinstall --cask` either way — and
-  it sat *after* the reinstall was prescribed, so a literal reading had you
-  inspecting a bundle the forced uninstall had already replaced. The check moves
-  into the do-not-clear-the-staging-directory paragraph, where its answer does
-  matter: it tells you whether the Caskroom leftover is your only copy, which is
-  why deleting it by hand can lose the app. It also gains the copy-pasteable
-  `ls -A "/Applications/<App>.app"`, with all three outcomes spelled out —
-  verified against a healthy bundle (prints `Contents`), an empty one (no
-  output), and a missing one (`No such file or directory`). Separately, the same
-  paragraph restated the wedge-persistence fact already given six paragraphs
-  earlier; that duplicate is removed and the claim now appears once
+- `docs/homebrew.md`'s cask-recovery runbook drops the bundle check instead of
+  dressing it up. It asked the operator to confirm `/Applications/<App>.app` was
+  "present and non-empty" while nothing branched on the answer — the prescribed
+  action was `brew reinstall --cask` either way — and it sat *after* the
+  reinstall was prescribed, so read literally it had you inspecting a bundle the
+  forced uninstall had already replaced. Adding a command and an outcome table
+  was tried first and rejected on review: every outcome still led to the same
+  step, so the check remained decorative. What survives is the one load-bearing
+  fact, stated where it matters — the interrupted upgrade may already have
+  stripped the live app, so the Caskroom leftover can be the only copy, which is
+  why deleting it by hand can lose the app. Separately, the same paragraph
+  restated the wedge-persistence fact already given six paragraphs earlier under
+  **Cause**; that duplicate is removed and the claim now appears once
   ([#210](https://github.com/tgautier/dotfiles/issues/210)).
 - The `gh` credential helper in `gitconfig` no longer hardcodes an absolute path.
   Both `[credential]` blocks read `!/usr/bin/gh auth git-credential`, which is

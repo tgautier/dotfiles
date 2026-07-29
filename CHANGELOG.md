@@ -77,6 +77,7 @@ grouped by **date** rather than by semantic version. Newest first.
   and `copilot-cli` casks stay in the Brewfile for interactive use and are
   deliberately not review agents.
 - Bump mise Flutter (`vfox-flutter`) 3.44.7 → 3.44.8.
+- Bump mise `yarn` 4.17.1 → 4.18.0.
 - Tap trust is now declared in the Brewfiles: `trusted: true` on
   `kenn-io/tap/roborev` and `terror/tap/just-lsp` (formula-level trust, as
   Homebrew recommends), in both `Brewfile` and `Brewfile.linux`. This replaces

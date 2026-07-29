@@ -86,12 +86,12 @@ default rather than a fallback:
   earlier bad move. Inspecting which one you have is exactly the step this
   avoids.
 
-**Do not clear the staging directory by hand first.** If `/Applications/<App>.app`
-is missing — or present but *empty*, which Homebrew can leave behind when an
-upgrade strips a bundle's contents without removing its directory — then the
-Caskroom copy is the only copy of the app you have. Reinstall covers that case
-by construction: it fetches before it uninstalls, so nothing is removed until
-the replacement is already on disk.
+**Do not clear the staging directory by hand.** The interrupted upgrade may
+already have stripped the live app — either removing `/Applications/<App>.app`
+outright, or leaving the directory in place with its contents gone — so the
+Caskroom leftover can be the only copy you have, and deleting it can lose the
+app. Reinstall does not need the staging directory cleared — its uninstall is
+forced, per the first property above.
 
 **Reinstall lands the current version, and does not preserve the old one.** A
 cask tap generally serves only the current version, so once the forced
@@ -101,11 +101,6 @@ what you want.
 
 Needing a *different* version is a separate task: pinning or downgrading a cask
 has its own constraints and is out of scope here.
-
-The reinstall is not what puts your install at risk, though: the interrupted
-upgrade may have stripped `/Applications/<App>.app` already, so confirm it is
-present and non-empty before treating it as a version you still have. Until the
-wedge is cleared, every `just update` keeps failing on this cask.
 
 Do not improvise a rollback by copying the Caskroom leftover aside. It is one
 of the three shapes above, only one of which is a working app, so the copy may

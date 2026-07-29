@@ -5,24 +5,44 @@ zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,
 # Run all CI checks
 ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks lint-via-private
 
-# Assert `rcrc` resolves DOTFILES_DIRS the way README documents. This is the one
-# half of the override contract that reaches the operator's real $HOME through
-# rcm — a stray trailing slash becomes a doubled separator and rcm derives a
-# wrongly-named link from it — so the documented cases are pinned rather than
-# asserted. Sourcing rcrc is side-effect-free: it only assigns, and its one
-# external touch is a `2>/dev/null`-guarded grep.
-[doc("Check rcrc resolves DOTFILES_DIRS and normalises the override paths")]
+# Assert `rcrc` resolves the way README documents, on both halves of the
+# override contract: DOTFILES_DIRS, which reaches the operator's real $HOME
+# through rcm (a stray trailing slash becomes a doubled separator and rcm derives
+# a wrongly-named link from it), and EXCLUDES, whose private sourcing fails
+# silently behind a `2>/dev/null` when PRIVATE_DIR drifts. Both are pinned rather
+# than asserted. Sourcing rcrc is side-effect-free: it only assigns, and its one
+# external touch is that guarded grep.
+[doc("Check rcrc resolves DOTFILES_DIRS + EXCLUDES and normalises the paths")]
 lint-rcrc:
     #!/usr/bin/env bash
     set -euo pipefail
-    resolve() {
+    # One place that sources rcrc under a clean environment. `var` picks which
+    # resolved variable to read, so the DOTFILES_DIRS and EXCLUDES cases share
+    # this rather than each hand-rolling its own `env -u … sh -c`.
+    read_var() {
+        local var=$1; shift
         env -u DOTFILES_DIR -u DOTFILES_PRIVATE_DIR ${1:+"$@"} \
-            sh -c '. ./rcrc; printf "%s" "$DOTFILES_DIRS"'
+            sh -c '. ./rcrc; eval printf "%s" "\"\$$0\""' "$var"
     }
+    resolve() { read_var DOTFILES_DIRS ${1:+"$@"}; }
     expect() {
         local label=$1 want=$2 got=$3
         if [[ "$got" != "$want" ]]; then
             echo "ERROR [$label]: want [$want] got [$got]" >&2
+            exit 1
+        fi
+    }
+    expect_has() {
+        local label=$1 needle=$2 got=$3
+        if [[ "$got" != *"$needle"* ]]; then
+            echo "ERROR [$label]: expected to contain [$needle], got [$got]" >&2
+            exit 1
+        fi
+    }
+    expect_lacks() {
+        local label=$1 needle=$2 got=$3
+        if [[ "$got" == *"$needle"* ]]; then
+            echo "ERROR [$label]: expected NOT to contain [$needle], got [$got]" >&2
             exit 1
         fi
     }
@@ -55,26 +75,19 @@ lint-rcrc:
     # comment/blank-line filter together.
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
-    printf '# a comment line\n\nsentinel-pattern\n' > "$tmp/rcm-excludes"
-    excludes=$(env -u DOTFILES_DIR DOTFILES_PRIVATE_DIR="$tmp" \
-                   sh -c '. ./rcrc; printf "%s" "$EXCLUDES"')
-    if [[ "$excludes" != *sentinel-pattern* ]]; then
-        echo "ERROR: EXCLUDES did not pick up the private rcm-excludes file" >&2
-        echo "       got [$excludes]" >&2
-        exit 1
-    fi
-    if [[ "$excludes" == *comment* ]]; then
-        echo "ERROR: EXCLUDES kept a comment line from rcm-excludes" >&2
-        echo "       got [$excludes]" >&2
-        exit 1
-    fi
+    # Two patterns, so the `tr '\n' ' '` join is exercised (with one, an
+    # unjoined embedded newline would still substring-match). An INDENTED comment
+    # alongside the column-0 one, so the filter's `[[:space:]]*` tolerance is
+    # exercised too — without it an indented comment leaks in as two bogus
+    # exclude patterns.
+    printf '# a comment line\n\t  # indented comment\n\nsentinel-pattern\nsecond-pattern\n' \
+        > "$tmp/rcm-excludes"
+    excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp")
+    expect_has   "EXCLUDES sources the private file" "sentinel-pattern second-pattern" "$excludes"
+    expect_lacks "EXCLUDES drops comment lines"      "comment"                         "$excludes"
     # An absent private repo must leave the base excludes intact, not blank.
-    excludes=$(env -u DOTFILES_DIR DOTFILES_PRIVATE_DIR="$tmp/nope" \
-                   sh -c '. ./rcrc; printf "%s" "$EXCLUDES"')
-    if [[ "$excludes" != *CHANGELOG.md* ]]; then
-        echo "ERROR: an absent private repo emptied the base EXCLUDES: [$excludes]" >&2
-        exit 1
-    fi
+    excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp/nope")
+    expect_has   "absent private repo keeps base EXCLUDES" "CHANGELOG.md" "$excludes"
 
     # The strip helper and its temp var must not leak into the sourcing shell.
     leaked=$(sh -c '. ./rcrc; printf "%s" "${_v-unset}"')
@@ -350,6 +363,7 @@ _ensure-profile:
 # (appears unused) is excluded for that file ONLY: setting variables for rcm to
 # read IS its purpose, so every assignment is consumed externally. Scoped to the
 # file rather than added to the shared zsh_excludes list.
+[doc("Lint shell scripts with ShellCheck")]
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
     shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
@@ -707,6 +721,7 @@ lint-cleanup-symlinks:
 #      pointed at e.g. ~/dev/dots-private).
 #
 # #214 replaced (1) with (2) and lost the moved-checkout case; this keeps both.
+[doc("Print stale $HOME symlinks pointing into a dotfiles checkout (no removal)")]
 _scan-stale-symlinks:
     #!/usr/bin/env zsh
     set -u

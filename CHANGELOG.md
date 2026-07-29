@@ -18,12 +18,18 @@ grouped by **date** rather than by semantic version. Newest first.
   who set the override pointed that guard at a private repo `rcup` never merged.
   Documented in `README.md` → Custom checkout locations
   ([#215](https://github.com/tgautier/dotfiles/issues/215)).
-- `just lint-rcrc`, wired into `just ci` — pins how `rcrc` resolves
-  `DOTFILES_DIRS`: defaults with no override, each override alone and both
-  together, one *and* several trailing slashes stripped, a root value surviving
-  as `/` rather than collapsing to an empty entry (which would make the derived
-  prefix match anything), and no helper or temp var leaking into the sourcing
-  shell. `rcrc` is also now shellchecked (`--shell=sh`, since rcm sources it as
+- `just lint-rcrc`, wired into `just ci` — pins both halves of the override
+  contract. For `DOTFILES_DIRS`: defaults with no override, each override alone
+  and both together, one *and* several trailing slashes stripped, a root value
+  surviving as `/` rather than collapsing to an empty entry (which would make the
+  derived prefix match anything), and no helper or temp var leaking into the
+  sourcing shell. For `EXCLUDES`: the private `rcm-excludes` file is actually
+  sourced from the configured path, comment and blank lines are filtered out
+  (including *indented* comments, so the filter's whitespace tolerance is
+  exercised), multiple patterns are joined onto one line, and an absent private
+  repo leaves the base excludes intact rather than blank. `EXCLUDES` is the half
+  that fails silently — its sourcing hides behind a `2>/dev/null`, so a drifted
+  path yields a well-formed `DOTFILES_DIRS` and no private patterns at all. `rcrc` is also now shellchecked (`--shell=sh`, since rcm sources it as
   POSIX shell), which it never was — `lint-shell` covered `bin/*` and the zsh
   files only. `SC2034` is excluded for that file alone, because setting
   variables for rcm to read is precisely its purpose

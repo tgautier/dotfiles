@@ -250,7 +250,7 @@ Brewfile.personal       # macOS personal-only casks/apps
 Brewfile.linux          # Linux Homebrew packages
 Justfile                # Bootstrap, CI and update recipes
 .githooks/              # pre-commit, post-commit, post-rewrite (enabled by just setup)
-CLAUDE.md               # Repo guidance for Claude Code, incl. the concern map
+CLAUDE.md               # Repo guidance for Claude Code (see Project-Local Rules)
 .claude/                # Repo-local Claude Code rules
 .roborev.toml           # Review-tool scope context
 .markdownlint.yml       # markdownlint rules (used by just lint-markdown)
@@ -343,15 +343,17 @@ zshrc           # interactive — prompt, keybindings, history, mise; sources
                 #   zsh/zaliases and zsh/zcompletion
 ~/.zshrc.local  # sourced near the end of zshrc, if present — machine-local
                 #   overrides, kept in dotfiles-private rather than here
-                #   NB: zsh-syntax-highlighting and `mise activate` run AFTER it
+                #   NB: zsh-syntax-highlighting and `mise activate` run AFTER it,
+                #   so mise's runtimes win for the tools it manages
 zlogin          # login, after zshrc — precompiles ~/.zcompdump in the background
 ```
 
 `~/.zshrc.local` is the hook for anything machine-specific or private: `zshrc`
 sources it when readable, and this repo never tracks it. It is *not* the last
-thing to run — zsh-syntax-highlighting and `mise activate zsh` follow it, and
-mise prepends its shim directory to `PATH`, so a `PATH` override placed there is
-overridden by mise rather than winning.
+thing to run — zsh-syntax-highlighting and `mise activate zsh` follow it. `mise
+activate` prepends the bin directories of the runtimes it manages, so for a tool
+listed in `config/mise/config.toml` mise's version wins over a `PATH` entry added
+there; entries for anything mise doesn't manage survive and still take effect.
 
 `zlogin` runs last and is a pure optimisation: it compiles the completion dump
 so the *next* login sources the compiled form. Guard platform-specific code with

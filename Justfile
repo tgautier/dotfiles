@@ -34,10 +34,12 @@ lint-just:
     # rather than a copy of it.
     check() {
         local file=$1 called status=0 name
-        # `if !` is load-bearing: a plain `called=$(scan …)` assignment would
-        # take the pipeline's exit status under `pipefail`, and `set -e` would
-        # kill the recipe here — making the empty-match guard below unreachable
-        # and its diagnostic unprintable.
+        # Keeps the guard below reachable if `check` is ever called outside a
+        # condition context. Today's call sites (`check … || exit 1`, and the
+        # fixtures' `if check …`) already suppress `-e` for this whole body, so
+        # a plain assignment would fall through on its own — but a refactor to a
+        # bare `check Justfile` would restore `-e` here, and the no-match
+        # pipeline under `pipefail` would abort before the guard could report.
         if ! called=$(scan "$file"); then called=""; fi
         # An empty result means the regex broke, not that the file is clean:
         # `setup` alone makes three such calls. Without this the lint would
@@ -82,7 +84,10 @@ lint-just:
     fi
     echo "lint-just unknown-recipe detection OK"
 
-    printf '# just %s in a comment must not match\nnothing:\n    echo hi\n' link > "$tmp/empty"
+    # The comment is INDENTED so the emptiness comes from the comment filter
+    # rather than the indent filter — a column-0 comment would be dropped by the
+    # first filter and leave the comment-exclusion branch untested.
+    printf 'nothing:\n    # just %s in a comment must not match\n    echo hi\n' link > "$tmp/empty"
     if out=$(check "$tmp/empty" 2>&1); then
         echo "ERROR: lint-just did not fire when the pattern matched nothing" >&2
         exit 1

@@ -82,10 +82,12 @@ setup: _ensure-profile
 # zshenv, tmux.conf, …) — the edit lands in this repo, but the running machine
 # only picks it up once the links are re-applied. `just update` does NOT
 # re-link: it upgrades installed software, not local config. RCRC points rcm at
-# this repo's in-tree config rather than ~/.rcrc, so every DOTFILES_DIRS entry
-# is linked; this is the authoritative invocation, and `setup` calls it rather
-# than repeating it. The [doc] attribute carries the summary because `just
-# --list` would otherwise show only the last line of this comment.
+# this repo's in-tree config, so every DOTFILES_DIRS entry is linked even on a
+# machine that has never been bootstrapped — `~/.rcrc` is itself one of the
+# symlinks rcm creates, so a bare `rcup` only finds the same config after the
+# first run. That makes this the authoritative invocation, and `setup` calls it
+# rather than repeating it. The [doc] attribute carries the summary because
+# `just --list` would otherwise show only the last line of this comment.
 [doc("Re-apply the rcm symlinks (run after editing a symlinked dotfile)")]
 link:
     RCRC="{{dotfiles_dir}}/rcrc" rcup

@@ -21,8 +21,8 @@ Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** 
 ```sh
 # Re-apply the rcm symlinks (uses DOTFILES_DIRS from rcrc). Required for an
 # edit to a symlinked dotfile — gitconfig, zshrc, zshenv, tmux.conf — to take
-# effect on this machine. `just update` does NOT re-link. Never run bare `rcup`:
-# this repo keeps its rcrc in-tree, and the recipe carries the required RCRC=
+# effect on this machine. `just update` does NOT re-link. Prefer this over a
+# bare `rcup`, which finds the same config only once ~/.rcrc is itself linked
 just link
 
 # Install packages (auto-selects the platform Brewfile and, on macOS, the

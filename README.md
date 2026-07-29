@@ -186,8 +186,12 @@ just link
 ```
 
 `just setup` also re-links, but it is the whole bootstrap — `just link` is the
-one step. Run neither as a bare `rcup`: this repo keeps its `rcrc` in-tree, and
-the recipe carries the `RCRC=` that points rcm at it.
+one step.
+
+Prefer it over a bare `rcup`. This repo keeps its `rcrc` in-tree rather than at
+`~/.rcrc`, and the recipe passes `RCRC=` explicitly, so it works on any machine.
+A bare `rcup` reads the same config only *after* the first bootstrap, because
+`~/.rcrc` is itself one of the symlinks rcm creates.
 
 ## Documentation
 

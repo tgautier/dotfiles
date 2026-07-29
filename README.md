@@ -252,10 +252,15 @@ Justfile                # Bootstrap, CI and update recipes
 .githooks/              # pre-commit, post-commit, post-rewrite (enabled by just setup)
 .claude/                # Repo-local Claude Code rules (see CLAUDE.md)
 .roborev.toml           # Review-tool scope context
+.markdownlint.yml       # markdownlint rules (used by just lint-markdown)
+.markdownlint-cli2.yaml # markdownlint file globs
 docs/                   # Detailed guides and cheat sheets
 CHANGELOG.md            # Date-based rolling changelog
 .github/workflows/ci.yml
 ```
+
+Every tracked top-level entry appears above except `README.md` and `.gitignore`,
+which are self-describing.
 
 ## Scripts (`bin/`)
 
@@ -274,18 +279,18 @@ rcm links each script into `~/.bin`, which `zshenv` adds to `PATH` (alongside
 `zsh/zcompletion` prepends `~/.zsh/functions` to `fpath` and autoloads each
 file, so every one is available as a command.
 
-| Function            | Description                                                       |
-| ------------------- | ----------------------------------------------------------------- |
-| `api_key`           | Random hex key via `openssl rand`, default 16 bytes               |
-| `b64_decode`        | Base64-decode arguments (GNU and BSD compatible)                  |
-| `b64_encode`        | Base64-encode arguments                                           |
-| `cdroot`            | `cd` to the repository root (`git root`)                          |
-| `current_tt`        | Set the terminal title to the current directory's name            |
-| `load_env_kops`     | Verify `KOPS_STATE_STORE` is set before using kops                |
-| `load_env_kubectl`  | Source `kubectl` and `helm` completions on demand                 |
-| `plantuml`          | Render a PlantUML source file to PNG                              |
-| `tt`                | Set the terminal title to an arbitrary string                     |
-| `uuid`              | Lowercase UUID via `uuidgen`, with a fallback                     |
+| Function            | Description                                                          |
+| ------------------- | -------------------------------------------------------------------- |
+| `api_key`           | Random hex key via `openssl rand`, default 16 bytes                  |
+| `b64_decode`        | Base64-decode arguments (GNU and BSD compatible)                     |
+| `b64_encode`        | Base64-encode arguments                                              |
+| `cdroot`            | `cd` to the repository root (`git root`)                             |
+| `current_tt`        | Set the terminal title to the current directory's name               |
+| `load_env_kops`     | Guard `KOPS_STATE_STORE`, then export AWS creds from `aws configure` |
+| `load_env_kubectl`  | Source `kubectl` and `helm` completions on demand                    |
+| `plantuml`          | Render a PlantUML source file to PNG                                 |
+| `tt`                | Set the terminal title to an arbitrary string                        |
+| `uuid`              | Lowercase UUID via `uuidgen`, with a fallback                        |
 
 ## Aliases (`zsh/zaliases`)
 
@@ -318,7 +323,7 @@ per-clone installation.
 | ------------------------- | ---------- | ----------------------------------------------------------------- |
 | `gitconfig`               | Git        | SSH signing via 1Password, `pull.ff=only`, `gh` credential helper |
 | `gitignore`               | Git        | Global ignores — OS, editor and build noise                       |
-| `git_template/`           | Git        | Template dir applied to `git init`                                |
+| `git_template/`           | Git        | Init template dir — linked, but not wired to `init.templateDir`   |
 | `tmux.conf`               | tmux       | `C-a` prefix, vi copy mode, platform-aware clipboard              |
 | `editorconfig`            | Editors    | UTF-8, LF, 2-space indent; tabs for `Makefile`                    |
 | `psqlrc`                  | psql       | Unicode borders, timing, `¤` for null, coloured prompt            |
@@ -331,12 +336,17 @@ per-clone installation.
 ## Shell load order
 
 ```text
-zshenv     # always — $PLATFORM, env vars, PATH, SSH agent
-zprofile   # login — Homebrew init, completion cache, ~/.local/bin, cargo
-zshrc      # interactive — prompt, keybindings, history, mise; sources
-           #   zsh/zaliases and zsh/zcompletion
-zlogin     # login, after zshrc — precompiles ~/.zcompdump in the background
+zshenv          # always — $PLATFORM, env vars, PATH, SSH agent
+zprofile        # login — Homebrew init, completion cache, ~/.local/bin, cargo
+zshrc           # interactive — prompt, keybindings, history, mise; sources
+                #   zsh/zaliases and zsh/zcompletion
+~/.zshrc.local  # sourced last by zshrc, if present — machine-local overrides,
+                #   kept in dotfiles-private rather than here
+zlogin          # login, after zshrc — precompiles ~/.zcompdump in the background
 ```
+
+`~/.zshrc.local` is the hook for anything machine-specific or private: it is
+sourced at the end of `zshrc` when readable, and this repo never tracks it.
 
 `zlogin` runs last and is a pure optimisation: it compiles the completion dump
 so the *next* login sources the compiled form. Guard platform-specific code with

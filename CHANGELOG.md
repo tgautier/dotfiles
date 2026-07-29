@@ -23,18 +23,18 @@ grouped by **date** rather than by semantic version. Newest first.
   rather than merely checking a variable, and the load-order block omitted
   `~/.zshrc.local` — the one hook a reader would use for machine-local config,
   which matters more now that `CLAUDE.md` defers here instead of keeping its own
-  copy. Its position is documented precisely: `zshrc` sources it *near* the end,
-  with zsh-syntax-highlighting and `mise activate zsh` after it, so mise's
-  runtimes win for the tools listed in `config/mise/config.toml` while a `PATH`
-  entry for anything else survives. Plus the two markdownlint configs, missing from a `Structure` block whose
-  commit message had claimed exhaustiveness; the block now states its own
+  copy. `~/.zshrc.local`'s position is documented precisely: `zshrc` sources it
+  *near* the end, with zsh-syntax-highlighting and `mise activate zsh` after it,
+  so mise wins for any runtime it manages while a `PATH` entry for anything else
+  survives. Plus the two markdownlint configs, missing from a `Structure` block
+  whose commit message had claimed exhaustiveness; the block now states its own
   exclusion rule so the two remaining omissions read as deliberate.
   The `Structure` block is refreshed for everything it had drifted past —
   `zlogin`, `.githooks/`, `.claude/`, `CLAUDE.md`, `Brewfile.work` /
   `Brewfile.personal`, `CHANGELOG.md`, `.roborev.toml`, `gitignore`,
-  `git_template/`, `agignore`, `editorconfig`, `psqlrc` and `iterm2/`. `CLAUDE.md`'s load-order line gains the
-  missing `zlogin` step and now defers to the README section instead of carrying
-  a second partial copy
+  `git_template/`, `agignore`, `editorconfig`, `psqlrc` and `iterm2/`.
+  `CLAUDE.md`'s load-order line gains the missing `zlogin` step and now defers to
+  the README section instead of carrying a second partial copy
   ([#219](https://github.com/tgautier/dotfiles/issues/219)).
 - `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR` are now honoured by every consumer,
   not just `lint-via-private`. `rcrc` reads them for both `DOTFILES_DIRS` and

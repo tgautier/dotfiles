@@ -351,9 +351,11 @@ zlogin          # login, after zshrc — precompiles ~/.zcompdump in the backgro
 `~/.zshrc.local` is the hook for anything machine-specific or private: `zshrc`
 sources it when readable, and this repo never tracks it. It is *not* the last
 thing to run — zsh-syntax-highlighting and `mise activate zsh` follow it. `mise
-activate` prepends the bin directories of the runtimes it manages, so for a tool
-listed in `config/mise/config.toml` mise's version wins over a `PATH` entry added
-there; entries for anything mise doesn't manage survive and still take effect.
+activate` prepends the bin directories of the runtimes it manages, so for any
+runtime mise manages — `config/mise/config.toml` plus any trusted project-level
+`mise.toml` under `trusted_config_paths` — mise's version wins over a `PATH`
+entry added there. Entries for anything mise doesn't manage survive and still
+take effect.
 
 `zlogin` runs last and is a pure optimisation: it compiles the completion dump
 so the *next* login sources the compiled form. Guard platform-specific code with

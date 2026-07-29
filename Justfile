@@ -34,16 +34,9 @@ lint-just:
     # rather than a copy of it.
     check() {
         local file=$1 called status=0 name
-        # Keeps the guard below reachable if `check` is ever called outside a
-        # condition context. Today's call sites — `check … || exit 1` and the
-        # fixtures' `if out=$(check … 2>&1)` — already suppress `-e` for this
-        # whole body: bash carries the ignore-return state into command
-        # substitutions (its own `comsub_ignore_return`), so the fixtures' form
-        # suppresses it too. A plain assignment would therefore fall through to
-        # the guard on its own at both of today's call sites. But a refactor to
-        # a bare `check Justfile` would restore `-e` here, and the no-match
-        # pipeline under `pipefail` would abort before the guard could report.
-        if ! called=$(scan "$file"); then called=""; fi
+        # `|| true` so a no-match pipeline yields an empty string instead of
+        # aborting under `pipefail`, in any caller's `-e` context.
+        called=$(scan "$file" || true)
         # An empty result means the regex broke, not that the file is clean:
         # `setup` alone makes three such calls. Without this the lint would
         # silently pass forever.

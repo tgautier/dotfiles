@@ -79,13 +79,12 @@ Shell startup is optimized with caching (kubectl context, environment vars). Avo
 
 The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
-- `just ci` — runs all checks (shell, markdown, Brewfile, mise, Justfile, plus
-  the keyword guard delegated to the private repo)
+- `just ci` — runs every lint (the individual targets are listed in
+  `README.md`'s CI / Linting table)
 - `just setup` — full machine bootstrap (profile, packages, symlinks, runtimes, hooks, tools)
 
-The individual lint targets are enumerated once, in `README.md`'s CI / Linting
-table — don't duplicate that list here. Two copies of it drifted apart three
-times while this file was being written.
+Duplicating that target list here has drifted from the table before — keep the
+single enumeration in `README.md`.
 
 ### tmux
 

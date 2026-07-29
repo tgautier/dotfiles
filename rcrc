@@ -1,7 +1,18 @@
-# Private repo path, used by both EXCLUDES and DOTFILES_DIRS below. Single
-# source of truth: if it drifts, the exclude-sourcing would silently no-op
+# Repo paths, used by EXCLUDES and DOTFILES_DIRS below. Single source of truth
+# for the private path: if it drifts, the exclude-sourcing would silently no-op
 # (2>/dev/null) and rcup would resume hanging on the excluded directory.
-PRIVATE_DIR="${HOME}/Workspace/tgautier/dotfiles-private"
+#
+# DOTFILES_DIR / DOTFILES_PRIVATE_DIR override the defaults per machine. rcm
+# sources this file as shell, which is exactly why it can read them — the same
+# two variables are the contract shared with the Justfile's `private_dir` and
+# `_scan-stale-symlinks`, so overriding one here moves all three together.
+#
+# The two DEFAULTS below are duplicated in the Justfile (`public_dir`,
+# `private_dir`) on purpose: this file is shell evaluated by rcm, those are just
+# variables evaluated at justfile load, and neither can read the other's without
+# a fragile bridge. Change one, change both.
+PUBLIC_DIR="${DOTFILES_DIR:-${HOME}/Workspace/tgautier/dotfiles}"
+PRIVATE_DIR="${DOTFILES_PRIVATE_DIR:-${HOME}/Workspace/tgautier/dotfiles-private}"
 
 # Base excludes plus any private-only exclude patterns appended from
 # ${PRIVATE_DIR}/rcm-excludes. Sourced here (rcm reads rcrc as shell) so
@@ -14,5 +25,5 @@ PRIVATE_DIR="${HOME}/Workspace/tgautier/dotfiles-private"
 # HOMEBREW_BUNDLE_FILE=~/.Brewfile[.linux], so excluding them breaks bare
 # `brew bundle`.
 EXCLUDES="README.md .githooks Justfile CHANGELOG.md rcm-excludes $( { grep -hvE '^[[:space:]]*(#|$)' "${PRIVATE_DIR}/rcm-excludes" 2>/dev/null || true; } | tr '\n' ' ')"
-DOTFILES_DIRS="${HOME}/Workspace/tgautier/dotfiles ${PRIVATE_DIR}"
+DOTFILES_DIRS="${PUBLIC_DIR} ${PRIVATE_DIR}"
 SYMLINK_DIRS="claude/skills claude/rules claude/hooks"

@@ -39,9 +39,9 @@ HARD INVARIANTS — flag violations as blockers:
 
 SCOPE CONTEXT — understand before flagging:
 
-- rcup symlinks: tracked files are symlinked into $HOME by rcm based on `rcrc`. Both this repo and `dotfiles-private` are merged via `DOTFILES_DIRS`.
+- rcup symlinks: tracked files are symlinked into $HOME by rcm based on `rcrc`. Both this repo and `dotfiles-private` are merged via `DOTFILES_DIRS`. Their paths default to `$HOME/Workspace/tgautier/` and are overridable with `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR`, a contract shared by `rcrc`, the `Justfile` vars, and `_scan-stale-symlinks`.
 - Versioning: SemVer and changelog policy are defined in the global Claude Code config (in `dotfiles-private`) and auto-load via rcm. Don't expect a `versioning.md` file in this repo's tree.
-- CI: `just ci` runs shell, markdown, Brewfile, mise, and Justfile lints, plus the keyword guard delegated to the private repo — the same checks run in GitHub Actions.
+- CI: `just ci` runs shell, markdown, Brewfile, mise, Justfile and stale-symlink-scanner lints, plus the keyword guard delegated to the private repo — the same checks run in GitHub Actions.
 
 DO NOT FLAG:
 

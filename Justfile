@@ -19,10 +19,14 @@ lint-rcrc:
     # One place that sources rcrc under a clean environment. `var` picks which
     # resolved variable to read, so the DOTFILES_DIRS and EXCLUDES cases share
     # this rather than each hand-rolling its own `env -u … sh -c`.
+    #
+    # The `-u` pair is a clean-slate default, not a contradiction with a caller's
+    # `NAME=value` operand: env processes options before operands, so an operand
+    # deliberately re-supplies what `-u` cleared.
     read_var() {
         local var=$1; shift
         env -u DOTFILES_DIR -u DOTFILES_PRIVATE_DIR ${1:+"$@"} \
-            sh -c '. ./rcrc; eval printf "%s" "\"\$$0\""' "$var"
+            sh -c 'set -e; . ./rcrc; eval "printf %s \"\${$1}\""' sh "$var"
     }
     resolve() { read_var DOTFILES_DIRS ${1:+"$@"}; }
     expect() {
@@ -75,12 +79,20 @@ lint-rcrc:
     # comment/blank-line filter together.
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
-    # Two patterns, so the `tr '\n' ' '` join is exercised (with one, an
-    # unjoined embedded newline would still substring-match). An INDENTED comment
-    # alongside the column-0 one, so the filter's `[[:space:]]*` tolerance is
-    # exercised too — without it an indented comment leaks in as two bogus
-    # exclude patterns.
-    printf '# a comment line\n\t  # indented comment\n\nsentinel-pattern\nsecond-pattern\n' \
+    # Every part of rcrc's `grep -hvE '^[[:space:]]*(#|$)' | tr '\n' ' '` is
+    # exercised by the single joined needle asserted below:
+    #   - two patterns          -> pins the `tr` join (with one, an unjoined
+    #                              embedded newline would still substring-match)
+    #   - an INDENTED comment   -> pins the `[[:space:]]*` tolerance; without it
+    #                              the line survives and contributes its words as
+    #                              exclude patterns
+    #   - a blank line BETWEEN  -> pins the `$` alternative. Placed between the
+    #     the two patterns          patterns on purpose: a leaked blank breaks the
+    #                              contiguity of "sentinel-pattern second-pattern",
+    #                              so the existing assertion catches it. Before
+    #                              the first pattern it would only add a space
+    #                              outside the needle and slip through.
+    printf '# a comment line\n\t  # indented comment\nsentinel-pattern\n\nsecond-pattern\n' \
         > "$tmp/rcm-excludes"
     excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp")
     expect_has   "EXCLUDES sources the private file" "sentinel-pattern second-pattern" "$excludes"

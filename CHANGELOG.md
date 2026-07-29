@@ -29,7 +29,8 @@ grouped by **date** rather than by semantic version. Newest first.
   exercised), multiple patterns are joined onto one line, and an absent private
   repo leaves the base excludes intact rather than blank. `EXCLUDES` is the half
   that fails silently — its sourcing hides behind a `2>/dev/null`, so a drifted
-  path yields a well-formed `DOTFILES_DIRS` and no private patterns at all. `rcrc` is also now shellchecked (`--shell=sh`, since rcm sources it as
+  path yields a well-formed `DOTFILES_DIRS` and no private patterns at all.
+  `rcrc` is also now shellchecked (`--shell=sh`, since rcm sources it as
   POSIX shell), which it never was — `lint-shell` covered `bin/*` and the zsh
   files only. `SC2034` is excluded for that file alone, because setting
   variables for rcm to read is precisely its purpose

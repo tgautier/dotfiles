@@ -79,19 +79,22 @@ lint-rcrc:
     # comment/blank-line filter together.
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
-    # Every part of rcrc's `grep -hvE '^[[:space:]]*(#|$)' | tr '\n' ' '` is
-    # exercised by the single joined needle asserted below:
-    #   - two patterns          -> pins the `tr` join (with one, an unjoined
-    #                              embedded newline would still substring-match)
-    #   - an INDENTED comment   -> pins the `[[:space:]]*` tolerance; without it
-    #                              the line survives and contributes its words as
-    #                              exclude patterns
-    #   - a blank line BETWEEN  -> pins the `$` alternative. Placed between the
-    #     the two patterns          patterns on purpose: a leaked blank breaks the
-    #                              contiguity of "sentinel-pattern second-pattern",
-    #                              so the existing assertion catches it. Before
-    #                              the first pattern it would only add a space
-    #                              outside the needle and slip through.
+    # All four parts of rcrc's `grep -hvE '^[[:space:]]*(#|$)' | tr '\n' ' '` are
+    # pinned, but by DIFFERENT assertions — don't delete either one believing the
+    # other covers it:
+    #
+    #   fixture ingredient      pins                caught by
+    #   ----------------------  ------------------  ---------------------------
+    #   two patterns            the `tr` join       expect_has (joined needle)
+    #   blank line, mid-list    the `$` alternative expect_has (joined needle)
+    #   column-0 comment        the `#` alternative expect_lacks "comment"
+    #   indented comment        `[[:space:]]*`      expect_lacks "comment"
+    #
+    # The blank line sits BETWEEN the patterns on purpose: a leaked blank then
+    # breaks the contiguity of "sentinel-pattern second-pattern". Before the first
+    # pattern it would only add a space outside the needle and slip through.
+    # A leaked comment, by contrast, survives as leading tokens that don't break
+    # that contiguity, which is why it needs expect_lacks rather than the needle.
     printf '# a comment line\n\t  # indented comment\nsentinel-pattern\n\nsecond-pattern\n' \
         > "$tmp/rcm-excludes"
     excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp")

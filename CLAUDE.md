@@ -81,9 +81,11 @@ The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
 - `just ci` — runs all checks (shell, markdown, Brewfile, mise, Justfile, plus
   the keyword guard delegated to the private repo)
-- `just lint-shell` — shellcheck on `bin/*` and zsh files
-- `just lint-just` — asserts in-body `just <recipe>` calls name recipes that exist
 - `just setup` — full machine bootstrap (profile, packages, symlinks, runtimes, hooks, tools)
+
+The individual lint targets are enumerated once, in `README.md`'s CI / Linting
+table — don't duplicate that list here. Two copies of it drifted apart three
+times while this file was being written.
 
 ### tmux
 

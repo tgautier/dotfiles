@@ -37,8 +37,10 @@ lint-just:
         # Keeps the guard below reachable if `check` is ever called outside a
         # condition context. Today's call sites — `check … || exit 1` and the
         # fixtures' `if out=$(check … 2>&1)` — already suppress `-e` for this
-        # whole body (it reaches into the command substitution too; verified),
-        # so a plain assignment would fall through on its own. But a refactor to
+        # whole body: bash carries the ignore-return state into command
+        # substitutions (its own `comsub_ignore_return`), so the fixtures' form
+        # suppresses it too. A plain assignment would therefore fall through to
+        # the guard on its own at both of today's call sites. But a refactor to
         # a bare `check Justfile` would restore `-e` here, and the no-match
         # pipeline under `pipefail` would abort before the guard could report.
         if ! called=$(scan "$file"); then called=""; fi

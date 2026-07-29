@@ -14,36 +14,85 @@ ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-via-private
 # --dump rather than --summary because --summary omits `_`-prefixed recipes,
 # two of which are called from bodies. Calls carrying `-f` target another
 # justfile and are skipped by the pattern, which requires a recipe name
-# directly after `just`.
+# directly after `just`. Two negative fixtures run on every invocation, per the
+# guard-testing convention in .claude/rules/brewfile.md.
 [doc("Check that in-body `just <recipe>` calls name recipes that exist")]
 lint-just:
     #!/usr/bin/env bash
     set -euo pipefail
     known=" $(just --dump --dump-format json | jq -r '.recipes | keys[]' | tr '\n' ' ')"
+
     # Recipe bodies only: indented, and not a comment line. Prose in comments
     # ("so this works when just finds ~/.justfile") would otherwise match.
-    called=$(grep -E '^[[:space:]]' Justfile | grep -vE '^[[:space:]]*#' \
-                | grep -oE '(^|[^-[:alnum:]_])just +[a-z_][a-z0-9_-]*' \
-                | grep -oE '[a-z_][a-z0-9_-]*$' | sort -u)
-    # Fail loud if the pattern matches nothing: `setup` alone makes three such
-    # calls, so an empty result means the regex broke, not that the file is
-    # clean. Without this the lint would silently pass forever.
-    if [ -z "$called" ]; then
-        echo "lint-just: matched no \`just <recipe>\` calls — the pattern is broken" >&2
+    scan() {
+        grep -E '^[[:space:]]' "$1" | grep -vE '^[[:space:]]*#' \
+            | grep -oE '(^|[^-[:alnum:]_])just +[a-z_][a-z0-9_-]*' \
+            | grep -oE '[a-z_][a-z0-9_-]*$' | sort -u
+    }
+
+    # Factored out so the negative fixtures below exercise this exact logic
+    # rather than a copy of it.
+    check() {
+        local file=$1 called status=0 name
+        # `if !` is load-bearing: a plain `called=$(scan …)` assignment would
+        # take the pipeline's exit status under `pipefail`, and `set -e` would
+        # kill the recipe here — making the empty-match guard below unreachable
+        # and its diagnostic unprintable.
+        if ! called=$(scan "$file"); then called=""; fi
+        # An empty result means the regex broke, not that the file is clean:
+        # `setup` alone makes three such calls. Without this the lint would
+        # silently pass forever.
+        if [ -z "$called" ]; then
+            echo "lint-just: no \`just <recipe>\` call matched in $file — the pattern is broken" >&2
+            return 1
+        fi
+        for name in $called; do
+            case "$known" in
+                *" $name "*) ;;
+                *) echo "lint-just: $file calls \`just $name\`, which is not a recipe here" >&2
+                   status=1 ;;
+            esac
+        done
+        if [ "$status" -eq 0 ]; then
+            echo "Justfile recipe calls OK ($(printf '%s\n' "$called" | wc -l | tr -d ' ') checked)"
+        fi
+        return "$status"
+    }
+
+    check Justfile || exit 1
+
+    # Negative fixtures, mirroring `lint-brewfile`: assert each guard fires on
+    # known-bad input AND that the failure came from that guard, not from any
+    # incidental error. A guard that never fires is worse than no guard.
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+
+    # The recipe names go through printf ARGUMENTS, never as literal text on
+    # these lines: this file is itself scanned, so an inline `just <name>` here
+    # would be picked up as a real call by the check under test.
+    printf 'real:\n    echo hi\n\ncaller:\n    just %s\n' nosuchrecipe > "$tmp/unknown"
+    if out=$(check "$tmp/unknown" 2>&1); then
+        echo "ERROR: lint-just did not fire on a call to a non-existent recipe" >&2
         exit 1
     fi
-    status=0
-    for name in $called; do
-        case "$known" in
-            *" $name "*) ;;
-            *) echo "lint-just: body calls \`just $name\`, which is not a recipe here" >&2
-               status=1 ;;
-        esac
-    done
-    if [ "$status" -eq 0 ]; then
-        echo "Justfile recipe calls OK ($(echo "$called" | wc -w | tr -d ' ') checked)"
+    if ! grep -q 'is not a recipe here' <<<"$out"; then
+        echo "ERROR: unknown-recipe case did not come from the unknown-recipe guard:" >&2
+        echo "$out" >&2
+        exit 1
     fi
-    exit "$status"
+    echo "lint-just unknown-recipe detection OK"
+
+    printf '# just %s in a comment must not match\nnothing:\n    echo hi\n' link > "$tmp/empty"
+    if out=$(check "$tmp/empty" 2>&1); then
+        echo "ERROR: lint-just did not fire when the pattern matched nothing" >&2
+        exit 1
+    fi
+    if ! grep -q 'the pattern is broken' <<<"$out"; then
+        echo "ERROR: empty-match case did not come from the empty-match guard:" >&2
+        echo "$out" >&2
+        exit 1
+    fi
+    echo "lint-just empty-match detection OK"
 
 # Delegate to the private repo's justfile for checks that must not be defined
 # here (keyword lists etc.). Skips loudly when the private repo is absent —

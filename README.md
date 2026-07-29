@@ -253,12 +253,14 @@ just ci
 
 Individual targets:
 
-| Target                 | Description                                          |
-| ---------------------- | ---------------------------------------------------- |
-| `just lint-shell`      | ShellCheck on `bin/*` and zsh files                  |
-| `just lint-markdown`   | markdownlint-cli2                                    |
-| `just lint-brewfile`   | Ruby syntax check on Brewfiles                       |
-| `just lint-mise`       | Validate mise config                                 |
+| Target                  | Description                                          |
+| ----------------------- | ---------------------------------------------------- |
+| `just lint-shell`       | ShellCheck on `bin/*` and zsh files                  |
+| `just lint-markdown`    | markdownlint-cli2                                    |
+| `just lint-brewfile`    | Ruby syntax check on Brewfiles                       |
+| `just lint-mise`        | Validate mise config                                 |
+| `just lint-just`        | Check in-body `just <recipe>` calls resolve          |
+| `just lint-via-private` | Keyword guard, delegated to the private repo         |
 
 The pre-commit hook is enabled by the bootstrap (idempotent — safe to re-run):
 

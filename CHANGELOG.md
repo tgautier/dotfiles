@@ -252,6 +252,17 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `lint-rcrc`'s coverage comment now names every flag in the filter it describes.
+  It closed the set with `-v` and `-h` but omitted `-E`, which is pinned on the
+  same footing as `-v` — drop it and the pattern becomes a BRE where `(`, `)` and
+  `|` are literal, so nothing is filtered. The `column-0 comment` table row also
+  moved into the boundary prose, since it names a redundant ingredient rather
+  than an assertion and was the only row whose `caught by` column didn't answer
+  its own header. Verified by sabotage: dropping `-E` or `-v` fails the
+  joined-needle assertion, dropping `-h` changes nothing — and the claim that
+  *both* assertions fire was itself wrong, since the first one exits, so the
+  wording now says which one
+  ([#221](https://github.com/tgautier/dotfiles/pull/221) follow-up).
 - **`kfw` and `kxec` were silently truncated to bare `kubectl`.** `zsh/zaliases`
   defined them unquoted (`alias kfw=kubectl port-forward`), and zsh's `alias`
   builtin treats each whitespace-separated token as its own `name[=value]`

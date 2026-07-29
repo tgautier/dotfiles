@@ -87,17 +87,20 @@ lint-rcrc:
     #   ----------------------  ------------------  ---------------------------
     #   two patterns            the `tr` join       expect_has (joined needle)
     #   blank line, mid-list    the `$` alternative expect_has (joined needle)
-    #   indented comment        `[[:space:]]*`      expect_lacks "comment"
-    #                           and the `#` alt.
-    #   column-0 comment        nothing on its own  — belt and braces; the
-    #                                                 indented line already
-    #                                                 pins both
+    #   indented comment        `#` alt + `[[:space:]]*`  expect_lacks "comment"
     #
-    # Boundary, so the table isn't read as totality over the whole pipeline:
-    # `-v` is pinned incidentally (drop it and BOTH assertions fire, since only
-    # the comment and blank lines survive). `-h` is NOT pinned and structurally
-    # cannot be here — grep only prefixes filenames for multiple inputs or `-H`,
-    # and rcrc passes exactly one file, so dropping it changes nothing observable.
+    # Boundary, so the table isn't read as totality over the whole pipeline.
+    # `-v` and `-E` are pinned incidentally — drop either and the joined-needle
+    # assertion fails (it runs first and exits, so the expect_lacks case is never
+    # reached): without `-v` only the comment and blank lines survive, and without
+    # `-E` the pattern is a BRE where `(`, `)` and `|` are literal, so nothing
+    # matches and every line survives. `-h` is NOT pinned and cannot be here:
+    # grep only prefixes filenames for multiple inputs or `-H`, and rcrc passes
+    # exactly one file, so dropping it changes nothing observable.
+    #
+    # The fixture's column-0 comment pins nothing on its own — drop the `#`
+    # alternative and the INDENTED comment still survives `^[[:space:]]*$`, so
+    # expect_lacks fires from it alone. It stays as belt and braces.
     #
     # The blank line sits BETWEEN the patterns on purpose: a leaked blank then
     # breaks the contiguity of "sentinel-pattern second-pattern". Before the first

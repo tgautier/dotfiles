@@ -90,8 +90,8 @@ default rather than a fallback:
 already have stripped the live app — either removing `/Applications/<App>.app`
 outright, or leaving the directory in place with its contents gone — so the
 Caskroom leftover can be the only copy you have, and deleting it can lose the
-app. Reinstall does not need it cleared — see the fetch-before-uninstall
-property above.
+app. Reinstall does not need the staging directory cleared — its uninstall is
+forced, per the first property above.
 
 **Reinstall lands the current version, and does not preserve the old one.** A
 cask tap generally serves only the current version, so once the forced

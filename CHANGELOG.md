@@ -155,8 +155,9 @@ grouped by **date** rather than by semantic version. Newest first.
   fact, stated where it matters — the interrupted upgrade may already have
   stripped the live app, so the Caskroom leftover can be the only copy, which is
   why deleting it by hand can lose the app. Separately, the same paragraph
-  restated the wedge-persistence fact already given six paragraphs earlier under
-  **Cause**; that duplicate is removed and the claim now appears once
+  restated two facts already stated above — wedge persistence (under **Cause**,
+  six paragraphs earlier) and fetch-before-uninstall (in the property list four
+  lines earlier). Both duplicates are removed, and each claim now appears once
   ([#210](https://github.com/tgautier/dotfiles/issues/210)).
 - The `gh` credential helper in `gitconfig` no longer hardcodes an absolute path.
   Both `[credential]` blocks read `!/usr/bin/gh auth git-credential`, which is

@@ -35,10 +35,11 @@ lint-just:
     check() {
         local file=$1 called status=0 name
         # Keeps the guard below reachable if `check` is ever called outside a
-        # condition context. Today's call sites (`check … || exit 1`, and the
-        # fixtures' `if check …`) already suppress `-e` for this whole body, so
-        # a plain assignment would fall through on its own — but a refactor to a
-        # bare `check Justfile` would restore `-e` here, and the no-match
+        # condition context. Today's call sites — `check … || exit 1` and the
+        # fixtures' `if out=$(check … 2>&1)` — already suppress `-e` for this
+        # whole body (it reaches into the command substitution too; verified),
+        # so a plain assignment would fall through on its own. But a refactor to
+        # a bare `check Justfile` would restore `-e` here, and the no-match
         # pipeline under `pipefail` would abort before the guard could report.
         if ! called=$(scan "$file"); then called=""; fi
         # An empty result means the regex broke, not that the file is clean:

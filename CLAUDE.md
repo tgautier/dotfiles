@@ -79,7 +79,8 @@ Shell startup is optimized with caching (kubectl context, environment vars). Avo
 
 The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
 
-- `just ci` — runs all checks (shell, markdown, Brewfile, mise, Justfile)
+- `just ci` — runs all checks (shell, markdown, Brewfile, mise, Justfile, plus
+  the keyword guard delegated to the private repo)
 - `just lint-shell` — shellcheck on `bin/*` and zsh files
 - `just lint-just` — asserts in-body `just <recipe>` calls name recipes that exist
 - `just setup` — full machine bootstrap (profile, packages, symlinks, runtimes, hooks, tools)

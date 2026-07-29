@@ -151,9 +151,7 @@ grouped by **date** rather than by semantic version. Newest first.
   "present and non-empty" while nothing branched on the answer — the prescribed
   action was `brew reinstall --cask` either way — and it sat *after* the
   reinstall was prescribed, so read literally it had you inspecting a bundle the
-  forced uninstall had already replaced. Adding a command and an outcome table
-  was tried first and rejected on review: every outcome still led to the same
-  step, so the check remained decorative. What survives is the one load-bearing
+  forced uninstall had already replaced. What survives is the one load-bearing
   fact, stated where it matters — the interrupted upgrade may already have
   stripped the live app, so the Caskroom leftover can be the only copy, which is
   why deleting it by hand can lose the app. Separately, the same paragraph

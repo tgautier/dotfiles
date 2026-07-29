@@ -168,10 +168,12 @@ grouped by **date** rather than by semantic version. Newest first.
   Every interpolation of the path uses `quote()`, so a value containing `$`,
   a backtick, a quote or a backslash stays inert data rather than being expanded
   — matching `set-profile`'s existing precedent. `DOTFILES_PRIVATE_DIR` is scoped
-  to this recipe only: `rcrc` and `cleanup-symlinks` still hardcode the repo
-  paths, and reconciling all three needs the symlink sweep to keep matching links
-  into a *former* checkout path (rcm records absolute targets, which a
-  path-prefix match cannot see). Tracked separately rather than half-applied.
+  to this recipe only, tracked in
+  [#215](https://github.com/tgautier/dotfiles/issues/215) rather than
+  half-applied. `rcrc` is a one-line change left out purely to keep this PR
+  scoped; `cleanup-symlinks` is the genuinely hard one, because rcm records
+  absolute symlink targets, so links into a *former* checkout path must keep
+  matching and a prefix built from current paths cannot see them.
 - `_ensure-profile`'s non-interactive error reports the value it actually saw
   (`got '<absent>'` / `got 'Work'`) instead of always claiming no profile is set,
   which conflated a missing marker with an invalid one. Its trim comment no longer

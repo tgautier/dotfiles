@@ -264,12 +264,14 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 # sibling-derived path would silently skip the guard exactly when working on a
 # branch. Override per machine with DOTFILES_PRIVATE_DIR.
 #
-# Scope: `lint-via-private` only. `rcrc` declares the same path as PRIVATE_DIR and
-# `cleanup-symlinks` hardcodes both repo paths, so neither honours this override
-# yet — see the tracking issue before widening it. rcm sources `rcrc` as shell, so
-# it *could* read the env var; wiring all three together needs the symlink sweep
-# to keep matching links into a *former* checkout path, which rcm records as an
-# absolute target and a path-prefix match cannot see.
+# Scope: `lint-via-private` only — see #215 before widening it. `rcrc` and
+# `cleanup-symlinks` still hardcode the paths, for two unrelated reasons:
+#   - `rcrc` is a one-liner. rcm sources it as shell, so it can read the env var
+#     directly. It is unwired only to keep #214 scoped, so until then setting the
+#     override points the keyword guard at a private repo `rcup` never merges.
+#   - `cleanup-symlinks` is the hard one: rcm records absolute symlink targets, so
+#     links into a *former* checkout path must keep matching, and a prefix built
+#     from the current paths cannot see them.
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
 private_justfile := private_dir / "justfile"
 

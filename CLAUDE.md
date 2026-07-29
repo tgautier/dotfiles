@@ -63,9 +63,14 @@ This repo targets **three platforms**: macOS, Linux, and WSL2. Every change must
 
 ### Shell Configuration Load Order
 
-`zshenv` → `zprofile` → `zshrc` → `zsh/zaliases` + `zsh/zcompletion`
+`zshenv` → `zprofile` → `zshrc` (sources `zsh/zaliases` + `zsh/zcompletion`) →
+`zlogin`. The last is a pure optimisation — it precompiles `~/.zcompdump` in the
+background for the *next* login. `README.md` → Shell load order has the
+per-file detail; don't duplicate that list here.
 
-Custom functions live in `zsh/functions/` and are autoloaded. Scripts in `bin/` are added to PATH automatically.
+Custom functions live in `zsh/functions/`, which `zsh/zcompletion` prepends to
+`fpath` and autoloads. Scripts in `bin/` are linked by rcm into `~/.bin`, which
+`zshenv` puts on `PATH`.
 
 ### Tool Version Management (mise)
 

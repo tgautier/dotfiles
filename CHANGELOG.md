@@ -10,6 +10,21 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `README.md` reference tables for the executable and configuration surface,
+  which was previously discoverable only by `ls`: **Scripts (`bin/`)** (4),
+  **Shell functions (`zsh/functions/`)** (10), **Aliases (`zsh/zaliases`)**,
+  **Git hooks (`.githooks/`)** (3), **Configuration files**, and a **Shell load
+  order** block. Every row was enumerated from the tree at authoring time rather
+  than from memory — which caught two claims that would have shipped wrong: `bin/`
+  reaches `PATH` as `~/.bin` via `zshenv`, not `~/bin`, and the functions are
+  autoloaded because `zsh/zcompletion` prepends `~/.zsh/functions` to `fpath`.
+  The `Structure` block is refreshed for everything it had drifted past —
+  `zlogin`, `.githooks/`, `.claude/`, `Brewfile.work` / `Brewfile.personal`,
+  `CHANGELOG.md`, `.roborev.toml`, `gitignore`, `git_template/`, `agignore`,
+  `editorconfig`, `psqlrc` and `iterm2/`. `CLAUDE.md`'s load-order line gains the
+  missing `zlogin` step and now defers to the README section instead of carrying
+  a second partial copy
+  ([#219](https://github.com/tgautier/dotfiles/issues/219)).
 - `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR` are now honoured by every consumer,
   not just `lint-via-private`. `rcrc` reads them for both `DOTFILES_DIRS` and
   `EXCLUDES` (it is sourced as shell by rcm, which is exactly why it can), and

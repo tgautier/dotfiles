@@ -203,9 +203,9 @@ Both repos default to `~/Workspace/tgautier/`. Override per machine with two
 environment variables, which are a single shared contract — set one and every
 consumer moves together:
 
-| Variable | Default | Used by |
-| --- | --- | --- |
-| `DOTFILES_DIR` | `~/Workspace/tgautier/dotfiles` | `DOTFILES_DIRS` in `rcrc`, the stale-symlink scanner |
+| Variable               | Default                                 | Used by                                                          |
+| ---------------------- | --------------------------------------- | ---------------------------------------------------------------- |
+| `DOTFILES_DIR`         | `~/Workspace/tgautier/dotfiles`         | `DOTFILES_DIRS` in `rcrc`, the stale-symlink scanner             |
 | `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | the above, plus `EXCLUDES` in `rcrc` and `just lint-via-private` |
 
 Export them before `just link` / `just setup` so `rcrc` sees them — rcm sources
@@ -223,9 +223,10 @@ Detailed guides live in the `docs/` folder:
 ## Structure
 
 ```text
-zshenv                  # Platform detection, environment variables, PATH
-zprofile                # Homebrew init, compinit
-zshrc                   # Prompt, keybindings, mise activation, sources aliases/completions
+zshenv                  # Platform detection ($PLATFORM), environment variables, PATH
+zprofile                # Homebrew init, completion cache, ~/.local/bin, Rust/cargo
+zshrc                   # Prompt, keybindings, history, mise activation, sources aliases/completions
+zlogin                  # Async zcompdump precompilation (see Shell load order)
 zsh/
   zaliases              # Shell aliases
   zcompletion           # Completion paths, autoloads functions
@@ -233,16 +234,113 @@ zsh/
 bin/                    # Scripts added to PATH
 config/
   mise/config.toml      # Pinned tool versions (node, python, ruby, go, etc.)
-  ghostty/config
+  ghostty/config        # Ghostty terminal config
+iterm2/                 # iTerm2 preferences plist
 tmux.conf               # tmux config (C-a prefix, vi mode, platform clipboard)
 gitconfig               # SSH signing via 1Password, rebase-based pulls
-rcrc                    # rcm config (DOTFILES_DIRS, EXCLUDES)
-Brewfile                # macOS Homebrew packages
+gitignore               # Global gitignore (OS, editor, build noise)
+git_template/           # Git init template directory
+agignore                # ack/ag ignore patterns
+editorconfig            # Cross-editor whitespace defaults
+psqlrc                  # psql prompt and output defaults
+rcrc                    # rcm config (DOTFILES_DIRS, EXCLUDES, SYMLINK_DIRS)
+Brewfile                # macOS shared base + profile-overlay tail
+Brewfile.work           # macOS work-only casks/apps
+Brewfile.personal       # macOS personal-only casks/apps
 Brewfile.linux          # Linux Homebrew packages
-Justfile                # CI and update recipes
+Justfile                # Bootstrap, CI and update recipes
+.githooks/              # pre-commit, post-commit, post-rewrite (enabled by just setup)
+.claude/                # Repo-local Claude Code rules (see CLAUDE.md)
+.roborev.toml           # Review-tool scope context
 docs/                   # Detailed guides and cheat sheets
+CHANGELOG.md            # Date-based rolling changelog
 .github/workflows/ci.yml
 ```
+
+## Scripts (`bin/`)
+
+rcm links each script into `~/.bin`, which `zshenv` adds to `PATH` (alongside
+`~/.bin.local` for machine-local scripts that stay out of this repo).
+
+| Script          | Description                                                               |
+| --------------- | ------------------------------------------------------------------------- |
+| `kseal`         | Seal a value (stdin or prompt) with `kubeseal --raw`, cluster-wide scope  |
+| `kshow`         | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)   |
+| `obsidian`      | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+) |
+| `op-ssh-sign`   | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`) |
+
+## Shell functions (`zsh/functions/`)
+
+`zsh/zcompletion` prepends `~/.zsh/functions` to `fpath` and autoloads each
+file, so every one is available as a command.
+
+| Function            | Description                                                       |
+| ------------------- | ----------------------------------------------------------------- |
+| `api_key`           | Random hex key via `openssl rand`, default 16 bytes               |
+| `b64_decode`        | Base64-decode arguments (GNU and BSD compatible)                  |
+| `b64_encode`        | Base64-encode arguments                                           |
+| `cdroot`            | `cd` to the repository root (`git root`)                          |
+| `current_tt`        | Set the terminal title to the current directory's name            |
+| `load_env_kops`     | Verify `KOPS_STATE_STORE` is set before using kops                |
+| `load_env_kubectl`  | Source `kubectl` and `helm` completions on demand                 |
+| `plantuml`          | Render a PlantUML source file to PNG                              |
+| `tt`                | Set the terminal title to an arbitrary string                     |
+| `uuid`              | Lowercase UUID via `uuidgen`, with a fallback                     |
+
+## Aliases (`zsh/zaliases`)
+
+| Alias  | Expands to                | Notes                            |
+| ------ | ------------------------- | -------------------------------- |
+| `k`    | `kubectl`                 |                                  |
+| `kctx` | `kubectx`                 |                                  |
+| `kns`  | `kubens`                  |                                  |
+| `kxec` | `kubectl exec -it`        |                                  |
+| `kfw`  | `kubectl port-forward`    |                                  |
+| `ll`   | `ls -lh`                  |                                  |
+| `la`   | `ls -lah`                 |                                  |
+| `ls`   | `ls -G` / `ls --color`    | BSD flag on macOS, GNU elsewhere |
+| `ts`   | Tailscale.app CLI binary  | macOS only                       |
+
+## Git hooks (`.githooks/`)
+
+`just setup` points `core.hooksPath` here, so they are repo-local and need no
+per-clone installation.
+
+| Hook            | Runs                                                              |
+| --------------- | ----------------------------------------------------------------- |
+| `pre-commit`    | `mise x -- just ci` — every lint, skipped if `just` is absent     |
+| `post-commit`   | Queues a roborev review of the new commit                         |
+| `post-rewrite`  | Remaps roborev reviews after a rebase or amend                    |
+
+## Configuration files
+
+| File                      | Configures | Highlights                                                        |
+| ------------------------- | ---------- | ----------------------------------------------------------------- |
+| `gitconfig`               | Git        | SSH signing via 1Password, `pull.ff=only`, `gh` credential helper |
+| `gitignore`               | Git        | Global ignores — OS, editor and build noise                       |
+| `git_template/`           | Git        | Template dir applied to `git init`                                |
+| `tmux.conf`               | tmux       | `C-a` prefix, vi copy mode, platform-aware clipboard              |
+| `editorconfig`            | Editors    | UTF-8, LF, 2-space indent; tabs for `Makefile`                    |
+| `psqlrc`                  | psql       | Unicode borders, timing, `¤` for null, coloured prompt            |
+| `agignore`                | ack/ag     | Skip `.git`, `node_modules`, build output                         |
+| `rcrc`                    | rcm        | `DOTFILES_DIRS`, `EXCLUDES`, `SYMLINK_DIRS`                       |
+| `config/mise/config.toml` | mise       | Pinned runtimes — node, python, ruby, go, erlang, elixir, …       |
+| `config/ghostty/config`   | Ghostty    | Font, auto light/dark theme, window size                          |
+| `iterm2/`                 | iTerm2     | Preferences plist                                                 |
+
+## Shell load order
+
+```text
+zshenv     # always — $PLATFORM, env vars, PATH, SSH agent
+zprofile   # login — Homebrew init, completion cache, ~/.local/bin, cargo
+zshrc      # interactive — prompt, keybindings, history, mise; sources
+           #   zsh/zaliases and zsh/zcompletion
+zlogin     # login, after zshrc — precompiles ~/.zcompdump in the background
+```
+
+`zlogin` runs last and is a pure optimisation: it compiles the completion dump
+so the *next* login sources the compiled form. Guard platform-specific code with
+`$PLATFORM` in any of these files.
 
 ## Platform Detection
 

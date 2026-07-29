@@ -47,6 +47,35 @@ lint-rcrc:
     expect "root value not emptied" \
         "$home_default /" "$(resolve DOTFILES_PRIVATE_DIR=/)"
 
+    # EXCLUDES is the other half of the contract, and the one rcrc's own header
+    # names as the silent-failure path: if PRIVATE_DIR drifts, the exclude
+    # sourcing no-ops behind `2>/dev/null` and rcup resumes hanging on the
+    # excluded directory — a well-formed DOTFILES_DIRS with an EXCLUDES quietly
+    # missing every private pattern. Pin the path derivation and the
+    # comment/blank-line filter together.
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+    printf '# a comment line\n\nsentinel-pattern\n' > "$tmp/rcm-excludes"
+    excludes=$(env -u DOTFILES_DIR DOTFILES_PRIVATE_DIR="$tmp" \
+                   sh -c '. ./rcrc; printf "%s" "$EXCLUDES"')
+    if [[ "$excludes" != *sentinel-pattern* ]]; then
+        echo "ERROR: EXCLUDES did not pick up the private rcm-excludes file" >&2
+        echo "       got [$excludes]" >&2
+        exit 1
+    fi
+    if [[ "$excludes" == *comment* ]]; then
+        echo "ERROR: EXCLUDES kept a comment line from rcm-excludes" >&2
+        echo "       got [$excludes]" >&2
+        exit 1
+    fi
+    # An absent private repo must leave the base excludes intact, not blank.
+    excludes=$(env -u DOTFILES_DIR DOTFILES_PRIVATE_DIR="$tmp/nope" \
+                   sh -c '. ./rcrc; printf "%s" "$EXCLUDES"')
+    if [[ "$excludes" != *CHANGELOG.md* ]]; then
+        echo "ERROR: an absent private repo emptied the base EXCLUDES: [$excludes]" >&2
+        exit 1
+    fi
+
     # The strip helper and its temp var must not leak into the sourcing shell.
     leaked=$(sh -c '. ./rcrc; printf "%s" "${_v-unset}"')
     if [[ "$leaked" != "unset" ]]; then
@@ -57,7 +86,7 @@ lint-rcrc:
         echo "ERROR: rcrc left _rcrc_strip_slashes defined in the sourcing shell" >&2
         exit 1
     fi
-    echo "rcrc OK (defaults, both overrides, slash normalisation, root value, no leaks)"
+    echo "rcrc OK (defaults, both overrides, slash normalisation, root value, EXCLUDES sourcing, no leaks)"
 
 # Assert every in-body `just <recipe>` call names a recipe that exists here.
 # Those calls are opaque shell strings to just, so nothing else catches a typo:
@@ -311,14 +340,18 @@ _ensure-profile:
     read -r reply
     just set-profile "${reply:-work}"
 
-# Lint shell scripts with ShellCheck
+# Lint shell scripts with ShellCheck.
+#
+# Rationale lives here rather than in the body: this is a LINEWISE recipe, so
+# every indented line — comments included — is echoed and handed to a shell.
+#
+# `rcrc` is checked with --shell=sh, not in the zsh group below, because rcm
+# sources it and it must stay portable to whatever shell rcm uses. SC2034
+# (appears unused) is excluded for that file ONLY: setting variables for rcm to
+# read IS its purpose, so every assignment is consumed externally. Scoped to the
+# file rather than added to the shared zsh_excludes list.
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
-    # rcrc is POSIX sh sourced by rcm — checked with --shell=sh, not the zsh
-    # group below, since it must stay portable to whatever shell rcm uses.
-    # SC2034 (appears unused) is excluded for this file ONLY: setting variables
-    # for rcm to read IS its purpose, so every assignment is consumed
-    # externally. Scoped to rcrc rather than added to the shared exclude list.
     shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 
@@ -438,9 +471,9 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 # together; previously it moved only this one, so an operator who set it pointed
 # the keyword guard at a private repo `rcup` never merged.
 #
-# The two defaults below are duplicated in `rcrc` on purpose — it is shell
-# sourced by rcm, these are justfile-load-time variables, and neither can read
-# the other's without a fragile bridge. Change one, change both.
+# The two defaults below live in three places on purpose — here, `rcrc`, and
+# `lint-rcrc`'s expected values (which run under `env -u`, so they cannot
+# inherit these). Change one, change all three; see the note in `rcrc`.
 public_dir := env("DOTFILES_DIR", env("HOME") / "Workspace/tgautier/dotfiles")
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
 private_justfile := private_dir / "justfile"

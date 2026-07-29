@@ -7,10 +7,12 @@
 # two variables are the contract shared with the Justfile's `private_dir` and
 # `_scan-stale-symlinks`, so overriding one here moves all three together.
 #
-# The two DEFAULTS below are duplicated in the Justfile (`public_dir`,
-# `private_dir`) on purpose: this file is shell evaluated by rcm, those are just
-# variables evaluated at justfile load, and neither can read the other's without
-# a fragile bridge. Change one, change both.
+# The two DEFAULTS below live in three places on purpose: here, the Justfile's
+# `public_dir` / `private_dir`, and `lint-rcrc`'s expected values. This file is
+# shell evaluated by rcm, those are justfile-load-time variables, and `lint-rcrc`
+# runs under `env -u` precisely so it cannot inherit either — so none can read
+# another's without a fragile bridge. Change one, change all three; `lint-rcrc`
+# fails loudly if you miss it, but only after the other two are already edited.
 PUBLIC_DIR="${DOTFILES_DIR:-${HOME}/Workspace/tgautier/dotfiles}"
 PRIVATE_DIR="${DOTFILES_PRIVATE_DIR:-${HOME}/Workspace/tgautier/dotfiles-private}"
 

@@ -271,7 +271,7 @@ Individual targets:
 
 | Target                         | Description                                    |
 | ------------------------------ | ---------------------------------------------- |
-| `just lint-shell`              | ShellCheck on `bin/*` and zsh files            |
+| `just lint-shell`              | ShellCheck on `bin/*`, `rcrc`, and zsh files   |
 | `just lint-markdown`           | markdownlint-cli2                              |
 | `just lint-brewfile`           | Ruby syntax check on Brewfiles                 |
 | `just lint-mise`               | Validate mise config                           |

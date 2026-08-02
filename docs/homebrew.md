@@ -41,8 +41,8 @@ Both failures below were observed on casks marked `auto_updates`
 obvious question — those apps update themselves, so why is Homebrew touching
 them at all? Neither failure *requires* the flag: the App conflict lists
 interruption triggers in its own section, and the Binary conflict turns on a
-stale recorded artifact list. This explains why these casks were being upgraded
-at all, not why the upgrades failed.
+stale recorded artifact list. The flag explains why these casks were in an
+upgrade at all — not why the upgrades then failed.
 
 Because a non-greedy check skips an `auto_updates` cask *unless* the version
 inside the installed app bundle is behind the tap, which Homebrew upgrades by
@@ -225,14 +225,13 @@ the install below does not recreate it, because Homebrew skips a cask already
 at the tap version. (If you already did delete it, the first bullet under *Read
 both confirmations* is the way back.)
 
-Given that, one command decides the whole thing — run it on the path the error
-printed, not a rebuilt one. `$(brew --prefix)/bin/<name>` is the usual form and
-what this doc writes throughout, but a cask's `binary` stanza can name an
-absolute or `~`-rooted `target:`, which Homebrew uses verbatim instead of
-placing it under `bin/`:
+Given that, one command decides the whole thing. Run it on the path the error
+printed, not a rebuilt one: that is usually `$(brew --prefix)/bin/<name>`, but a
+cask's `binary` stanza can name an absolute or `~`-rooted `target:`, which
+Homebrew honours as written (expanding `~`) instead of placing it under `bin/`.
 
 ```sh
-ls -l "$(brew --prefix)/bin/<name>"      # or whatever path the error named
+ls -l "<the path the error printed>"     # usually $(brew --prefix)/bin/<name>
 ```
 
 **Delete it only if the arrow points at the artifact `brew info --cask <cask>`

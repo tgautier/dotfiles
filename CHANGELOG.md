@@ -10,6 +10,15 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `brew "kimi-code"` (Moonshot's terminal coding agent) in `Brewfile.personal`,
+  under a new `# CLI Tools & Development` block — the first formula in an
+  overlay, which until now carried only `# Applications` and Mac App Store
+  entries. It had been installed by hand and was therefore uninstalled by the
+  `brew bundle cleanup --force` in `update-brew`, which is the pipeline working
+  as designed: undeclared packages do not survive. `.claude/rules/brewfile.md`
+  now states where a `brew` entry goes in an overlay, rather than enumerating
+  two blocks as if they were the whole set
+  ([#226](https://github.com/tgautier/dotfiles/issues/226)).
 - `README.md` reference tables for the executable and configuration surface,
   which was previously discoverable only by `ls`: **Scripts (`bin/`)** (4),
   **Shell functions (`zsh/functions/`)** (10), **Aliases (`zsh/zaliases`)**,
@@ -252,6 +261,22 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `docs/homebrew.md` covers the second `just update` cask failure, "there is
+  already a **Binary** at `<prefix>/bin/<name>`" — hit on obsidian 1.12.7 →
+  1.13.4 ([#225](https://github.com/tgautier/dotfiles/issues/225)). A cask that
+  ships a CLI beside its app has two artifacts, and
+  Homebrew replays the *installed* version's recorded artifact list to uninstall
+  it; obsidian 1.12.7's held only App and Zap, so the upgrade never unlinked
+  `/opt/homebrew/bin/obsidian` and the new version refused to overwrite it. The
+  fix is to drop the stale symlink and install, not to reinstall. Also corrects
+  the existing App-conflict section, which sold `brew reinstall --cask` as the
+  near-universal remedy for a wedged cask: its uninstall replays that same
+  recorded list, so against this failure it removes the app and *then* fails at
+  the identical point — verified the hard way before the real fix landed. A new
+  section explains why an `auto_updates` cask is upgraded at all, since
+  `brew outdated --cask` lists nothing while `just update` dies on one:
+  non-greedy checks skip such casks *unless* the installed app bundle is behind
+  the tap, which Homebrew acts on by default.
 - `lint-rcrc`'s coverage comment now names every flag in the filter it describes.
   It closed the set with `-v` and `-h` but omitted `-E`, which is pinned on the
   same footing as `-v` — drop it and the pattern becomes a BRE where `(`, `)` and

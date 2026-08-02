@@ -51,10 +51,12 @@ rather than a second opinion: the cask that fails the update is listed there
 too. If it is *not* listed, the app self-updated between the two runs — re-run
 `just update` rather than hunting a discrepancy that isn't one.
 
-Add `--greedy` and the list grows by every cask whose bundle is current and
-whose Homebrew metadata is merely stale. Those are the ones `just update`
-leaves alone, and the contrast is only ever between greedy and non-greedy — not
-between `outdated` and the update itself.
+Add `--greedy` and, for `auto_updates` casks, the list grows by every one whose
+bundle is current and whose Homebrew metadata is merely stale. Those are the
+ones `just update` leaves alone. (`--greedy` widens other classes too — notably
+`version :latest` casks whose downloaded artifact changed — on rules of their
+own.) The contrast is only ever between greedy and non-greedy, not between
+`outdated` and the update itself.
 
 ## Troubleshooting
 
@@ -192,20 +194,33 @@ bundle, not the CLI itself, so removing it loses nothing and the install
 recreates it:
 
 ```sh
-readlink "$(brew --prefix)/bin/<name>"   # expect: .../<App>.app/Contents/MacOS/<tool>
+ls -l "$(brew --prefix)/bin/<name>"      # inspect BEFORE deleting — see below
 rm "$(brew --prefix)/bin/<name>"
 brew install --cask <cask>
+brew list --cask --versions <cask>       # confirm the new version landed
+ls -l "$(brew --prefix)/bin/<name>"      # confirm the link came back
 ```
 
-Confirm what `readlink` prints before deleting — the fix assumes a symlink the
-cask owns. A path into the app bundle is that. A real file is not, and is
-someone else's install to investigate rather than delete. A path under
-`$(brew --cellar)` means a formula owns the name, which Homebrew detects and
-warns past instead of failing on, so it cannot be what produced this error.
+**Read the `ls -l` before running the `rm`** — the fix assumes a symlink the
+cask owns, and only one of these three outputs is that:
 
-Use `brew upgrade --cask <cask>` in place of the install if the app is still
-there; `brew list --cask --versions <cask>` says which. After the reinstall
-misstep above it is gone, and `install` is the right call.
+| `ls -l` shows | Meaning | Action |
+| --- | --- | --- |
+| `l...  <name> -> /Applications/<App>.app/...` | the cask's own link | delete it, continue |
+| `-...  <name>` (a regular file) | not a symlink — someone else's install | stop and investigate |
+| `No such file or directory` | wrong path, or already cleared | stop; re-read the error |
+
+`ls -l` rather than `readlink` on purpose: `readlink` prints nothing and exits 1
+for BOTH a regular file and a missing path, so it cannot tell the delete-it case
+from the two stop cases — and the next line in the block deletes.
+
+A link under `$(brew --cellar)` is a fourth shape, but not one this error can
+produce: a formula owning the name makes Homebrew warn and skip the link rather
+than fail.
+
+`brew install --cask` is correct whether or not the app survived the failure —
+for an explicitly named cask that is already installed, it routes through the
+upgrade path — so there is no need to check first and pick a different verb.
 
 **Finish the update.** As with the App conflict, the rest of `update-brew` never
 ran — re-run `just update` so the direct `brew` calls stay a one-off.

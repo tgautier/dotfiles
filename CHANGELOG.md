@@ -264,9 +264,9 @@ grouped by **date** rather than by semantic version. Newest first.
 - `docs/homebrew.md` covers the second `just update` cask failure, "there is
   already a **Binary** at `<prefix>/bin/<name>`" — hit on obsidian 1.12.7 →
   1.13.4 ([#225](https://github.com/tgautier/dotfiles/issues/225)). A cask that
-  ships a CLI beside its app has two artifacts, and
-  Homebrew replays the *installed* version's recorded artifact list to uninstall
-  it; obsidian 1.12.7's held only App and Zap, so the upgrade never unlinked
+  ships a CLI beside its app carries a Binary artifact in addition to the App,
+  and Homebrew replays the *installed* version's recorded artifact list to
+  uninstall it; obsidian 1.12.7's held only App and Zap, so it never unlinked
   `/opt/homebrew/bin/obsidian` and the new version refused to overwrite it. The
   fix is to drop the stale symlink and install, not to reinstall. Also corrects
   the existing App-conflict section, which sold `brew reinstall --cask` as the

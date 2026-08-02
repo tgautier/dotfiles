@@ -225,10 +225,14 @@ the install below does not recreate it, because Homebrew skips a cask already
 at the tap version. (If you already did delete it, the first bullet under *Read
 both confirmations* is the way back.)
 
-Given that, one command decides the whole thing:
+Given that, one command decides the whole thing — run it on the path the error
+printed, not a rebuilt one. `$(brew --prefix)/bin/<name>` is the usual form and
+what this doc writes throughout, but a cask's `binary` stanza can name an
+absolute or `~`-rooted `target:`, which Homebrew uses verbatim instead of
+placing it under `bin/`:
 
 ```sh
-ls -l "$(brew --prefix)/bin/<name>"
+ls -l "$(brew --prefix)/bin/<name>"      # or whatever path the error named
 ```
 
 **Delete it only if the arrow points at the artifact `brew info --cask <cask>`
@@ -255,13 +259,16 @@ inside `$(brew --cellar)`, which it attributes to a formula, warns about, and
 skips. So "it is a symlink" is not the test, and neither is the error itself.
 The arrow is.
 
-A **dangling** arrow is still the cask's link and still has to go. It is what
-the earlier reinstall misstep leaves — app deleted, arrow pointing at nothing —
-and it is tempting to think Homebrew will just replace it. It will not: the App
-artifact is installed before the Binary one, so the bundle is back in place
-before the link is tested, the arrow resolves again, and you get the identical
-error. `ls -l` never follows the arrow anyway, so this looks exactly like the
-delete-it case, which is what it is.
+A **dangling** arrow changes nothing about the test above — apply it exactly as
+written, because `ls -l` never follows the arrow and prints the same line either
+way. An arrow matching the `brew info` path is the cask's link and goes; one
+pointing elsewhere is still someone else's and still stops you, dangling or not.
+
+Danglingness is worth naming only because it is tempting to think it makes the
+link harmless. It does not. It is what the earlier reinstall misstep leaves —
+app deleted, arrow pointing at nothing — and the App artifact is installed
+before the Binary one, so the bundle is back in place before the link is tested,
+the arrow resolves again, and you get the identical error.
 
 **`No such file or directory` has two causes with opposite answers.** Both look
 the same on screen — the failed `just update` is still in your scrollback either
@@ -287,9 +294,7 @@ brew list --cask --versions <cask>        # expect the version update wanted
 ls -l "<the path the error printed>"      # expect the link back
 ```
 
-That path is usually `$(brew --prefix)/bin/<name>`, which is what the `ls -l`
-above assumes — but the Binary artifact's directory is configurable
-(`--binarydir`), so take it from the error rather than rebuilding it.
+Same path as the inspect command above — the one the error named.
 
 `brew install --cask` is right whether or not the app survived — for a named
 cask already installed it routes through the upgrade path, absent

@@ -63,8 +63,10 @@ brew update && brew outdated --cask
 Still empty means the app self-updated between the two runs — re-run
 `just update`. Now listed means the earlier check read a stale tap:
 `update-brew` refreshes it with `brew update` first, so a bare `brew outdated`
-beforehand answers from whatever the last refresh left behind, and re-running
-`just update` on its own would just reproduce the crash.
+beforehand answers from whatever the last refresh left behind. The cask really
+is outdated and `just update` will fail again on it, so go to the matching
+section below — read the artifact word in the error, `App` or `Binary` — rather
+than re-running the update.
 
 Add `--greedy` and, for `auto_updates` casks, the list grows by every one whose
 bundle is current and whose Homebrew metadata is merely stale. Those are the
@@ -205,6 +207,10 @@ recorded artifact list (watch it print `Purging files for version
 point — and the app is now uninstalled, leaving the link dangling. Observed on
 2026-08-02 with obsidian: recovering from that took the fix below anyway.
 
+The prohibition is about running it *now*, while the link is still there.
+Reinstall becomes the right verb once the `rm` has cleared it — see the end of
+this section.
+
 **Fix** — drop the stale link, then install. It is a symlink *into* the app
 bundle, not the CLI itself, so removing it loses nothing and the install
 recreates it:
@@ -216,13 +222,19 @@ deletes:
 ls -l "$(brew --prefix)/bin/<name>"
 ```
 
-That prints one of two outputs, and only one of them is the symlink the cask
-owns:
+Two of the outputs it can print are in the table below, and only one of those is
+the symlink the cask owns:
 
 | `ls -l` shows | Meaning | Action |
 | --- | --- | --- |
 | `l...  <name> -> /Applications/<App>.app/...` | the cask's own link | delete it, continue below |
 | `-...  <name>` (a regular file) | not a symlink — someone else's install | stop and investigate |
+
+The first row assumes you are still recovering. If you are re-entering this
+block after a run whose two confirmations already passed, the link you are
+looking at is the healthy one the fix just created — stop here. Deleting it now
+would not be undone by the install below, which no-ops on a cask already at the
+tap version.
 
 The arrow target may itself be gone — the reinstall misstep above removes the
 app but leaves this link behind, dangling. `ls -l` never follows the arrow, so
@@ -254,6 +266,21 @@ ls -l "$(brew --prefix)/bin/<name>"      # confirm the link came back
 `brew install --cask` is correct whether or not the app survived the failure —
 for an explicitly named cask that is already installed, it routes through the
 upgrade path — so there is no need to check first and pick a different verb.
+
+**Read the two confirmations; they can fail quietly.** The version line should
+show the version the update was trying to install, and the `ls -l` should show
+the link again. If the version is unchanged, or the `ls -l` prints nothing, the
+install no-opped — Homebrew skips a cask already at the tap version
+(`Not upgrading <cask>, the latest version is already installed`), and skipping
+means nothing was re-linked. Recreate it with:
+
+```sh
+brew reinstall --cask <cask>
+```
+
+Which is safe *here*, and only here. The prohibition further up applies before
+the `rm`, while the stale link is still blocking; once it is gone, reinstall has
+nothing to trip over.
 
 **Finish the update.** As with the App conflict, the rest of `update-brew` never
 ran — re-run `just update` so the direct `brew` calls stay a one-off.

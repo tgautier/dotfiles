@@ -192,12 +192,16 @@ wording — **the remedy above makes this one worse**. Read the artifact word in
 the error: `App` or `Binary`.
 
 Scope: the recovery below is written for a CLI that ships *inside* the app
-bundle — the shape `brew info --cask <cask>` shows as an absolute source path
-under Artifacts. A cask whose `binary` stanza names a source relative to the
-staged path links out of the Caskroom instead, and `brew info` prints that
-relative string bare. Only the comparison changes: check the `ls -l` arrow
-against `$(brew --prefix)/Caskroom/<cask>/<version>/<the source brew info
-prints>`, and the rest of the section applies unaltered.
+bundle — meaning the source path `brew info --cask <cask>` lists under Artifacts
+sits within `<App>.app`. Anything else links out of the Caskroom instead,
+whether it prints as a bare relative string or as an absolute path under
+`$(brew --caskroom)`. Only the comparison changes for those: check that the
+`ls -l` arrow points inside `$(brew --caskroom)/<cask>/`, the same membership
+test with the cask's Caskroom directory standing in for the app bundle, and the
+rest of the section applies unaltered. Membership rather than a full path for
+the same reason the rule below uses it: the staged path carries a version, and
+the stale link was made by whichever version last linked it, not the one
+`brew info` describes.
 
 **Symptom** — `just update` dies in `update-brew`, and the upgrade rolls itself
 back first:

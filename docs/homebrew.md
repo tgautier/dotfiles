@@ -203,14 +203,20 @@ the new version's install half refuses to overwrite an existing target. Every
 subsequent `just update` repeats it, because the failure leaves the same
 leftover behind.
 
-**Fix** — clear the leftover link, then install.
+**Fix** — clear the leftover link, then install. **Not `brew reinstall --cask`,
+which is the App conflict's remedy and the wrong move here**: its uninstall
+replays the same recorded artifact list, so the link survives, the install half
+fails at the identical point, and the app is gone. That prohibition is about
+running it *first*; once the link is cleared it becomes useful again, at the end
+of this section.
 
 **Run this only while `just update` is actually failing with the Binary error.**
 Everything below assumes that error is on your screen right now. If it is not —
 you already ran the fix, or you are reading ahead — there is nothing to clear,
 and deleting a healthy link would leave you worse off than when you started:
 the install below does not recreate it, because Homebrew skips a cask already
-at the tap version.
+at the tap version. (If you already did delete it, the first bullet under *Read
+both confirmations* is the way back.)
 
 Given that, one command decides the whole thing:
 
@@ -225,15 +231,24 @@ shape from memory.
 
 Anything else belongs to something other than this cask and stops the recovery:
 a regular file, or a symlink pointing anywhere else — another tool's shim, a
-hand-made `ln -s`. Homebrew raises this same error for any target it does not
-own, so "it is a symlink" is not the test. The arrow is.
+hand-made `ln -s`. Homebrew raises this error for any target it does not own,
+excepting only one it can attribute to a formula of the same name, which it
+warns about and skips instead. So "it is a symlink" is not the test. The arrow
+is.
 
-Two outputs look like exceptions and are not. A **dangling** arrow still counts
-— `ls -l` never follows it, so the earlier `brew reinstall` misstep, which
-deletes the app and leaves the link, prints the same line and gets the same
-answer. And **`No such file or directory`** means there is nothing to delete:
-either the path is wrong, or your earlier `rm` already landed. Skip to the
-install.
+**`No such file or directory` has two causes with opposite answers, and the
+error on your screen tells you which.** Homebrew raises only when something
+*resolves* at that target, so while the error is live there IS a link and an
+empty `ls -l` means you are looking at the wrong path — check the binary's
+target name in `brew info --cask <cask>` and re-run the `ls -l`. Going on to
+the install would leave the blocker untouched and reproduce the same error.
+Only if your own `rm` already landed is there genuinely nothing to delete; skip
+to the install.
+
+The same "must resolve" rule means a **dangling** link is not a blocker at all:
+Homebrew overwrites it. If the earlier reinstall misstep left one behind — app
+gone, arrow pointing at nothing — the install alone is enough, though clearing
+it first is harmless.
 
 `readlink` would also answer the arrow question, but it prints nothing for both
 a regular file and a missing path — one stops the recovery and the other does
@@ -249,16 +264,19 @@ ls -l "$(brew --prefix)/bin/<name>"       # expect the link back
 ```
 
 `brew install --cask` is right whether or not the app survived — for a named
-cask already installed it routes through the upgrade path.
+cask already installed it routes through the upgrade path, absent
+`HOMEBREW_NO_INSTALL_UPGRADE`. An install that prints nothing at all points at
+that variable.
 
 **Read both confirmations.** They fail in two different ways:
 
-- **Version right, `ls -l` empty** — the install no-opped (`Not upgrading
-  <cask>, the latest version is already installed`) and re-linked nothing. The
-  version line looks correct because it reports what is installed, which here
-  already equals the tap version. `brew reinstall --cask <cask>` recreates the
-  link, and is safe now that the blocker is gone — the prohibition above applies
-  only while the stale link is still there.
+- **Version right, `ls -l` empty** — you re-entered this fix after it had
+  already succeeded, so the cask was already at the tap version and the install
+  no-opped (`Not upgrading <cask>, the latest version is already installed`),
+  re-linking nothing. The version line looks correct because it reports what is
+  installed. This is the state the precondition warns about, and
+  `brew reinstall --cask <cask>` is the way out: it recreates the link, and is
+  safe here because the blocker is already gone.
 - **Version still the old one** — the install ran and failed, and the revert put
   the old version back. The no-op above is not the explanation, so do not
   reinstall: scroll back for the error it printed and work from that.

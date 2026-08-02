@@ -225,30 +225,45 @@ ls -l "$(brew --prefix)/bin/<name>"
 ```
 
 **Delete it only if the arrow points at the artifact `brew info --cask <cask>`
-lists under Artifacts** — for the app-plus-CLI casks this failure applies to,
-that is a path inside the app bundle. Compare the two; do not pattern-match the
-shape from memory.
+lists under Artifacts** — for the app-plus-CLI casks this failure applies to, a
+path inside the app bundle. Compare the two rather than pattern-matching the
+shape from memory, and mind that they print in opposite senses:
+
+```text
+ls -l      <prefix>/bin/<name> -> /Applications/<App>.app/.../<tool>
+brew info  /Applications/<App>.app/.../<tool> -> <name> (Binary)
+```
+
+`ls -l` runs link → source; `brew info` runs source → link name. So the path
+your `ls -l` arrow points *at* is the one on the **left** of the `brew info`
+arrow. Comparing the two right-hand sides gives you a path against a bare token
+and reads a perfectly good cask link as foreign.
 
 Anything else belongs to something other than this cask and stops the recovery:
 a regular file, or a symlink pointing anywhere else — another tool's shim, a
 hand-made `ln -s`. Homebrew raises this error for any target it does not own,
-excepting only one it can attribute to a formula of the same name, which it
-warns about and skips instead. So "it is a symlink" is not the test. The arrow
-is.
+excepting only one that resolves inside `$(brew --cellar)`, which it attributes
+to a formula, warns about, and skips. So "it is a symlink" is not the test. The
+arrow is.
 
-**`No such file or directory` has two causes with opposite answers, and the
-error on your screen tells you which.** Homebrew raises only when something
-*resolves* at that target, so while the error is live there IS a link and an
-empty `ls -l` means you are looking at the wrong path — check the binary's
-target name in `brew info --cask <cask>` and re-run the `ls -l`. Going on to
-the install would leave the blocker untouched and reproduce the same error.
-Only if your own `rm` already landed is there genuinely nothing to delete; skip
-to the install.
+A **dangling** arrow is still the cask's link and still has to go. It is what
+the earlier reinstall misstep leaves — app deleted, arrow pointing at nothing —
+and it is tempting to think Homebrew will just replace it. It will not: the App
+artifact is installed before the Binary one, so the bundle is back in place
+before the link is tested, the arrow resolves again, and you get the identical
+error. `ls -l` never follows the arrow anyway, so this looks exactly like the
+delete-it case, which is what it is.
 
-The same "must resolve" rule means a **dangling** link is not a blocker at all:
-Homebrew overwrites it. If the earlier reinstall misstep left one behind — app
-gone, arrow pointing at nothing — the install alone is enough, though clearing
-it first is harmless.
+**`No such file or directory` has two causes with opposite answers.** Both look
+the same on screen — the failed `just update` is still in your scrollback either
+way — so the discriminator is where you are in this fix, not what you can see.
+**Before** you have run the `rm` below, an empty `ls -l` means you are on the
+wrong path: Homebrew raises only when something resolves at that target, so
+while the error stands there is something there. Copy the path out of the error
+itself, which prints it verbatim, and re-run the `ls -l` on that. Going on to
+the install would leave the blocker untouched and reproduce the error. **After**
+your own `rm` has landed, there is genuinely nothing to delete — skip to the
+install.
 
 `readlink` would also answer the arrow question, but it prints nothing for both
 a regular file and a missing path — one stops the recovery and the other does

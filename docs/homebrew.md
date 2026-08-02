@@ -71,9 +71,8 @@ act: `brew install --cask <cask>` and `brew upgrade --cask <cask>` check a named
 cask greedily, so either can upgrade one `brew outdated --cask` never listed.
 What does *not* change `outdated` is naming a cask:
 `brew outdated --cask <cask>` runs the same non-greedy predicate as the bare
-form. Only a greedy
-invocation makes it look harder — `--greedy`, the narrower `--greedy-latest` /
-`--greedy-auto-updates`, `HOMEBREW_UPGRADE_GREEDY`, or
+form. Only a greedy invocation makes it look harder — `--greedy`, the narrower
+`--greedy-latest` / `--greedy-auto-updates`, `HOMEBREW_UPGRADE_GREEDY`, or
 `HOMEBREW_UPGRADE_GREEDY_CASKS`.
 
 A cask that fails the update while `brew outdated --cask` stays quiet has two
@@ -192,11 +191,13 @@ macOS only, and distinct from the App conflict above despite the near-identical
 wording — **the remedy above makes this one worse**. Read the artifact word in
 the error: `App` or `Binary`.
 
-Scope: this assumes the CLI ships *inside* the app bundle — the shape
-`brew info --cask <cask>` shows as an absolute source path under Artifacts, and
-the only shape the recovery below is written for. A cask whose `binary` stanza
-names a source relative to the staged path links out of the Caskroom instead,
-and its stale link needs a different comparison than the one used here.
+Scope: the recovery below is written for a CLI that ships *inside* the app
+bundle — the shape `brew info --cask <cask>` shows as an absolute source path
+under Artifacts. A cask whose `binary` stanza names a source relative to the
+staged path links out of the Caskroom instead, and `brew info` prints that
+relative string bare. Only the comparison changes: check the `ls -l` arrow
+against `$(brew --prefix)/Caskroom/<cask>/<version>/<the source brew info
+prints>`, and the rest of the section applies unaltered.
 
 **Symptom** — `just update` dies in `update-brew`, and the upgrade rolls itself
 back first:
@@ -233,13 +234,14 @@ running it *first*; once the link is cleared it becomes useful again, at the end
 of this section.
 
 **Run this only while the Binary error is live** — from `just update`, or from a
-`brew reinstall --cask` you already tried.
-Everything below assumes that error is on your screen right now. If it is not —
-you already ran the fix, or you are reading ahead — there is nothing to clear,
-and deleting a healthy link would leave you worse off than when you started:
-the install below does not recreate it, because Homebrew skips a cask already
-at the tap version. (If you already did delete it, the first bullet under *Read
-both confirmations* is the way back.)
+`brew reinstall --cask` you already tried. Everything below assumes that error
+is on your screen right now, and the link you would delete is a healthy one if
+it is not. Having already run the fix, that link is the one the fix created, and
+deleting it leaves you worse off than when you started: the install below will
+not recreate it, because Homebrew skips a cask already at the tap version. Only
+reading ahead, it is the healthy link for the version you have, and there is
+nothing here to fix yet. (If you already did delete it, the first bullet under
+*Read both confirmations* is the way back.)
 
 Given that, one command decides the whole thing. Run it on the path the error
 printed, not a rebuilt one: that is usually `$(brew --prefix)/bin/<name>`, but a
@@ -269,13 +271,14 @@ your `ls -l` arrow points *at* is the one on the **left** of the `brew info`
 arrow. Comparing the two right-hand sides gives you a path against a bare token
 and reads a perfectly good cask link as foreign.
 
-Whatever the rule does not select stops the recovery — a regular file, another
-tool's shim, a hand-made `ln -s`. Do not look for a second test to settle those:
-the error cannot, because Homebrew raises for anything that *resolves* at that
-path, the cask's own stale link included — which is why you are here — excepting
-only a target resolving inside `$(brew --cellar)`, which it attributes to a
-formula, warns about, and skips. Nor can "is it a symlink". The arrow is the
-test, and it is the only one.
+At a path that exists, whatever the rule does not select stops the recovery — a
+regular file, another tool's shim, a hand-made `ln -s`. Do not look for a second
+test to settle those: the error cannot, because Homebrew raises for anything
+that *resolves* at that path, the cask's own stale link included — which is why
+you are here — excepting only a target resolving inside `$(brew --cellar)`,
+which it attributes to a formula, warns about, and skips. Nor can "is it a
+symlink". For a path that exists, the arrow is the only test. An empty `ls -l`
+is a different question, read further down.
 
 A **dangling** arrow does not change it either. `ls -l` never follows the arrow,
 so it prints the same line whether or not the target exists — read where the

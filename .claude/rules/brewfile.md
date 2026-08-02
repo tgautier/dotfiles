@@ -25,7 +25,7 @@ Because the overlay is merged into the same `brew bundle` evaluation, both `brew
 - A package shared by **all** machines goes in the base (`Brewfile` for macOS, and also `Brewfile.linux` unless it's a cask/mas or platform-specific tool)
 - A package for **one Mac profile only** goes in `Brewfile.work` or `Brewfile.personal` — never in the shared `Brewfile` base
 - Casks (`cask`) and Mac App Store (`mas`) entries never appear in `Brewfile.linux` — they are not available on Linux
-- The macOS `Brewfile` base is organized into comment-delimited blocks: `# CLI Tools & Development`, `# Applications`, `# Fonts`, `# Mac App Store Applications`. The overlays use `# Applications` and `# Mac App Store Applications` blocks
+- The macOS `Brewfile` base is organized into comment-delimited blocks: `# CLI Tools & Development`, `# Applications`, `# Fonts`, `# Mac App Store Applications`. The overlays use the same block names in the same order, but carry only the blocks they need — a `brew` formula in an overlay goes under `# CLI Tools & Development`, never into `# Applications`
 - `Brewfile.linux` is organized into a `# CLI Tools & Development` block
 - Within each block in each file, entries are sorted alphabetically (a-z) by package name
 - Tap entries (`tap`) come before all blocks

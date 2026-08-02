@@ -5,6 +5,9 @@
 # Keep entries sorted alphabetically within each block, per
 # .claude/rules/brewfile.md.
 
+# CLI Tools & Development
+brew "kimi-code"
+
 # Applications
 cask "adobe-creative-cloud"
 cask "audacity"

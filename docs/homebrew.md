@@ -39,15 +39,16 @@ something else breaks.
 Both failures below were observed on casks marked `auto_updates`
 (`brew info --cask <cask>` prints it next to the version), which raises the
 obvious question — those apps update themselves, so why is Homebrew touching
-them at all? Neither failure *requires* the flag: the App conflict lists
-interruption triggers in its own section, and the Binary conflict turns on a
-stale recorded artifact list. The flag explains why these casks were in an
-upgrade at all — not why the upgrades then failed.
+them at all? The flag is why the upgrade is *surprising*, not why it happened —
+and not why it then failed either. Neither failure requires it: the App conflict
+lists interruption triggers in its own section, and the Binary conflict turns on
+a stale recorded artifact list.
 
-Because a non-greedy check skips an `auto_updates` cask *unless* the version
-inside the installed app bundle is behind the tap, which Homebrew upgrades by
-default (opt out with `HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`). So one reaches
-an upgrade exactly when the app has *not* self-updated.
+What puts one of these casks in an upgrade is a version lag. A non-greedy check
+suppresses an `auto_updates` cask *unless* the version inside the installed app
+bundle is behind the tap, which Homebrew upgrades by default (opt out with
+`HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`). So one reaches an upgrade exactly
+when the app has *not* self-updated.
 
 Absent `HOMEBREW_UPGRADE_GREEDY` and `HOMEBREW_UPGRADE_GREEDY_CASKS`,
 `brew outdated --cask` runs the same non-greedy predicate as
@@ -83,8 +84,9 @@ the contrast is only ever between greedy and non-greedy, not between `outdated`
 and the update itself. Naming a cask changes that, but only for the verbs that
 act: `brew install --cask <cask>` and `brew upgrade --cask <cask>` check a named
 cask greedily, so either can upgrade one `brew outdated --cask` never listed.
-`brew outdated` itself stays non-greedy however you invoke it — narrowing it to
-`brew outdated --cask <cask>` does not make it look harder.
+What does *not* change `outdated` is naming a cask: `brew outdated --cask
+<cask>` runs the same non-greedy predicate as the bare form. Only `--greedy` or
+the two variables above make it look harder.
 
 ## Troubleshooting
 
@@ -314,9 +316,10 @@ that variable.
 - **Version still the old one** — the no-op above is not the explanation, and
   what the install printed tells you which case you are in. An error means it
   ran and failed, and the revert put the old version back: work from that error,
-  do not reinstall. *Nothing at all* printed means
-  `HOMEBREW_NO_INSTALL_UPGRADE`, named above — there is no error to hunt, and
-  the install never attempted the upgrade.
+  do not reinstall. *Nothing at all* printed means `HOMEBREW_NO_INSTALL_UPGRADE`,
+  named above — there is no error to hunt, the upgrade was never attempted, and
+  the link is still missing. Finish with `brew reinstall --cask <cask>`, which
+  does not consult that variable, or unset it and re-run the install.
 
 **Finish the update.** As with the App conflict, the rest of `update-brew` never
 ran — re-run `just update` so the direct `brew` calls stay a one-off.

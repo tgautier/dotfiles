@@ -37,20 +37,24 @@ something else breaks.
 ### Why an auto-updating cask is upgraded at all
 
 Both failures below hit casks marked `auto_updates` (`brew info --cask <cask>`
-prints it next to the version), which is confusing: `brew outdated --cask` lists
-nothing while `just update` dies on one of them. They are not the same question.
+prints it next to the version), which raises the obvious question — those apps
+update themselves, so why is Homebrew touching them at all?
 
-`brew outdated --cask` and the `brew bundle install` / `brew upgrade` steps of
-`update-brew` all run **non-greedy**, and a non-greedy check skips an
-`auto_updates` cask — *unless* Homebrew sees the version inside the installed
-app bundle is behind the tap, which it acts on by default
-(`HOMEBREW_UPGRADE_AUTO_UPDATES_CASKS`, disabled only by setting
-`HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`).
+Because a non-greedy check skips an `auto_updates` cask *unless* the version
+inside the installed app bundle is behind the tap, which Homebrew upgrades by
+default (opt out with `HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`). So one reaches
+an upgrade exactly when the app has *not* self-updated.
 
-So an `auto_updates` cask reaches an upgrade exactly when the app has *not*
-self-updated. That is why `--greedy` lists a pile of casks `just update` leaves
-alone — their bundles are current and only Homebrew's metadata is stale — while
-the one app that fell behind is the one that fails.
+`brew outdated --cask` runs the same non-greedy predicate as the `brew bundle
+install` and `brew upgrade` steps of `update-brew`, so it is a faithful preview
+rather than a second opinion: the cask that fails the update is listed there
+too. If it is *not* listed, the app self-updated between the two runs — re-run
+`just update` rather than hunting a discrepancy that isn't one.
+
+Add `--greedy` and the list grows by every cask whose bundle is current and
+whose Homebrew metadata is merely stale. Those are the ones `just update`
+leaves alone, and the contrast is only ever between greedy and non-greedy — not
+between `outdated` and the update itself.
 
 ## Troubleshooting
 

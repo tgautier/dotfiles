@@ -261,6 +261,18 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `docs/homebrew.md`'s Caskroom fallback comparison is a membership test rather
+  than a versioned path
+  ([#227](https://github.com/tgautier/dotfiles/issues/227)). The Binary-conflict
+  section is scoped to casks whose CLI ships inside the app bundle; for the other
+  shape it pointed at
+  `$(brew --prefix)/Caskroom/<cask>/<version>/<source>`, which reintroduced the
+  version-lag trap the in-bundle rule exists to survive — the staged path carries
+  a version, `brew info` describes the tap version, and the stale link was made
+  by whichever version last linked it, so the reader would find no match and stop
+  on their own cask's link. It never said which version to substitute either. Now
+  `$(brew --caskroom)/<cask>/`, mirroring the in-bundle rule it parallels, which
+  is version-agnostic for the same reason.
 - `docs/homebrew.md` covers the second `just update` cask failure, "there is
   already a **Binary** at `<prefix>/bin/<name>`" — hit on obsidian 1.12.7 →
   1.13.4 ([#225](https://github.com/tgautier/dotfiles/issues/225)). A cask that

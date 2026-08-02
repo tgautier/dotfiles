@@ -60,6 +60,21 @@ fails is listed there too. (Set either variable and it stops being a preview:
 greedier than `outdated` for that one cask. If you ever see the three disagree,
 those are the two places to look.)
 
+Add `--greedy` and, for `auto_updates` casks, the list grows by every one whose
+bundle is current and whose Homebrew metadata is merely stale. Those are the
+ones `just update` leaves alone. (`--greedy` widens other classes too — notably
+`version :latest` casks whose downloaded artifact changed — on rules of their
+own.) Within `update-brew`, whose `upgrade` and `bundle` passes name no casks,
+the contrast is only ever between greedy and non-greedy, not between `outdated`
+and the update itself. Naming a cask changes that, but only for the verbs that
+act: `brew install --cask <cask>` and `brew upgrade --cask <cask>` check a named
+cask greedily, so either can upgrade one `brew outdated --cask` never listed.
+What does *not* change `outdated` is naming a cask: `brew outdated --cask
+<cask>` runs the same non-greedy predicate as the bare form. Only a greedy
+invocation makes it look harder — `--greedy`, the narrower `--greedy-latest` /
+`--greedy-auto-updates`, `HOMEBREW_UPGRADE_GREEDY`, or
+`HOMEBREW_UPGRADE_GREEDY_CASKS`.
+
 A cask that fails the update while `brew outdated --cask` stays quiet has two
 possible causes, and one command tells them apart:
 
@@ -74,19 +89,6 @@ beforehand answers from whatever the last refresh left behind. The cask really
 is outdated and `just update` will fail again on it, so go to the matching
 section below — read the artifact word in the error, `App` or `Binary` — rather
 than re-running the update.
-
-Add `--greedy` and, for `auto_updates` casks, the list grows by every one whose
-bundle is current and whose Homebrew metadata is merely stale. Those are the
-ones `just update` leaves alone. (`--greedy` widens other classes too — notably
-`version :latest` casks whose downloaded artifact changed — on rules of their
-own.) Within `update-brew`, whose `upgrade` and `bundle` passes name no casks,
-the contrast is only ever between greedy and non-greedy, not between `outdated`
-and the update itself. Naming a cask changes that, but only for the verbs that
-act: `brew install --cask <cask>` and `brew upgrade --cask <cask>` check a named
-cask greedily, so either can upgrade one `brew outdated --cask` never listed.
-What does *not* change `outdated` is naming a cask: `brew outdated --cask
-<cask>` runs the same non-greedy predicate as the bare form. Only `--greedy` or
-the two variables above make it look harder.
 
 ## Troubleshooting
 
@@ -221,7 +223,8 @@ fails at the identical point, and the app is gone. That prohibition is about
 running it *first*; once the link is cleared it becomes useful again, at the end
 of this section.
 
-**Run this only while `just update` is actually failing with the Binary error.**
+**Run this only while the Binary error is live** — from `just update`, or from a
+`brew reinstall --cask` you already tried.
 Everything below assumes that error is on your screen right now. If it is not —
 you already ran the fix, or you are reading ahead — there is nothing to clear,
 and deleting a healthy link would leave you worse off than when you started:
@@ -285,15 +288,15 @@ your own `rm` has landed, there is genuinely nothing to delete — skip to the
 install.
 
 `readlink` would also answer the arrow question, but it prints nothing for both
-a regular file and a missing path — one stops the recovery and the other does
-not, and `ls -l` is what separates them.
+a regular file and a missing path. The first stops the recovery outright; the
+second needs the reading above. `ls -l` at least tells those two apart.
 
 With the link cleared or absent:
 
 ```sh
 rm "<the path the error printed>"         # skip if there was nothing to delete
 brew install --cask <cask>
-brew list --cask --versions <cask>        # expect the version update wanted
+brew list --cask --versions <cask>        # expect the version the update wanted
 ls -l "<the path the error printed>"      # expect the link back
 ```
 

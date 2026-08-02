@@ -39,8 +39,10 @@ something else breaks.
 Both failures below were observed on casks marked `auto_updates`
 (`brew info --cask <cask>` prints it next to the version), which raises the
 obvious question — those apps update themselves, so why is Homebrew touching
-them at all? It is a precondition for the Binary conflict; the App conflict has
-other triggers too, listed in its own section.
+them at all? Neither failure *requires* the flag: the App conflict lists
+interruption triggers in its own section, and the Binary conflict turns on a
+stale recorded artifact list. This explains why these casks were being upgraded
+at all, not why the upgrades failed.
 
 Because a non-greedy check skips an `auto_updates` cask *unless* the version
 inside the installed app bundle is behind the tap, which Homebrew upgrades by
@@ -76,8 +78,11 @@ Add `--greedy` and, for `auto_updates` casks, the list grows by every one whose
 bundle is current and whose Homebrew metadata is merely stale. Those are the
 ones `just update` leaves alone. (`--greedy` widens other classes too — notably
 `version :latest` casks whose downloaded artifact changed — on rules of their
-own.) The contrast is only ever between greedy and non-greedy, not between
-`outdated` and the update itself.
+own.) Within `update-brew`, whose `upgrade` and `bundle` passes name no casks,
+the contrast is only ever between greedy and non-greedy, not between `outdated`
+and the update itself. A cask you name explicitly is a different matter: it is
+checked greedily either way, so `brew install --cask <cask>` can upgrade one
+that `brew outdated --cask` never listed.
 
 ## Troubleshooting
 
@@ -244,11 +249,11 @@ and reads a perfectly good cask link as foreign.
 Anything else belongs to something other than this cask and stops the recovery:
 a regular file, or a symlink pointing anywhere else — another tool's shim, a
 hand-made `ln -s`. The error says nothing about which of these you have:
-Homebrew raises for *anything* already sitting at that path, the cask's own
-stale link included — which is why you are here — excepting only a target that
-resolves inside `$(brew --cellar)`, which it attributes to a formula, warns
-about, and skips. So "it is a symlink" is not the test, and neither is the error
-itself. The arrow is.
+Homebrew raises for anything that *resolves* at that path, the cask's own stale
+link included — which is why you are here — excepting only a target resolving
+inside `$(brew --cellar)`, which it attributes to a formula, warns about, and
+skips. So "it is a symlink" is not the test, and neither is the error itself.
+The arrow is.
 
 A **dangling** arrow is still the cask's link and still has to go. It is what
 the earlier reinstall misstep leaves — app deleted, arrow pointing at nothing —
@@ -276,11 +281,15 @@ not, and `ls -l` is what separates them.
 With the link cleared or absent:
 
 ```sh
-rm "$(brew --prefix)/bin/<name>"          # skip if there was nothing to delete
+rm "<the path the error printed>"         # skip if there was nothing to delete
 brew install --cask <cask>
 brew list --cask --versions <cask>        # expect the version update wanted
-ls -l "$(brew --prefix)/bin/<name>"       # expect the link back
+ls -l "<the path the error printed>"      # expect the link back
 ```
+
+That path is usually `$(brew --prefix)/bin/<name>`, which is what the `ls -l`
+above assumes — but the Binary artifact's directory is configurable
+(`--binarydir`), so take it from the error rather than rebuilding it.
 
 `brew install --cask` is right whether or not the app survived — for a named
 cask already installed it routes through the upgrade path, absent

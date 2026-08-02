@@ -203,102 +203,65 @@ the new version's install half refuses to overwrite an existing target. Every
 subsequent `just update` repeats it, because the failure leaves the same
 leftover behind.
 
-**Do not run `brew reinstall --cask` here.** Its uninstall replays the same
-recorded artifact list (watch it print `Purging files for version
-<old-version>`), so the stale link survives, the install half fails at the same
-point — and the app is now uninstalled, leaving the link dangling. Observed on
-2026-08-02 with obsidian: recovering from that took the fix below anyway.
+**Fix** — clear the leftover link, then install.
 
-The prohibition is about running it *now*, while the link is still there.
-Reinstall becomes the right verb once the `rm` has cleared it — see the end of
-this section.
+**Run this only while `just update` is actually failing with the Binary error.**
+Everything below assumes that error is on your screen right now. If it is not —
+you already ran the fix, or you are reading ahead — there is nothing to clear,
+and deleting a healthy link would leave you worse off than when you started:
+the install below does not recreate it, because Homebrew skips a cask already
+at the tap version.
 
-**Fix** — drop the stale link, then install. It is a symlink *into* the app
-bundle, not the CLI itself, so removing it loses nothing and the install
-recreates it:
-
-Inspect first — this step is deliberately its own block, because the next one
-deletes:
+Given that, one command decides the whole thing:
 
 ```sh
 ls -l "$(brew --prefix)/bin/<name>"
 ```
 
-**Delete it only if the arrow points into the cask's own app bundle** — the
-exact path `brew info --cask <cask>` prints under Artifacts, of the form
-`/Applications/<App>.app/Contents/MacOS/<tool>`. That is the whole rule. It is
-stated as one condition rather than a list of outputs on purpose: this error
-fires for *any* resolving target Homebrew does not recognise as its own, so a
-list of the shapes you might see will always be missing one, and the shapes are
-easy to confuse at a glance.
+**Delete it only if the arrow points at the artifact `brew info --cask <cask>`
+lists under Artifacts** — for the app-plus-CLI casks this failure applies to,
+that is a path inside the app bundle. Compare the two; do not pattern-match the
+shape from memory.
 
-Anything else is someone else's file and stops the recovery — a regular file, or
-a symlink whose arrow points somewhere other than that bundle (another tool's
-shim, a hand-made `ln -s`). Both are as capable of producing this error as the
-stale cask link is, and only the arrow tells them apart.
+Anything else belongs to something other than this cask and stops the recovery:
+a regular file, or a symlink pointing anywhere else — another tool's shim, a
+hand-made `ln -s`. Homebrew raises this same error for any target it does not
+own, so "it is a symlink" is not the test. The arrow is.
 
-Two readings are not "something else", though, and neither changes the rule:
+Two outputs look like exceptions and are not. A **dangling** arrow still counts
+— `ls -l` never follows it, so the earlier `brew reinstall` misstep, which
+deletes the app and leaves the link, prints the same line and gets the same
+answer. And **`No such file or directory`** means there is nothing to delete:
+either the path is wrong, or your earlier `rm` already landed. Skip to the
+install.
 
-- **A dangling arrow still counts as the cask's link.** The reinstall misstep
-  above removes the app while leaving the link behind. `ls -l` never follows the
-  arrow, so it prints the same line whether or not the target exists — judge by
-  where the arrow points, not by whether it resolves.
-- **`No such file or directory` means there is nothing to delete.** On a first
-  attempt the path is wrong — stop and re-read the error. On a resumed run your
-  earlier `rm` landed and the install did not: skip the `rm` and run the rest.
+`readlink` would also answer the arrow question, but it prints nothing for both
+a regular file and a missing path — one stops the recovery and the other does
+not, and `ls -l` is what separates them.
 
-One more stop condition, unrelated to the output: if you are re-entering this
-block after a run whose two confirmations already passed, the link is the
-healthy one the fix just created. Deleting it now would not be undone by the
-install below, which no-ops on a cask already at the tap version.
-
-`ls -l` rather than `readlink` on purpose. `readlink` would answer the delete
-question — it prints the arrow target for a symlink and nothing for anything
-else — but the two "anything else" cases have *different* next steps here, and
-it renders them identically: a regular file and a missing path both print
-nothing and exit 1. `ls -l` separates them, which is what lets the two readings
-above be two readings rather than one shrug.
-
-A target under `$(brew --cellar)` is the one foreign shape this error cannot
-produce: a formula owning the name makes Homebrew warn and skip the link rather
-than fail. Stop for it anyway — the rule above is what you follow, not this
-footnote.
-
-Once the `ls -l` says the link is the cask's own, the rest runs together:
+With the link cleared or absent:
 
 ```sh
-rm "$(brew --prefix)/bin/<name>"
+rm "$(brew --prefix)/bin/<name>"          # skip if there was nothing to delete
 brew install --cask <cask>
-brew list --cask --versions <cask>       # confirm the new version landed
-ls -l "$(brew --prefix)/bin/<name>"      # confirm the link came back
+brew list --cask --versions <cask>        # expect the version update wanted
+ls -l "$(brew --prefix)/bin/<name>"       # expect the link back
 ```
 
-`brew install --cask` is correct whether or not the app survived the failure —
-for an explicitly named cask that is already installed, it routes through the
-upgrade path — so there is no need to check first and pick a different verb.
+`brew install --cask` is right whether or not the app survived — for a named
+cask already installed it routes through the upgrade path.
 
-**Read the two confirmations; they can fail quietly.** The version line should
-show the version the update was trying to install, and the `ls -l` should show
-the link again. They fail in two different ways, and the pair tells you which:
+**Read both confirmations.** They fail in two different ways:
 
-- **Version right, `ls -l` prints nothing** — the install no-opped. Homebrew
-  skips a cask already at the tap version (`Not upgrading <cask>, the latest
-  version is already installed`), and skipping means nothing was re-linked. The
-  version line still looks correct because it reports what is installed, which
-  in this state already equals the tap version.
-- **Version still the old one** — the install did not run at all, so the no-op
-  above is not the explanation. Scroll back through its output for the real
-  error before doing anything else.
-
-Either way, the link is recreated with:
-
-```sh
-brew reinstall --cask <cask>
-```
-
-Which is safe *here*, and only here. The prohibition further up applies before
-the `rm`, while the stale link is still blocking; once it is gone, reinstall has
-nothing to trip over.
+- **Version right, `ls -l` empty** — the install no-opped (`Not upgrading
+  <cask>, the latest version is already installed`) and re-linked nothing. The
+  version line looks correct because it reports what is installed, which here
+  already equals the tap version. `brew reinstall --cask <cask>` recreates the
+  link, and is safe now that the blocker is gone — the prohibition above applies
+  only while the stale link is still there.
+- **Version still the old one** — the install ran and failed, and the revert put
+  the old version back. The no-op above is not the explanation, so do not
+  reinstall: scroll back for the error it printed and work from that.
 
 **Finish the update.** As with the App conflict, the rest of `update-brew` never
 ran — re-run `just update` so the direct `brew` calls stay a one-off.

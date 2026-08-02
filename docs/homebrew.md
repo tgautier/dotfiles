@@ -80,9 +80,11 @@ ones `just update` leaves alone. (`--greedy` widens other classes too — notabl
 `version :latest` casks whose downloaded artifact changed — on rules of their
 own.) Within `update-brew`, whose `upgrade` and `bundle` passes name no casks,
 the contrast is only ever between greedy and non-greedy, not between `outdated`
-and the update itself. A cask you name explicitly is a different matter: it is
-checked greedily either way, so `brew install --cask <cask>` can upgrade one
-that `brew outdated --cask` never listed.
+and the update itself. Naming a cask changes that, but only for the verbs that
+act: `brew install --cask <cask>` and `brew upgrade --cask <cask>` check a named
+cask greedily, so either can upgrade one `brew outdated --cask` never listed.
+`brew outdated` itself stays non-greedy however you invoke it — narrowing it to
+`brew outdated --cask <cask>` does not make it look harder.
 
 ## Troubleshooting
 
@@ -309,9 +311,12 @@ that variable.
   installed. This is the state the precondition warns about, and
   `brew reinstall --cask <cask>` is the way out: it recreates the link, and is
   safe here because the blocker is already gone.
-- **Version still the old one** — the install ran and failed, and the revert put
-  the old version back. The no-op above is not the explanation, so do not
-  reinstall: scroll back for the error it printed and work from that.
+- **Version still the old one** — the no-op above is not the explanation, and
+  what the install printed tells you which case you are in. An error means it
+  ran and failed, and the revert put the old version back: work from that error,
+  do not reinstall. *Nothing at all* printed means
+  `HOMEBREW_NO_INSTALL_UPGRADE`, named above — there is no error to hunt, and
+  the install never attempted the upgrade.
 
 **Finish the update.** As with the App conflict, the rest of `update-brew` never
 ran — re-run `just update` so the direct `brew` calls stay a one-off.

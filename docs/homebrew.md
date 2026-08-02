@@ -45,11 +45,26 @@ inside the installed app bundle is behind the tap, which Homebrew upgrades by
 default (opt out with `HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`). So one reaches
 an upgrade exactly when the app has *not* self-updated.
 
-`brew outdated --cask` runs the same non-greedy predicate as the `brew bundle
-install` and `brew upgrade` steps of `update-brew`, so it is a faithful preview
-rather than a second opinion: the cask that fails the update is listed there
-too. If it is *not* listed, the app self-updated between the two runs — re-run
-`just update` rather than hunting a discrepancy that isn't one.
+Absent `HOMEBREW_UPGRADE_GREEDY` and `HOMEBREW_UPGRADE_GREEDY_CASKS`,
+`brew outdated --cask` runs the same non-greedy predicate as
+the `brew bundle install` and `brew upgrade` steps of `update-brew` — so it
+previews the update rather than offering a second opinion, and the cask that
+fails is listed there too. (Set either variable and it stops being a preview:
+`outdated` and `upgrade` honour them, `brew bundle install` does not. If you
+ever see the three disagree, that is the place to look.)
+
+A cask that fails the update while `brew outdated --cask` stays quiet has two
+possible causes, and one command tells them apart:
+
+```sh
+brew update && brew outdated --cask
+```
+
+Still empty means the app self-updated between the two runs — re-run
+`just update`. Now listed means the earlier check read a stale tap:
+`update-brew` refreshes it with `brew update` first, so a bare `brew outdated`
+beforehand answers from whatever the last refresh left behind, and re-running
+`just update` on its own would just reproduce the crash.
 
 Add `--greedy` and, for `auto_updates` casks, the list grows by every one whose
 bundle is current and whose Homebrew metadata is merely stale. Those are the
@@ -101,7 +116,8 @@ wedged cask — read the error text before reaching for it. It does *not* resolv
 the Binary conflict documented below: there its uninstall leaves the blocker in
 place, so it fails at the same point having already removed the app.
 
-Three properties make it the default rather than a fallback here:
+Against a wedged *staging directory* specifically, three properties make it the
+default rather than a fallback:
 
 - Its internal uninstall is **forced**, so the backup step overwrites the
   wedged staging directory instead of refusing — which is exactly what a plain
@@ -208,7 +224,12 @@ cask owns, and only one of these three outputs is that:
 | --- | --- | --- |
 | `l...  <name> -> /Applications/<App>.app/...` | the cask's own link | delete it, continue |
 | `-...  <name>` (a regular file) | not a symlink — someone else's install | stop and investigate |
-| `No such file or directory` | wrong path, or already cleared | stop; re-read the error |
+| `No such file or directory`, fresh attempt | wrong path | stop; re-read the error |
+| `No such file or directory`, resumed run | you already deleted it, or reinstalled | skip the `rm`, run the rest |
+
+That last row is the common one on a second pass: the `rm` succeeded and the
+install didn't, or the reinstall misstep above already took the link with it.
+Nothing is wrong — go straight to `brew install --cask` and the two checks.
 
 `ls -l` rather than `readlink` on purpose: `readlink` prints nothing and exits 1
 for BOTH a regular file and a missing path, so it cannot tell the delete-it case

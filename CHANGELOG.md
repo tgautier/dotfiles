@@ -275,9 +275,11 @@ grouped by **date** rather than by semantic version. Newest first.
   the identical point — verified the hard way before the real fix landed. A new
   section explains why an `auto_updates` cask — an app that updates itself — is
   upgraded at all: non-greedy checks skip such casks *unless* the installed app
-  bundle is behind the tap, which Homebrew upgrades by default. `brew outdated
-  --cask` runs that same predicate, so it previews the failure rather than
-  disagreeing with it; the greedy-vs-non-greedy gap is the only real contrast.
+  bundle is behind the tap, which Homebrew upgrades by default.
+  `brew outdated --cask` runs that same predicate absent the greedy env vars, so
+  it previews the failure rather than disagreeing with it; where it does stay
+  quiet, `brew update && brew outdated --cask` separates a self-update from a
+  stale tap.
 - `lint-rcrc`'s coverage comment now names every flag in the filter it describes.
   It closed the set with `-v` and `-h` but omitted `-E`, which is pinned on the
   same footing as `-v` — drop it and the pattern becomes a BRE where `(`, `)` and

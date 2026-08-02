@@ -194,8 +194,9 @@ the error: `App` or `Binary`.
 Scope: the recovery below is written for a CLI that ships *inside* the app
 bundle — the shape `brew info --cask <cask>` shows as an absolute source path
 under Artifacts. A cask whose `binary` stanza names a source relative to the
-staged path links out of the Caskroom instead — you have that shape when the
-Artifacts source prints as a bare relative string rather than an absolute path.
+staged path links out of the Caskroom instead — you have that shape whenever the
+Artifacts source is anything other than a path inside the app bundle, whether a
+bare relative string or an absolute path under the Caskroom.
 Only the comparison changes: check that the `ls -l` arrow points inside
 `$(brew --caskroom)/<cask>/` — the same membership test, with the cask's
 Caskroom directory standing in for the app bundle — and the rest of the section

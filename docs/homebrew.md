@@ -202,42 +202,54 @@ leftover behind.
 **Do not run `brew reinstall --cask` here.** Its uninstall replays the same
 recorded artifact list (watch it print `Purging files for version
 <old-version>`), so the stale link survives, the install half fails at the same
-point — and the app is now uninstalled. Observed on 2026-08-02 with obsidian:
-recovering from that took the fix below anyway.
+point — and the app is now uninstalled, leaving the link dangling. Observed on
+2026-08-02 with obsidian: recovering from that took the fix below anyway.
 
 **Fix** — drop the stale link, then install. It is a symlink *into* the app
 bundle, not the CLI itself, so removing it loses nothing and the install
 recreates it:
 
+Inspect first — this step is deliberately its own block, because the next one
+deletes:
+
 ```sh
-ls -l "$(brew --prefix)/bin/<name>"      # inspect BEFORE deleting — see below
+ls -l "$(brew --prefix)/bin/<name>"
+```
+
+That prints one of two outputs, and only one of them is the symlink the cask
+owns:
+
+| `ls -l` shows | Meaning | Action |
+| --- | --- | --- |
+| `l...  <name> -> /Applications/<App>.app/...` | the cask's own link | delete it, continue below |
+| `-...  <name>` (a regular file) | not a symlink — someone else's install | stop and investigate |
+
+The arrow target may itself be gone — the reinstall misstep above removes the
+app but leaves this link behind, dangling. `ls -l` never follows the arrow, so
+it prints the same line either way and the action is unchanged.
+
+A third output, `No such file or directory`, is not a case the table covers
+because it depends on where you are rather than on what is on disk. On a first
+attempt it means the path is wrong — stop and re-read the error. On a resumed
+run it usually means your earlier `rm` landed and the install did not: skip the
+`rm` and run the rest.
+
+`ls -l` rather than `readlink` on purpose: `readlink` prints nothing and exits 1
+for BOTH a regular file and a missing path, so it cannot separate the delete-it
+case from either stop case.
+
+A link under `$(brew --cellar)` would be a further shape, but not one this error
+can produce: a formula owning the name makes Homebrew warn and skip the link
+rather than fail.
+
+Once the `ls -l` says the link is the cask's own, the rest runs together:
+
+```sh
 rm "$(brew --prefix)/bin/<name>"
 brew install --cask <cask>
 brew list --cask --versions <cask>       # confirm the new version landed
 ls -l "$(brew --prefix)/bin/<name>"      # confirm the link came back
 ```
-
-**Read the `ls -l` before running the `rm`** — the fix assumes a symlink the
-cask owns, and only one of these three outputs is that:
-
-| `ls -l` shows | Meaning | Action |
-| --- | --- | --- |
-| `l...  <name> -> /Applications/<App>.app/...` | the cask's own link | delete it, continue |
-| `-...  <name>` (a regular file) | not a symlink — someone else's install | stop and investigate |
-| `No such file or directory`, fresh attempt | wrong path | stop; re-read the error |
-| `No such file or directory`, resumed run | you already deleted it, or reinstalled | skip the `rm`, run the rest |
-
-That last row is the common one on a second pass: the `rm` succeeded and the
-install didn't, or the reinstall misstep above already took the link with it.
-Nothing is wrong — go straight to `brew install --cask` and the two checks.
-
-`ls -l` rather than `readlink` on purpose: `readlink` prints nothing and exits 1
-for BOTH a regular file and a missing path, so it cannot tell the delete-it case
-from the two stop cases — and the next line in the block deletes.
-
-A link under `$(brew --cellar)` is a fourth shape, but not one this error can
-produce: a formula owning the name makes Homebrew warn and skip the link rather
-than fail.
 
 `brew install --cask` is correct whether or not the app survived the failure —
 for an explicitly named cask that is already installed, it routes through the

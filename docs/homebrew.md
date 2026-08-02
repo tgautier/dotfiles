@@ -69,8 +69,9 @@ the contrast is only ever between greedy and non-greedy, not between `outdated`
 and the update itself. Naming a cask changes that, but only for the verbs that
 act: `brew install --cask <cask>` and `brew upgrade --cask <cask>` check a named
 cask greedily, so either can upgrade one `brew outdated --cask` never listed.
-What does *not* change `outdated` is naming a cask: `brew outdated --cask
-<cask>` runs the same non-greedy predicate as the bare form. Only a greedy
+What does *not* change `outdated` is naming a cask:
+`brew outdated --cask <cask>` runs the same non-greedy predicate as the bare
+form. Only a greedy
 invocation makes it look harder — `--greedy`, the narrower `--greedy-latest` /
 `--greedy-auto-updates`, `HOMEBREW_UPGRADE_GREEDY`, or
 `HOMEBREW_UPGRADE_GREEDY_CASKS`.
@@ -86,9 +87,11 @@ Still empty means the app self-updated between the two runs — re-run
 `just update`. Now listed means the earlier check read a stale tap:
 `update-brew` refreshes it with `brew update` first, so a bare `brew outdated`
 beforehand answers from whatever the last refresh left behind. The cask really
-is outdated and `just update` will fail again on it, so go to the matching
-section below — read the artifact word in the error, `App` or `Binary` — rather
-than re-running the update.
+is outdated and `just update` will fail again on it, so work the failure rather
+than re-running the update. If the error names an artifact — `App` or `Binary` —
+go to the matching section below; a cask upgrade can also fail for reasons that
+name none (a checksum mismatch, quarantine, a `depends_on macos` bump), and
+those are worked from the error on its own terms.
 
 ## Troubleshooting
 
@@ -241,10 +244,14 @@ Homebrew honours as written (expanding `~`) instead of placing it under `bin/`.
 ls -l "<the path the error printed>"     # usually $(brew --prefix)/bin/<name>
 ```
 
-**Delete it only if the arrow points at the artifact `brew info --cask <cask>`
-lists under Artifacts** — for the app-plus-CLI casks this failure applies to, a
-path inside the app bundle. Compare the two rather than pattern-matching the
-shape from memory, and mind that they print in opposite senses:
+**Delete it only if the arrow points inside the cask's own app bundle** —
+normally the exact path `brew info --cask <cask>` lists under Artifacts, which
+is what to compare against rather than pattern-matching the shape from memory.
+Normally, because `brew info` describes the *tap* version while the stale link
+was made by whichever version last linked it: a cask that moved its binary
+between versions shows the old path in `ls -l` and the new one in `brew info`,
+and the bundle test is the one that survives that. Mind that the two print in
+opposite senses:
 
 ```text
 ls -l      <prefix>/bin/<name> -> /Applications/<App>.app/.../<tool>

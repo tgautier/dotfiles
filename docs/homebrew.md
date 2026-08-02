@@ -36,9 +36,11 @@ something else breaks.
 
 ### Why an auto-updating cask is upgraded at all
 
-Both failures below hit casks marked `auto_updates` (`brew info --cask <cask>`
-prints it next to the version), which raises the obvious question — those apps
-update themselves, so why is Homebrew touching them at all?
+Both failures below were observed on casks marked `auto_updates`
+(`brew info --cask <cask>` prints it next to the version), which raises the
+obvious question — those apps update themselves, so why is Homebrew touching
+them at all? It is a precondition for the Binary conflict; the App conflict has
+other triggers too, listed in its own section.
 
 Because a non-greedy check skips an `auto_updates` cask *unless* the version
 inside the installed app bundle is behind the tap, which Homebrew upgrades by
@@ -241,10 +243,12 @@ and reads a perfectly good cask link as foreign.
 
 Anything else belongs to something other than this cask and stops the recovery:
 a regular file, or a symlink pointing anywhere else — another tool's shim, a
-hand-made `ln -s`. Homebrew raises this error for any target it does not own,
-excepting only one that resolves inside `$(brew --cellar)`, which it attributes
-to a formula, warns about, and skips. So "it is a symlink" is not the test. The
-arrow is.
+hand-made `ln -s`. The error says nothing about which of these you have:
+Homebrew raises for *anything* already sitting at that path, the cask's own
+stale link included — which is why you are here — excepting only a target that
+resolves inside `$(brew --cellar)`, which it attributes to a formula, warns
+about, and skips. So "it is a symlink" is not the test, and neither is the error
+itself. The arrow is.
 
 A **dangling** arrow is still the cask's link and still has to go. It is what
 the earlier reinstall misstep leaves — app deleted, arrow pointing at nothing —

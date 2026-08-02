@@ -34,6 +34,24 @@ paper over it with `|| true` or `continue-on-error` — a red `just update` mean
 a package really is broken, and silencing it hides a half-installed app until
 something else breaks.
 
+### Why an auto-updating cask is upgraded at all
+
+Both failures below hit casks marked `auto_updates` (`brew info --cask <cask>`
+prints it next to the version), which is confusing: `brew outdated --cask` lists
+nothing while `just update` dies on one of them. They are not the same question.
+
+`brew outdated --cask` and the `brew bundle install` / `brew upgrade` steps of
+`update-brew` all run **non-greedy**, and a non-greedy check skips an
+`auto_updates` cask — *unless* Homebrew sees the version inside the installed
+app bundle is behind the tap, which it acts on by default
+(`HOMEBREW_UPGRADE_AUTO_UPDATES_CASKS`, disabled only by setting
+`HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`).
+
+So an `auto_updates` cask reaches an upgrade exactly when the app has *not*
+self-updated. That is why `--greedy` lists a pile of casks `just update` leaves
+alone — their bundles are current and only Homebrew's metadata is stale — while
+the one app that fell behind is the one that fails.
+
 ## Troubleshooting
 
 ### Cask upgrade fails with "there is already an App at"
@@ -72,8 +90,12 @@ cleared.
 brew reinstall --cask <cask>
 ```
 
-That is the whole remedy in nearly every case. Three properties make it the
-default rather than a fallback:
+That is the whole remedy **for this symptom**, and not a general fix for a
+wedged cask — read the error text before reaching for it. It does *not* resolve
+the Binary conflict documented below: there its uninstall leaves the blocker in
+place, so it fails at the same point having already removed the app.
+
+Three properties make it the default rather than a fallback here:
 
 - Its internal uninstall is **forced**, so the backup step overwrites the
   wedged staging directory instead of refusing — which is exactly what a plain
@@ -121,6 +143,68 @@ so the direct `brew` call stays a one-off:
 ```sh
 just update
 ```
+
+### Cask upgrade fails with "there is already a Binary at"
+
+macOS only, and distinct from the App conflict above despite the near-identical
+wording — **the remedy above makes this one worse**. Read the artifact word in
+the error: `App` or `Binary`.
+
+**Symptom** — `just update` dies in `update-brew`, and the upgrade rolls itself
+back first:
+
+```text
+==> Moving App '<App>.app' to '/Applications/<App>.app'
+Warning: Reverting upgrade for Cask <cask>
+==> Removing App '/Applications/<App>.app'
+==> Purging files for version <new-version> of Cask <cask>
+==> Moving App '<App>.app' to '/Applications/<App>.app'
+Error: <cask>: It seems there is already a Binary at '/opt/homebrew/bin/<name>'.
+```
+
+The app is back where it started — the revert is the *consequence*, not the
+problem. The Binary line is the one that matters.
+
+**Cause** — the cask ships a CLI alongside the app (`brew info --cask <cask>`
+lists it under Artifacts as `.../<App>.app/Contents/MacOS/<tool> -> <name>
+(Binary)`). Homebrew replays the *installed* version's artifact list to
+uninstall it, and that recorded list can be missing the Binary. Re-running with
+`--debug` prints the set it loaded; for obsidian 1.12.7 it held only
+`Cask::Artifact::App` and `Cask::Artifact::Zap`.
+
+So the upgrade's uninstall half never unlinks `/opt/homebrew/bin/<name>`, and
+the new version's install half refuses to overwrite an existing target. Every
+subsequent `just update` repeats it, because the failure leaves the same
+leftover behind.
+
+**Do not run `brew reinstall --cask` here.** Its uninstall replays the same
+recorded artifact list (watch it print `Purging files for version
+<old-version>`), so the stale link survives, the install half fails at the same
+point — and the app is now uninstalled. Observed on 2026-08-02 with obsidian:
+recovering from that took the fix below anyway.
+
+**Fix** — drop the stale link, then install. It is a symlink *into* the app
+bundle, not the CLI itself, so removing it loses nothing and the install
+recreates it:
+
+```sh
+readlink "$(brew --prefix)/bin/<name>"   # expect: .../<App>.app/Contents/MacOS/<tool>
+rm "$(brew --prefix)/bin/<name>"
+brew install --cask <cask>
+```
+
+Confirm what `readlink` prints before deleting — the fix assumes a symlink the
+cask owns. A path into the app bundle is that. A real file is not, and is
+someone else's install to investigate rather than delete. A path under
+`$(brew --cellar)` means a formula owns the name, which Homebrew detects and
+warns past instead of failing on, so it cannot be what produced this error.
+
+Use `brew upgrade --cask <cask>` in place of the install if the app is still
+there; `brew list --cask --versions <cask>` says which. After the reinstall
+misstep above it is gone, and `install` is the right call.
+
+**Finish the update.** As with the App conflict, the rest of `update-brew` never
+ran — re-run `just update` so the direct `brew` calls stay a one-off.
 
 ### `brew bundle` fails on a missing profile marker
 

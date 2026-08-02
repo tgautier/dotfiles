@@ -192,6 +192,12 @@ macOS only, and distinct from the App conflict above despite the near-identical
 wording — **the remedy above makes this one worse**. Read the artifact word in
 the error: `App` or `Binary`.
 
+Scope: this assumes the CLI ships *inside* the app bundle — the shape
+`brew info --cask <cask>` shows as an absolute source path under Artifacts, and
+the only shape the recovery below is written for. A cask whose `binary` stanza
+names a source relative to the staged path links out of the Caskroom instead,
+and its stale link needs a different comparison than the one used here.
+
 **Symptom** — `just update` dies in `update-brew`, and the upgrade rolls itself
 back first:
 
@@ -263,19 +269,17 @@ your `ls -l` arrow points *at* is the one on the **left** of the `brew info`
 arrow. Comparing the two right-hand sides gives you a path against a bare token
 and reads a perfectly good cask link as foreign.
 
-Anything else belongs to something other than this cask and stops the recovery:
-a regular file, or a symlink pointing anywhere else — another tool's shim, a
-hand-made `ln -s`. The error says nothing about which of these you have:
-Homebrew raises for anything that *resolves* at that path, the cask's own stale
-link included — which is why you are here — excepting only a target resolving
-inside `$(brew --cellar)`, which it attributes to a formula, warns about, and
-skips. So "it is a symlink" is not the test, and neither is the error itself.
-The arrow is.
+Whatever the rule does not select stops the recovery — a regular file, another
+tool's shim, a hand-made `ln -s`. Do not look for a second test to settle those:
+the error cannot, because Homebrew raises for anything that *resolves* at that
+path, the cask's own stale link included — which is why you are here — excepting
+only a target resolving inside `$(brew --cellar)`, which it attributes to a
+formula, warns about, and skips. Nor can "is it a symlink". The arrow is the
+test, and it is the only one.
 
-A **dangling** arrow changes nothing about the test above — apply it exactly as
-written, because `ls -l` never follows the arrow and prints the same line either
-way. An arrow matching the `brew info` path is the cask's link and goes; one
-pointing elsewhere is still someone else's and still stops you, dangling or not.
+A **dangling** arrow does not change it either. `ls -l` never follows the arrow,
+so it prints the same line whether or not the target exists — read where the
+arrow points and apply the rule unchanged.
 
 Danglingness is worth naming only because it is tempting to think it makes the
 link harmless. It does not. It is what the earlier reinstall misstep leaves —

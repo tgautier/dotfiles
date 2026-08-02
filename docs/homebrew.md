@@ -50,8 +50,10 @@ Absent `HOMEBREW_UPGRADE_GREEDY` and `HOMEBREW_UPGRADE_GREEDY_CASKS`,
 the `brew bundle install` and `brew upgrade` steps of `update-brew` — so it
 previews the update rather than offering a second opinion, and the cask that
 fails is listed there too. (Set either variable and it stops being a preview:
-`outdated` and `upgrade` honour them, `brew bundle install` does not. If you
-ever see the three disagree, that is the place to look.)
+`outdated` and `upgrade` honour them, `brew bundle install` does not. A
+`greedy: true` option on a Brewfile entry pulls the other way, making `bundle`
+greedier than `outdated` for that one cask. If you ever see the three disagree,
+those are the two places to look.)
 
 A cask that fails the update while `brew outdated --cask` stays quiet has two
 possible causes, and one command tells them apart:
@@ -222,37 +224,45 @@ deletes:
 ls -l "$(brew --prefix)/bin/<name>"
 ```
 
-Two of the outputs it can print are in the table below, and only one of those is
-the symlink the cask owns:
+**Delete it only if the arrow points into the cask's own app bundle** — the
+exact path `brew info --cask <cask>` prints under Artifacts, of the form
+`/Applications/<App>.app/Contents/MacOS/<tool>`. That is the whole rule. It is
+stated as one condition rather than a list of outputs on purpose: this error
+fires for *any* resolving target Homebrew does not recognise as its own, so a
+list of the shapes you might see will always be missing one, and the shapes are
+easy to confuse at a glance.
 
-| `ls -l` shows | Meaning | Action |
-| --- | --- | --- |
-| `l...  <name> -> /Applications/<App>.app/...` | the cask's own link | delete it, continue below |
-| `-...  <name>` (a regular file) | not a symlink — someone else's install | stop and investigate |
+Anything else is someone else's file and stops the recovery — a regular file, or
+a symlink whose arrow points somewhere other than that bundle (another tool's
+shim, a hand-made `ln -s`). Both are as capable of producing this error as the
+stale cask link is, and only the arrow tells them apart.
 
-The first row assumes you are still recovering. If you are re-entering this
-block after a run whose two confirmations already passed, the link you are
-looking at is the healthy one the fix just created — stop here. Deleting it now
-would not be undone by the install below, which no-ops on a cask already at the
-tap version.
+Two readings are not "something else", though, and neither changes the rule:
 
-The arrow target may itself be gone — the reinstall misstep above removes the
-app but leaves this link behind, dangling. `ls -l` never follows the arrow, so
-it prints the same line either way and the action is unchanged.
+- **A dangling arrow still counts as the cask's link.** The reinstall misstep
+  above removes the app while leaving the link behind. `ls -l` never follows the
+  arrow, so it prints the same line whether or not the target exists — judge by
+  where the arrow points, not by whether it resolves.
+- **`No such file or directory` means there is nothing to delete.** On a first
+  attempt the path is wrong — stop and re-read the error. On a resumed run your
+  earlier `rm` landed and the install did not: skip the `rm` and run the rest.
 
-A third output, `No such file or directory`, is not a case the table covers
-because it depends on where you are rather than on what is on disk. On a first
-attempt it means the path is wrong — stop and re-read the error. On a resumed
-run it usually means your earlier `rm` landed and the install did not: skip the
-`rm` and run the rest.
+One more stop condition, unrelated to the output: if you are re-entering this
+block after a run whose two confirmations already passed, the link is the
+healthy one the fix just created. Deleting it now would not be undone by the
+install below, which no-ops on a cask already at the tap version.
 
-`ls -l` rather than `readlink` on purpose: `readlink` prints nothing and exits 1
-for BOTH a regular file and a missing path, so it cannot separate the delete-it
-case from either stop case.
+`ls -l` rather than `readlink` on purpose. `readlink` would answer the delete
+question — it prints the arrow target for a symlink and nothing for anything
+else — but the two "anything else" cases have *different* next steps here, and
+it renders them identically: a regular file and a missing path both print
+nothing and exit 1. `ls -l` separates them, which is what lets the two readings
+above be two readings rather than one shrug.
 
-A link under `$(brew --cellar)` would be a further shape, but not one this error
-can produce: a formula owning the name makes Homebrew warn and skip the link
-rather than fail.
+A target under `$(brew --cellar)` is the one foreign shape this error cannot
+produce: a formula owning the name makes Homebrew warn and skip the link rather
+than fail. Stop for it anyway — the rule above is what you follow, not this
+footnote.
 
 Once the `ls -l` says the link is the cask's own, the rest runs together:
 
@@ -269,10 +279,18 @@ upgrade path — so there is no need to check first and pick a different verb.
 
 **Read the two confirmations; they can fail quietly.** The version line should
 show the version the update was trying to install, and the `ls -l` should show
-the link again. If the version is unchanged, or the `ls -l` prints nothing, the
-install no-opped — Homebrew skips a cask already at the tap version
-(`Not upgrading <cask>, the latest version is already installed`), and skipping
-means nothing was re-linked. Recreate it with:
+the link again. They fail in two different ways, and the pair tells you which:
+
+- **Version right, `ls -l` prints nothing** — the install no-opped. Homebrew
+  skips a cask already at the tap version (`Not upgrading <cask>, the latest
+  version is already installed`), and skipping means nothing was re-linked. The
+  version line still looks correct because it reports what is installed, which
+  in this state already equals the tap version.
+- **Version still the old one** — the install did not run at all, so the no-op
+  above is not the explanation. Scroll back through its output for the real
+  error before doing anything else.
+
+Either way, the link is recreated with:
 
 ```sh
 brew reinstall --cask <cask>

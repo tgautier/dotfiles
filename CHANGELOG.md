@@ -10,6 +10,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- `brew "cargo-audit"` in `Brewfile` and `Brewfile.linux`. A project's `just pre-push` invokes `cargo audit`; with the tool absent the recipe fails on the missing subcommand — and until that repo wired the recipe in, the audit simply never ran on this machine, letting four RUSTSEC advisories sit invisible. Declaring it in the bundle makes the gate real on every machine.
 - `brew "kimi-code"` (Moonshot's terminal coding agent) in `Brewfile.personal`,
   under a new `# CLI Tools & Development` block — the first formula in an
   overlay, which until now carried only `# Applications` and Mac App Store

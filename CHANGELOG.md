@@ -168,6 +168,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Elixir 1.20.2 → 1.20.3 in `config/mise/config.toml`; OTP-29 suffix unchanged.
 - The stale-symlink sweep is split in two: `_scan-stale-symlinks` finds and
   prints stale links, `cleanup-symlinks` confirms and removes them. The scan
   honours a `CLEANUP_HOME` override so fixtures can drive it against a temp

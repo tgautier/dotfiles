@@ -134,7 +134,7 @@ test-chezmoi-canary:
     #!/usr/bin/env bash
     set -euo pipefail
     command -v chezmoi >/dev/null || { echo "chezmoi is required for the canary guard" >&2; exit 1; }
-    for pair in 'tmux.conf:dot_tmux.conf' 'zshrc:dot_zshrc' 'zshenv:dot_zshenv' 'zprofile:dot_zprofile' 'psqlrc:dot_psqlrc' 'gitignore:dot_gitignore'; do
+    for pair in 'tmux.conf:dot_tmux.conf' 'zshrc:dot_zshrc' 'zshenv:dot_zshenv' 'zprofile:dot_zprofile' 'psqlrc:dot_psqlrc' 'gitignore:dot_gitignore' 'agignore:dot_agignore' 'editorconfig:dot_editorconfig'; do
         source=${pair%%:*}
         chezmoi_file=${pair##*:}
         test -f "home/$chezmoi_file"
@@ -156,6 +156,8 @@ test-chezmoi-canary:
     cmp -s zprofile "$tmp/home/.zprofile"
     cmp -s psqlrc "$tmp/home/.psqlrc"
     cmp -s gitignore "$tmp/home/.gitignore"
+    cmp -s agignore "$tmp/home/.agignore"
+    cmp -s editorconfig "$tmp/home/.editorconfig"
     for name in kshow kseal op-ssh-sign obsidian; do
         cmp -s "bin/$name" "$tmp/home/.bin/$name"
         test -x "$tmp/home/.bin/$name"

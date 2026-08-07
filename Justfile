@@ -168,6 +168,31 @@ test-chezmoi-canary:
     test -z "$diff_output"
     echo "chezmoi canary OK (equivalent render, second apply is a no-op)"
 
+[doc("Remove the retired iTerm2 symlink after migrating to Ghostty")]
+cleanup-retired-iterm:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "${PLATFORM:-}" != "macos" ] && [ "$(uname -s)" != "Darwin" ]; then
+        echo "retired iTerm2 cleanup is macOS-only" >&2
+        exit 1
+    fi
+    target="$HOME/.iterm2/com.googlecode.iterm2.plist"
+    if [ -L "$target" ]; then
+        link=$(readlink "$target")
+        case "$link" in
+            */iterm2/com.googlecode.iterm2.plist)
+                rm "$target"
+                echo "removed retired iTerm2 symlink: $target"
+                ;;
+            *)
+                echo "refusing to remove non-rcm symlink: $target -> $link" >&2
+                exit 1
+                ;;
+        esac
+    else
+        echo "retired iTerm2 symlink absent: $target"
+    fi
+
 # Assert every in-body `just <recipe>` call names a recipe that exists here.
 # Those calls are opaque shell strings to just, so nothing else catches a typo:
 # `just --summary` and `just --dry-run setup` both exit 0 with a misspelt one,

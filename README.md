@@ -235,7 +235,6 @@ bin/                    # Scripts added to PATH
 config/
   mise/config.toml      # Pinned tool versions (node, python, ruby, go, etc.)
   ghostty/config        # Ghostty terminal config
-iterm2/                 # iTerm2 preferences plist
 tmux.conf               # tmux config (C-a prefix, vi mode, platform clipboard)
 gitconfig               # SSH signing via 1Password, rebase-based pulls
 gitignore               # Global gitignore (OS, editor, build noise)
@@ -332,7 +331,6 @@ per-clone installation.
 | `rcrc`                    | rcm        | `DOTFILES_DIRS`, `EXCLUDES`, `SYMLINK_DIRS`                       |
 | `config/mise/config.toml` | mise       | Pinned runtimes — node, python, ruby, go, erlang, elixir, …       |
 | `config/ghostty/config`   | Ghostty    | Font, auto light/dark theme, window size                          |
-| `iterm2/`                 | iTerm2     | Preferences plist                                                 |
 
 ## Shell load order
 

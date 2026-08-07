@@ -24,6 +24,9 @@ jobs:
           # `lint-cleanup-symlinks` in the "Run all checks" step below.
           sudo apt-get install -y shellcheck jq zsh
           npm install -g markdownlint-cli2
+          mise install chezmoi@2.72.0
+          mise use -g chezmoi@2.72.0
+          echo "$(mise where chezmoi@2.72.0)/bin" >> "$GITHUB_PATH"
 
       - name: Run all checks
         run: just ci

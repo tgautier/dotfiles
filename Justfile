@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks lint-via-private
+ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-chezmoi-canary lint-via-private
 
 # Assert `rcrc` resolves the way README documents, on both halves of the
 # override contract: DOTFILES_DIRS, which reaches the operator's real $HOME
@@ -128,6 +128,26 @@ lint-rcrc:
         exit 1
     fi
     echo "rcrc OK (defaults, both overrides, slash normalisation, root value, EXCLUDES sourcing, no leaks)"
+
+[doc("Render the chezmoi canary in an isolated HOME and verify source equivalence plus idempotence")]
+test-chezmoi-canary:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    command -v chezmoi >/dev/null || { echo "chezmoi is required for the canary guard" >&2; exit 1; }
+    test -f home/dot_tmux.conf
+    cmp -s tmux.conf home/dot_tmux.conf
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+    : > "$tmp/config.toml"
+    mkdir -p "$tmp/home"
+    chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply
+    cmp -s tmux.conf "$tmp/home/.tmux.conf"
+    diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
+    test -z "$diff_output"
+    chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply
+    diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
+    test -z "$diff_output"
+    echo "chezmoi canary OK (equivalent render, second apply is a no-op)"
 
 # Assert every in-body `just <recipe>` call names a recipe that exists here.
 # Those calls are opaque shell strings to just, so nothing else catches a typo:

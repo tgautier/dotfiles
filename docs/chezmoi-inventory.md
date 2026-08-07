@@ -41,8 +41,13 @@ criteria are demonstrated.
 ## Evidence still required
 
 1. Capture the live rcm target map on each supported platform.
-2. Add one thematic source slice under `home/` and compare `chezmoi diff` with
-   the recorded rcm targets.
-3. Prove a second apply is a no-op in an isolated HOME.
-4. Record backup and rollback commands before changing `just link` or
+2. Record backup and rollback commands before changing `just link` or
    `just setup`.
+
+## Canary evidence
+
+The `tmux.conf` slice is represented by `home/dot_tmux.conf`. On 2026-08-07 it
+rendered byte-for-byte identical to the current rcm source in an isolated HOME,
+and a second `chezmoi apply` produced no changes. This is shadow evidence only;
+rcm remains the active deployment owner until the complete target set has
+equivalent evidence.

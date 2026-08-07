@@ -134,7 +134,7 @@ test-chezmoi-canary:
     #!/usr/bin/env bash
     set -euo pipefail
     command -v chezmoi >/dev/null || { echo "chezmoi is required for the canary guard" >&2; exit 1; }
-    for pair in 'tmux.conf:dot_tmux.conf' 'zshrc:dot_zshrc' 'zshenv:dot_zshenv' 'zprofile:dot_zprofile'; do
+    for pair in 'tmux.conf:dot_tmux.conf' 'zshrc:dot_zshrc' 'zshenv:dot_zshenv' 'zprofile:dot_zprofile' 'psqlrc:dot_psqlrc' 'gitignore:dot_gitignore'; do
         source=${pair%%:*}
         chezmoi_file=${pair##*:}
         test -f "home/$chezmoi_file"
@@ -149,6 +149,8 @@ test-chezmoi-canary:
     cmp -s zshrc "$tmp/home/.zshrc"
     cmp -s zshenv "$tmp/home/.zshenv"
     cmp -s zprofile "$tmp/home/.zprofile"
+    cmp -s psqlrc "$tmp/home/.psqlrc"
+    cmp -s gitignore "$tmp/home/.gitignore"
     diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
     test -z "$diff_output"
     chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply

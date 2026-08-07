@@ -45,8 +45,8 @@ criteria are demonstrated.
 
 ## Canary evidence
 
-The `tmux.conf`, `zshrc`, `zshenv`, `zprofile`, `psqlrc`, `gitignore`, `agignore`,
-`editorconfig`, and four
+The `tmux.conf`, `zshrc`, `zshenv`, `zprofile`, `zlogin`, `psqlrc`, `gitignore`,
+`agignore`, `editorconfig`, and four
 public executable slices and Ghostty config are represented under `home/`, with
 executable-mode checks. On 2026-08-07 they rendered byte-for-byte
 identical to the current rcm sources in an isolated HOME, and a second

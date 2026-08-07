@@ -50,6 +50,6 @@ unset -f _rcrc_strip_slashes 2>/dev/null || true
 # NB: Brewfile / Brewfile.linux must stay linked — zshenv exports
 # HOMEBREW_BUNDLE_FILE=~/.Brewfile[.linux], so excluding them breaks bare
 # `brew bundle`.
-EXCLUDES="README.md .githooks Justfile CHANGELOG.md rcm-excludes $( { grep -hvE '^[[:space:]]*(#|$)' "${PRIVATE_DIR}/rcm-excludes" 2>/dev/null || true; } | tr '\n' ' ')"
+EXCLUDES="README.md .githooks docs home Justfile CHANGELOG.md .chezmoiroot rcm-excludes $( { grep -hvE '^[[:space:]]*(#|$)' "${PRIVATE_DIR}/rcm-excludes" 2>/dev/null || true; } | tr '\n' ' ')"
 DOTFILES_DIRS="${PUBLIC_DIR} ${PRIVATE_DIR}"
 SYMLINK_DIRS="claude/skills claude/rules claude/hooks"

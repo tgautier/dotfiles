@@ -115,6 +115,7 @@ lint-rcrc:
     # An absent private repo must leave the base excludes intact, not blank.
     excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp/nope")
     expect_has   "absent private repo keeps base EXCLUDES" "CHANGELOG.md" "$excludes"
+    expect_has   "base EXCLUDES keeps chezmoi metadata private" ".chezmoiroot" "$excludes"
 
     # The strip helper and its temp var must not leak into the sourcing shell.
     leaked=$(sh -c '. ./rcrc; printf "%s" "${_v-unset}"')

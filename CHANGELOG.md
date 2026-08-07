@@ -10,6 +10,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- Chezmoi Phase 1 scaffolding: `.chezmoiroot` reserves `home/` for future
+  source state, `docs/chezmoi-inventory.md` records the pre-migration rcm
+  target dispositions, and chezmoi is declared in the macOS/Linux Brewfiles.
+  The rcm cutover remains deferred until shadow-apply and rollback evidence is
+  complete ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - `brew "cargo-audit"` in `Brewfile` and `Brewfile.linux`. A project's `just pre-push` invokes `cargo audit`; with the tool absent the recipe fails on the missing subcommand — and until that repo wired the recipe in, the audit simply never ran on this machine, letting four RUSTSEC advisories sit invisible. Declaring it in the bundle makes the gate real on every machine. ([#230](https://github.com/tgautier/dotfiles/pull/230))
 - `brew "kimi-code"` (Moonshot's terminal coding agent) in `Brewfile.personal`,
   under a new `# CLI Tools & Development` block — the first formula in an

@@ -21,7 +21,7 @@ criteria are demonstrated.
 | `config/ghostty/config` | `~/.config/ghostty/config` | rcm | migrate as a plain chezmoi file |
 | `config/mise/config.toml` | `~/.config/mise/config.toml` | rcm | migrate as a plain chezmoi file; preserve machine-local overrides |
 | `bin/*` | `~/.bin/*` | rcm | migrate as executable files; verify modes |
-| `git_template/` | `~/.git_template/` | rcm | migrate as a directory; verify hook behavior |
+| `git_template/` | `~/.git_template/` | rcm | defer: empty placeholder only; migrate when functional template content exists |
 | `rcrc` | `~/.rcrc` | rcm | retain during shadow phase; remove only in cleanup PR |
 | `Brewfile`, `Brewfile.linux`, `Brewfile.personal`, `Brewfile.work` | `~/.Brewfile*` | rcm | preserve these links while `HOMEBREW_BUNDLE_FILE` depends on them |
 | `docs/`, `Justfile`, `README.md`, `CHANGELOG.md` | repository-only | rcm excludes | remain outside `home/` |
@@ -34,6 +34,9 @@ criteria are demonstrated.
   secrets; none of it is copied into this public source tree.
 - Application-owned mutable state is not imported until its reconciliation
   behavior has a dedicated fixture.
+- Empty directories and marker-only trees are not materialized in `home/` just
+  to satisfy chezmoi; they remain rcm-owned until they contain functional
+  content that can be tested.
 - Every migration PR must update this table and provide a disposition for any
   target not yet represented in chezmoi.
 

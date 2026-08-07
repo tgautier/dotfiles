@@ -7,7 +7,7 @@ criteria are demonstrated.
 
 | Current source | Target | Current owner | Phase 1 disposition |
 | --- | --- | --- | --- |
-| `gitconfig` | `~/.gitconfig` | rcm | migrate as a plain chezmoi file |
+| `gitconfig` | `~/.gitconfig` | rcm | defer: identity-bearing; split public defaults from private identity/signing overlay |
 | `gitignore` | `~/.gitignore` | rcm | migrate as a plain chezmoi file |
 | `agignore` | `~/.agignore` | rcm | migrate as a plain chezmoi file |
 | `editorconfig` | `~/.editorconfig` | rcm | migrate as a plain chezmoi file |
@@ -32,6 +32,9 @@ criteria are demonstrated.
   recipes, tests, and changelog files stay at the repository root.
 - The private repository remains the owner of private Claude configuration and
   secrets; none of it is copied into this public source tree.
+- Identity-bearing Git configuration remains private. Public Git defaults may
+  be extracted later, but `user.*`, signing keys, and account-specific
+  credential wiring must be supplied by the private overlay.
 - Application-owned mutable state is not imported until its reconciliation
   behavior has a dedicated fixture.
 - Empty directories and marker-only trees are not materialized in `home/` just

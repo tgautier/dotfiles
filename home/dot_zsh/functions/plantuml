@@ -1,0 +1,10 @@
+#!/usr/bin/env zsh
+input=${1:?"input file path is required"};
+output=${2:-"${input:r}.png"};
+
+docker run \
+  --rm \
+  -i think/plantuml \
+  -tpng \
+  < "${input}" \
+  > "${output}"

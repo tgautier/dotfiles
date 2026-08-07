@@ -144,7 +144,7 @@ test-chezmoi-canary:
         test -x "bin/$name"
         cmp -s "bin/$name" "home/dot_bin/executable_$name"
     done
-    for pair in 'zsh/zaliases:home/dot_zsh/dot_zaliases' 'zsh/zcompletion:home/dot_zsh/dot_zcompletion' 'zsh/functions/api_key:home/dot_zsh/functions/executable_api_key' 'zsh/functions/b64_decode:home/dot_zsh/functions/executable_b64_decode' 'zsh/functions/b64_encode:home/dot_zsh/functions/executable_b64_encode' 'zsh/functions/cdroot:home/dot_zsh/functions/executable_cdroot' 'zsh/functions/current_tt:home/dot_zsh/functions/executable_current_tt' 'zsh/functions/load_env_kops:home/dot_zsh/functions/executable_load_env_kops' 'zsh/functions/load_env_kubectl:home/dot_zsh/functions/executable_load_env_kubectl' 'zsh/functions/plantuml:home/dot_zsh/functions/executable_plantuml' 'zsh/functions/tt:home/dot_zsh/functions/executable_tt' 'zsh/functions/uuid:home/dot_zsh/functions/executable_uuid'; do
+    for pair in 'zsh/zaliases:home/dot_zsh/dot_zaliases' 'zsh/zcompletion:home/dot_zsh/dot_zcompletion' 'zsh/functions/api_key:home/dot_zsh/functions/api_key' 'zsh/functions/b64_decode:home/dot_zsh/functions/b64_decode' 'zsh/functions/b64_encode:home/dot_zsh/functions/b64_encode' 'zsh/functions/cdroot:home/dot_zsh/functions/cdroot' 'zsh/functions/current_tt:home/dot_zsh/functions/current_tt' 'zsh/functions/load_env_kops:home/dot_zsh/functions/load_env_kops' 'zsh/functions/load_env_kubectl:home/dot_zsh/functions/load_env_kubectl' 'zsh/functions/plantuml:home/dot_zsh/functions/plantuml' 'zsh/functions/tt:home/dot_zsh/functions/tt' 'zsh/functions/uuid:home/dot_zsh/functions/uuid'; do
         source=${pair%%:*}
         chezmoi_file=${pair##*:}
         cmp -s "$source" "$chezmoi_file"
@@ -172,7 +172,7 @@ test-chezmoi-canary:
     cmp -s zsh/zcompletion "$tmp/home/.zsh/.zcompletion"
     for name in api_key b64_decode b64_encode cdroot current_tt load_env_kops load_env_kubectl plantuml tt uuid; do
         cmp -s "zsh/functions/$name" "$tmp/home/.zsh/functions/$name"
-        test -x "$tmp/home/.zsh/functions/$name"
+        test ! -x "$tmp/home/.zsh/functions/$name"
     done
     cmp -s config/ghostty/config "$tmp/home/.config/ghostty/config"
     diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)

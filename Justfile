@@ -140,6 +140,10 @@ test-chezmoi-canary:
         test -f "home/$chezmoi_file"
         cmp -s "$source" "home/$chezmoi_file"
     done
+    for name in kshow kseal op-ssh-sign obsidian; do
+        test -x "bin/$name"
+        cmp -s "bin/$name" "home/dot_bin/executable_$name"
+    done
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
     : > "$tmp/config.toml"
@@ -151,6 +155,10 @@ test-chezmoi-canary:
     cmp -s zprofile "$tmp/home/.zprofile"
     cmp -s psqlrc "$tmp/home/.psqlrc"
     cmp -s gitignore "$tmp/home/.gitignore"
+    for name in kshow kseal op-ssh-sign obsidian; do
+        cmp -s "bin/$name" "$tmp/home/.bin/$name"
+        test -x "$tmp/home/.bin/$name"
+    done
     diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
     test -z "$diff_output"
     chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply

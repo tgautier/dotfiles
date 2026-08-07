@@ -144,6 +144,7 @@ test-chezmoi-canary:
         test -x "bin/$name"
         cmp -s "bin/$name" "home/dot_bin/executable_$name"
     done
+    cmp -s config/ghostty/config home/dot_config/ghostty/config
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
     : > "$tmp/config.toml"
@@ -159,6 +160,7 @@ test-chezmoi-canary:
         cmp -s "bin/$name" "$tmp/home/.bin/$name"
         test -x "$tmp/home/.bin/$name"
     done
+    cmp -s config/ghostty/config "$tmp/home/.config/ghostty/config"
     diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
     test -z "$diff_output"
     chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply

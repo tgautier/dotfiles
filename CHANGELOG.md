@@ -248,6 +248,9 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- Removed the obsolete iTerm2 cask, preferences plist, rcm inventory entry,
+  and documentation references now that Ghostty is the supported terminal.
+
 - `telnet` from `Brewfile.linux`: the Homebrew formula is now source-only
   (`bottle: false`), a Tier 3 config on Linux that `brew bundle` refuses to
   build, which aborted `just setup`. On Linux, install it from the distro

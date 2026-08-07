@@ -20,7 +20,6 @@ criteria are demonstrated.
 | `psqlrc` | `~/.psqlrc` | rcm | migrate as a plain chezmoi file |
 | `config/ghostty/config` | `~/.config/ghostty/config` | rcm | migrate as a plain chezmoi file |
 | `config/mise/config.toml` | `~/.config/mise/config.toml` | rcm | migrate as a plain chezmoi file; preserve machine-local overrides |
-| `iterm2/com.googlecode.iterm2.plist` | `~/.iterm2/com.googlecode.iterm2.plist` | rcm | preserve the current rcm target; verify any future native preference destination separately |
 | `bin/*` | `~/.bin/*` | rcm | migrate as executable files; verify modes |
 | `git_template/` | `~/.git_template/` | rcm | migrate as a directory; verify hook behavior |
 | `rcrc` | `~/.rcrc` | rcm | retain during shadow phase; remove only in cleanup PR |
@@ -47,9 +46,12 @@ criteria are demonstrated.
 ## Canary evidence
 
 The `tmux.conf`, `zshrc`, `zshenv`, `zprofile`, `psqlrc`, `gitignore`, and four
-public executable slices are represented under `home/`, with executable-mode
-checks. On 2026-08-07 they rendered byte-for-byte
+public executable slices and Ghostty config are represented under `home/`, with
+executable-mode checks. On 2026-08-07 they rendered byte-for-byte
 identical to the current rcm sources in an isolated HOME, and a second
 `chezmoi apply` produced no changes. This is shadow evidence only; rcm remains
 the active deployment owner until the complete target set has equivalent
 evidence.
+
+Existing machines should run `just cleanup-retired-iterm` once after updating;
+it removes only the retired `~/.iterm2/com.googlecode.iterm2.plist` symlink.

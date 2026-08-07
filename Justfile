@@ -144,6 +144,7 @@ test-chezmoi-canary:
         test -x "bin/$name"
         cmp -s "bin/$name" "home/dot_bin/executable_$name"
     done
+    cmp -s config/ghostty/config home/dot_config/ghostty/config
     tmp=$(mktemp -d)
     trap 'rm -rf "$tmp"' EXIT
     : > "$tmp/config.toml"
@@ -159,12 +160,38 @@ test-chezmoi-canary:
         cmp -s "bin/$name" "$tmp/home/.bin/$name"
         test -x "$tmp/home/.bin/$name"
     done
+    cmp -s config/ghostty/config "$tmp/home/.config/ghostty/config"
     diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
     test -z "$diff_output"
     chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply
     diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
     test -z "$diff_output"
     echo "chezmoi canary OK (equivalent render, second apply is a no-op)"
+
+[doc("Remove the retired iTerm2 symlink after migrating to Ghostty")]
+cleanup-retired-iterm:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ "${PLATFORM:-}" != "macos" ] && [ "$(uname -s)" != "Darwin" ]; then
+        echo "retired iTerm2 cleanup is macOS-only" >&2
+        exit 1
+    fi
+    target="$HOME/.iterm2/com.googlecode.iterm2.plist"
+    if [ -L "$target" ]; then
+        link=$(readlink "$target")
+        case "$link" in
+            */iterm2/com.googlecode.iterm2.plist)
+                rm "$target"
+                echo "removed retired iTerm2 symlink: $target"
+                ;;
+            *)
+                echo "refusing to remove non-rcm symlink: $target -> $link" >&2
+                exit 1
+                ;;
+        esac
+    else
+        echo "retired iTerm2 symlink absent: $target"
+    fi
 
 # Assert every in-body `just <recipe>` call names a recipe that exists here.
 # Those calls are opaque shell strings to just, so nothing else catches a typo:

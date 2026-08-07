@@ -10,6 +10,9 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
+- Public executable targets now have chezmoi shadow sources and isolated-HOME
+  equivalence checks; the private NAS executable remains excluded from this
+  public migration ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - Chezmoi Phase 1 scaffolding: `.chezmoiroot` reserves `home/` for future
   source state, `docs/chezmoi-inventory.md` records the pre-migration rcm
   target dispositions, and chezmoi is declared in the macOS/Linux Brewfiles.

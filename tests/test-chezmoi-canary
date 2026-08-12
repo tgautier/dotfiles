@@ -59,8 +59,11 @@ main() {
     awk 'BEGIN { FS=OFS="\t" } $2 == ".zsh/zaliases" { $2=".zsh/.zaliases" } { print }' "$manifest" > "$tmp/misnamed.tsv"
     expect_failure misnamed 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/misnamed.tsv"
 
-    awk 'BEGIN { FS=OFS="\t" } $2 != ".zsh/zaliases" { print }' "$manifest" > "$tmp/omitted.tsv"
-    expect_failure omission 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/omitted.tsv"
+    awk 'BEGIN { FS=OFS="\t" } $2 != ".zsh/zaliases" { print }' "$manifest" > "$tmp/shadow-omitted.tsv"
+    expect_failure 'shadow omission' 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/shadow-omitted.tsv"
+
+    awk 'BEGIN { FS=OFS="\t" } $2 != ".Brewfile" { print }' "$manifest" > "$tmp/deferred-omitted.tsv"
+    expect_failure 'deferred omission' 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/deferred-omitted.tsv"
 
     awk 'NR == 2 { print } { print }' "$manifest" > "$tmp/duplicate.tsv"
     expect_failure duplicate 'duplicate manifest' "$checker" "$repo_root" "$tmp/duplicate.tsv"
@@ -73,7 +76,7 @@ main() {
     printf 'unexpected fixture\n' > "$tmp/extra/home/dot_unexpected"
     expect_failure extra 'target map mismatch' "$checker" "$tmp/extra" "$tmp/extra/docs/chezmoi-targets.tsv"
 
-    printf 'chezmoi canary fixtures OK (misnamed, omission, duplicate, missing, extra)\n'
+    printf 'chezmoi canary fixtures OK (misnamed, shadow/deferred omission, duplicate, missing, extra)\n'
 }
 
 main "$@"

@@ -76,6 +76,11 @@ main() {
                 *) fail "invalid mode at line $line_no: $mode" ;;
             esac
             [[ -f "$repo_root/$rcm_source" ]] || fail "missing rcm source at line $line_no: $rcm_source"
+            if [[ "$mode" == executable ]]; then
+                [[ -x "$repo_root/$rcm_source" ]] || fail "rcm source is not executable at line $line_no: $rcm_source"
+            else
+                [[ ! -x "$repo_root/$rcm_source" ]] || fail "rcm source is unexpectedly executable at line $line_no: $rcm_source"
+            fi
             printf '%s\n' "$rcm_source" >> "$tmp/all-sources"
             printf '%s\n' "$target" >> "$tmp/all-targets"
             printf '%s\t%s\n' "$rcm_source" "$target" >> "$tmp/expected-rcm-map"

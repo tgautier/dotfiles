@@ -10,7 +10,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
-- A machine-readable 35-target rcm inventory and exact chezmoi parity guard. The guard verifies all 26 shadow target/source mappings, rendered bytes, executable modes, isolated idempotent apply, and sabotage fixtures while keeping rcm active ([#248](https://github.com/tgautier/dotfiles/issues/248)).
+- A machine-readable complete rcm inventory and exact chezmoi parity guard. The guard verifies every shadow target/source mapping, rendered bytes, executable modes, isolated idempotent apply, and sabotage fixtures while keeping rcm active ([#248](https://github.com/tgautier/dotfiles/issues/248)).
 - Chezmoi Phase 1 scaffolding: `.chezmoiroot` reserves `home/` for future
   source state, `docs/chezmoi-targets.tsv` records the pre-migration rcm target
   dispositions, and chezmoi is declared in the macOS/Linux Brewfiles.

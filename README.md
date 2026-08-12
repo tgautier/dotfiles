@@ -206,7 +206,7 @@ consumer moves together:
 | Variable               | Default                                 | Used by                                                          |
 | ---------------------- | --------------------------------------- | ---------------------------------------------------------------- |
 | `DOTFILES_DIR`         | `~/Workspace/tgautier/dotfiles`         | `DOTFILES_DIRS` in `rcrc`, the stale-symlink scanner             |
-| `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | the above, plus `EXCLUDES` in `rcrc` and `just lint-via-private` |
+| `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | the above, plus `EXCLUDES` in `rcrc`                             |
 
 Export them before `just link` / `just setup` so `rcrc` sees them — rcm sources
 `rcrc` as shell, which is what lets it read the environment at all. A trailing
@@ -393,7 +393,6 @@ Individual targets:
 | `just lint-just`               | Check in-body `just <recipe>` calls resolve    |
 | `just lint-rcrc`               | Check `rcrc` dirs, excludes, normalisation     |
 | `just lint-cleanup-symlinks`   | Fixture-test the stale-symlink scanner         |
-| `just lint-via-private`        | Keyword guard, delegated to the private repo   |
 
 The pre-commit hook is enabled by the bootstrap (idempotent — safe to re-run):
 

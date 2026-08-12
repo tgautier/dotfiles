@@ -54,13 +54,11 @@ grouped by **date** rather than by semantic version. Newest first.
   `CLAUDE.md`'s load-order line gains the missing `zlogin` step and now defers to
   the README section instead of carrying a second partial copy
   ([#219](https://github.com/tgautier/dotfiles/issues/219)).
-- `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR` are now honoured by every consumer,
-  not just `lint-via-private`. `rcrc` reads them for both `DOTFILES_DIRS` and
-  `EXCLUDES` (it is sourced as shell by rcm, which is exactly why it can), and
-  the stale-symlink scanner derives its repo list from them. Setting one moves
-  all three together; previously it moved only the keyword guard, so an operator
-  who set the override pointed that guard at a private repo `rcup` never merged.
-  Documented in `README.md` → Custom checkout locations
+- `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR` are now honoured by both remaining
+  consumers. `rcrc` reads them for `DOTFILES_DIRS` and `EXCLUDES` (it is sourced
+  as shell by rcm, which is exactly why it can), and the stale-symlink scanner
+  derives its repo list from them. Documented in `README.md` → Custom checkout
+  locations
   ([#215](https://github.com/tgautier/dotfiles/issues/215)).
 - `just lint-rcrc`, wired into `just ci` — pins both halves of the override
   contract. For `DOTFILES_DIRS`: defaults with no override, each override alone
@@ -114,8 +112,7 @@ grouped by **date** rather than by semantic version. Newest first.
   non-existent recipe, and a scan that matches nothing), each asserting the
   failure came from its own guard rather than from any incidental error — the
   convention `.claude/rules/brewfile.md` sets for guard logic. `jq` is now
-  installed explicitly in CI rather than assumed present in the runner image.
-  The README lint table also gains the `lint-via-private` row it was missing
+  installed explicitly in CI rather than assumed present in the runner image
   ([#213](https://github.com/tgautier/dotfiles/issues/213),
   partially [#219](https://github.com/tgautier/dotfiles/issues/219)).
 - `!.claude/worktrees/**` to the `markdownlint-cli2` globs, completing the
@@ -248,6 +245,9 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- The retired private keyword-guard call from `just ci`. The public gate no
+  longer depends on a recipe that the companion repository does not provide
+  ([#247](https://github.com/tgautier/dotfiles/issues/247)).
 - Removed the obsolete iTerm2 cask, preferences plist, rcm inventory entry,
   and documentation references now that Ghostty is the supported terminal.
 

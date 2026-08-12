@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-chezmoi-canary lint-via-private
+ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-chezmoi-canary
 
 # Assert `rcrc` resolves the way README documents, on both halves of the
 # override contract: DOTFILES_DIRS, which reaches the operator's real $HOME
@@ -297,21 +297,6 @@ lint-just:
     fi
     echo "lint-just empty-match detection OK"
 
-# Delegate to the private repo's justfile for checks that must not be defined
-# here (keyword lists etc.). Skips loudly when the private repo is absent —
-# notably on a CI runner, where it is never present, so this leg of the keyword
-# guard has never executed there. The enforcing copies are the two pre-commit
-# hooks (this repo's runs `just ci` with the private repo present; the private
-# repo's `ci-lint` includes `lint-public-no-arr`), so a skip here is a
-# defence-in-depth gap, not an unguarded invariant. Announce it either way: a
-# silent no-op reads as a pass.
-lint-via-private:
-    @if [ -f {{ quote(private_justfile) }} ]; then \
-        just -f {{ quote(private_justfile) }} lint-public-no-arr; \
-    else \
-        echo "⚠ lint-via-private: keyword guard SKIPPED — no private justfile at" {{ quote(private_justfile) }}; \
-    fi
-
 # Bootstrap this machine: profile, packages, symlinks, runtimes, hooks, tools (idempotent)
 setup: _ensure-profile
     #!/usr/bin/env bash
@@ -580,23 +565,19 @@ update: update-brew update-mas update-mise update-rust
 # Resolve through symlink so this works when just finds ~/.justfile
 dotfiles_dir := parent_directory(canonicalize(justfile()))
 
-# Companion repo paths. Anchored to $HOME rather than derived from dotfiles_dir
-# on purpose: inside a nested worktree dotfiles_dir is .claude/worktrees/<name>,
-# whose sibling is not the private repo, so a sibling-derived path would
-# silently skip the keyword guard exactly when working on a branch.
+# Companion repo paths. Anchor them to $HOME rather than deriving them from
+# dotfiles_dir. Inside a nested worktree, dotfiles_dir points at the worktree;
+# its sibling is not the configured private checkout.
 #
-# DOTFILES_DIR / DOTFILES_PRIVATE_DIR are the shared contract across all three
-# consumers — `lint-via-private` here, `DOTFILES_DIRS` + `EXCLUDES` in `rcrc`,
-# and the repo list in `_scan-stale-symlinks`. Setting one moves all three
-# together; previously it moved only this one, so an operator who set it pointed
-# the keyword guard at a private repo `rcup` never merged.
+# DOTFILES_DIR / DOTFILES_PRIVATE_DIR are the shared contract across the two
+# remaining consumers: `DOTFILES_DIRS` + `EXCLUDES` in `rcrc`, and the repo list
+# in `_scan-stale-symlinks`.
 #
 # The two defaults below live in three places on purpose — here, `rcrc`, and
 # `lint-rcrc`'s expected values (which run under `env -u`, so they cannot
 # inherit these). Change one, change all three; see the note in `rcrc`.
 public_dir := env("DOTFILES_DIR", env("HOME") / "Workspace/tgautier/dotfiles")
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
-private_justfile := private_dir / "justfile"
 
 # Platform-specific Brewfile
 brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.linux" }
@@ -840,8 +821,8 @@ _scan-stale-symlinks:
     # resolving could stop matching the targets actually on disk.
     # quote() not "…": double quotes protect spaces but not `$`, backtick or
     # backslash, and this value gates an `rm`. Matches the convention already
-    # used for private_justfile and set-profile's argument. A glob qualifier
-    # after a single-quoted word is valid zsh.
+    # used for set-profile's argument. A glob qualifier after a single-quoted
+    # word is valid zsh.
     repos=({{ quote(public_dir) }}(N:a) {{ quote(private_dir) }}(N:a))
     # (N) above drops a configured dir that doesn't exist on this machine, so an
     # absent private repo contributes no prefix. Without it zsh aborts the whole

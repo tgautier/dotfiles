@@ -218,6 +218,7 @@ absent private repo is skipped, not fatal.
 Detailed guides live in the `docs/` folder:
 
 - [Homebrew](docs/homebrew.md) — update flow, cask-upgrade recovery, and `just update` troubleshooting
+- [Chezmoi migration inventory](docs/chezmoi-inventory.md) — complete rcm target map, explicit dispositions, parity guard, and rollback boundary
 - [tmux](docs/tmux.md) — configuration overview, cheat sheet, and troubleshooting
 
 ## Structure
@@ -247,6 +248,9 @@ Brewfile                # macOS shared base + profile-overlay tail
 Brewfile.work           # macOS work-only casks/apps
 Brewfile.personal       # macOS personal-only casks/apps
 Brewfile.linux          # Linux Homebrew packages
+.chezmoiroot            # Selects home/ as the chezmoi source state
+home/                   # Shadow chezmoi sources; rcm still owns deployment
+tests/                  # Isolated parity checker and sabotage fixtures
 Justfile                # Bootstrap, CI and update recipes
 .githooks/              # pre-commit, post-commit, post-rewrite (enabled by just setup)
 CLAUDE.md               # Repo guidance for Claude Code (see Project-Local Rules)
@@ -254,7 +258,7 @@ CLAUDE.md               # Repo guidance for Claude Code (see Project-Local Rules
 .roborev.toml           # Review-tool scope context
 .markdownlint.yml       # markdownlint rules (used by just lint-markdown)
 .markdownlint-cli2.yaml # markdownlint file globs
-docs/                   # Detailed guides and cheat sheets
+docs/                   # Detailed guides, migration inventory, and target manifest
 CHANGELOG.md            # Date-based rolling changelog
 .github/workflows/ci.yml
 ```
@@ -386,13 +390,14 @@ Individual targets:
 
 | Target                         | Description                                    |
 | ------------------------------ | ---------------------------------------------- |
-| `just lint-shell`              | ShellCheck on `bin/*`, `rcrc`, and zsh files   |
+| `just lint-shell`              | ShellCheck on scripts, tests, `rcrc`, and zsh  |
 | `just lint-markdown`           | markdownlint-cli2                              |
 | `just lint-brewfile`           | Ruby syntax check on Brewfiles                 |
 | `just lint-mise`               | Validate mise config                           |
 | `just lint-just`               | Check in-body `just <recipe>` calls resolve    |
 | `just lint-rcrc`               | Check `rcrc` dirs, excludes, normalisation     |
 | `just lint-cleanup-symlinks`   | Fixture-test the stale-symlink scanner         |
+| `just test-chezmoi-canary`     | Compare exact maps in an isolated HOME         |
 
 The pre-commit hook is enabled by the bootstrap (idempotent — safe to re-run):
 

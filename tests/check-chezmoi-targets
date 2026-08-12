@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cleanup_root=
+
+cleanup() {
+    if [[ -n "$cleanup_root" && -d "$cleanup_root" ]]; then
+        rm -rf -- "$cleanup_root"
+    fi
+}
+
+fail() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 || fail "$1 is required for the chezmoi parity guard"
+}
+
+check_duplicates() {
+    local label=$1
+    local path=$2
+    local duplicates
+    duplicates=$(LC_ALL=C sort "$path" | uniq -d)
+    if [[ -n "$duplicates" ]]; then
+        printf 'ERROR: duplicate manifest %s:\n%s\n' "$label" "$duplicates" >&2
+        exit 1
+    fi
+}
+
+main() {
+    local script_dir repo_root manifest tmp header line_no
+    local rcm_source target disposition chezmoi_source mode extra
+    local source_state expected_source_state diff_output
+    script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+    repo_root=${1:-$(cd "$script_dir/.." && pwd -P)}
+    manifest=${2:-"$repo_root/docs/chezmoi-targets.tsv"}
+
+    for command_name in chezmoi jq lsrc sort uniq cmp comm mktemp wc tr; do
+        require_command "$command_name"
+    done
+    [[ -f "$repo_root/.chezmoiroot" ]] || fail "missing $repo_root/.chezmoiroot"
+    [[ -f "$manifest" ]] || fail "missing target manifest: $manifest"
+
+    tmp=$(mktemp -d)
+    cleanup_root=$tmp
+    trap cleanup EXIT
+    mkdir -p "$tmp/cache" "$tmp/destination" "$tmp/operator-home"
+    : > "$tmp/config.toml"
+    : > "$tmp/all-sources"
+    : > "$tmp/all-targets"
+    : > "$tmp/actual-rcm-map"
+    : > "$tmp/expected-rcm-map"
+    : > "$tmp/expected-map"
+
+    {
+        IFS= read -r header || fail "empty target manifest: $manifest"
+        [[ "$header" == $'rcm_source\ttarget\tdisposition\tchezmoi_source\tmode' ]] || fail "invalid target manifest header"
+        line_no=1
+        while IFS=$'\t' read -r rcm_source target disposition chezmoi_source mode extra; do
+            line_no=$((line_no + 1))
+            [[ -n "$rcm_source" && -n "$target" && -n "$disposition" && -n "$chezmoi_source" && -n "$mode" && -z "${extra:-}" ]] || fail "invalid target manifest row at line $line_no"
+            case "$rcm_source" in
+                /*|../*|*/../*) fail "unsafe rcm source at line $line_no: $rcm_source" ;;
+            esac
+            case "$target" in
+                .*/*|.*) ;;
+                *) fail "target must be a relative dotfile path at line $line_no: $target" ;;
+            esac
+            case "/$target/" in
+                *'/../'*|*'/./'*|*'//'*) fail "unsafe target at line $line_no: $target" ;;
+            esac
+            case "$mode" in
+                file|executable) ;;
+                *) fail "invalid mode at line $line_no: $mode" ;;
+            esac
+            [[ -f "$repo_root/$rcm_source" ]] || fail "missing rcm source at line $line_no: $rcm_source"
+            printf '%s\n' "$rcm_source" >> "$tmp/all-sources"
+            printf '%s\n' "$target" >> "$tmp/all-targets"
+            printf '%s\t%s\n' "$rcm_source" "$target" >> "$tmp/expected-rcm-map"
+            case "$disposition" in
+                shadow)
+                    case "$chezmoi_source" in
+                        -|/*|../*|*/../*) fail "invalid chezmoi source at line $line_no: $chezmoi_source" ;;
+                    esac
+                    [[ -f "$repo_root/home/$chezmoi_source" ]] || fail "missing chezmoi source at line $line_no: $chezmoi_source"
+                    printf '%s\t%s\n' "$target" "$chezmoi_source" >> "$tmp/expected-map"
+                    ;;
+                defer-homebrew-link|repository-only|defer-machine-overrides|drop-empty-placeholder|defer-private-overlay|retire-at-cutover)
+                    [[ "$chezmoi_source" == - ]] || fail "deferred target has a chezmoi source at line $line_no: $target"
+                    ;;
+                *) fail "unknown disposition at line $line_no: $disposition" ;;
+            esac
+        done
+    } < "$manifest"
+
+    [[ -s "$tmp/all-targets" ]] || fail "target manifest has no entries"
+    [[ -s "$tmp/expected-map" ]] || fail "target manifest has no shadow entries"
+    check_duplicates sources "$tmp/all-sources"
+    check_duplicates targets "$tmp/all-targets"
+    LC_ALL=C sort "$tmp/expected-rcm-map" > "$tmp/expected-rcm-map.sorted"
+    LC_ALL=C sort "$tmp/expected-map" > "$tmp/expected-map.sorted"
+    check_duplicates 'shadow target mappings' "$tmp/expected-map.sorted"
+
+    local target_absolute source_absolute target_relative source_relative
+    HOME="$tmp/operator-home" RCRC="$repo_root/rcrc" DOTFILES_DIR="$repo_root" DOTFILES_PRIVATE_DIR="$tmp/absent-private" lsrc -d "$repo_root" > "$tmp/lsrc-map"
+    while IFS=: read -r target_absolute source_absolute; do
+        case "$target_absolute" in
+            "$tmp/operator-home"/*) target_relative=${target_absolute#"$tmp/operator-home"/} ;;
+            *) fail "lsrc returned a target outside the isolated HOME: $target_absolute" ;;
+        esac
+        case "$source_absolute" in
+            "$repo_root"/*) source_relative=${source_absolute#"$repo_root"/} ;;
+            *) fail "lsrc returned a source outside the public repository: $source_absolute" ;;
+        esac
+        printf '%s\t%s\n' "$source_relative" "$target_relative" >> "$tmp/actual-rcm-map"
+    done < "$tmp/lsrc-map"
+    LC_ALL=C sort "$tmp/actual-rcm-map" > "$tmp/actual-rcm-map.sorted"
+    if ! cmp -s "$tmp/expected-rcm-map.sorted" "$tmp/actual-rcm-map.sorted"; then
+        printf 'ERROR: rcm target map mismatch\nMissing manifest mappings:\n' >&2
+        LC_ALL=C comm -13 "$tmp/expected-rcm-map.sorted" "$tmp/actual-rcm-map.sorted" >&2
+        printf 'Stale or misnamed manifest mappings:\n' >&2
+        LC_ALL=C comm -23 "$tmp/expected-rcm-map.sorted" "$tmp/actual-rcm-map.sorted" >&2
+        exit 1
+    fi
+
+    local chezmoi_bin jq_bin
+    chezmoi_bin=$(command -v chezmoi)
+    jq_bin=$(command -v jq)
+    local -a chezmoi_args
+    chezmoi_args=(--config "$tmp/config.toml" --cache "$tmp/cache" --persistent-state "$tmp/state.boltdb" --source "$repo_root" --destination "$tmp/destination" --no-tty)
+    run_chezmoi() {
+        env -u GIT_DIR -u GIT_WORK_TREE HOME="$tmp/operator-home" "$chezmoi_bin" "${chezmoi_args[@]}" "$@"
+    }
+
+    source_state=$(run_chezmoi source-path)
+    source_state=$(cd "$source_state" && pwd -P)
+    expected_source_state=$(cd "$repo_root/home" && pwd -P)
+    [[ "$source_state" == "$expected_source_state" ]] || fail ".chezmoiroot was not honored: expected $expected_source_state, got $source_state"
+
+    run_chezmoi managed --include files --path-style all --format json \
+        | "$jq_bin" -r 'to_entries[] | [.key, .value.sourceRelative] | @tsv' \
+        | LC_ALL=C sort > "$tmp/actual-map"
+    if ! cmp -s "$tmp/expected-map.sorted" "$tmp/actual-map"; then
+        printf 'ERROR: chezmoi target map mismatch\nMissing or misnamed mappings:\n' >&2
+        LC_ALL=C comm -23 "$tmp/expected-map.sorted" "$tmp/actual-map" >&2
+        printf 'Extra or misnamed mappings:\n' >&2
+        LC_ALL=C comm -13 "$tmp/expected-map.sorted" "$tmp/actual-map" >&2
+        exit 1
+    fi
+
+    run_chezmoi apply
+    while IFS=$'\t' read -r rcm_source target disposition chezmoi_source mode extra; do
+        [[ "$rcm_source" == rcm_source || "$disposition" != shadow ]] && continue
+        cmp -s "$repo_root/$rcm_source" "$tmp/destination/$target" || fail "rendered bytes differ for $target"
+        if [[ "$mode" == executable ]]; then
+            [[ -x "$tmp/destination/$target" ]] || fail "rendered target is not executable: $target"
+        else
+            [[ ! -x "$tmp/destination/$target" ]] || fail "rendered target is unexpectedly executable: $target"
+        fi
+    done < "$manifest"
+
+    diff_output=$(run_chezmoi diff)
+    [[ -z "$diff_output" ]] || fail "first apply left a non-empty chezmoi diff"
+    run_chezmoi apply
+    diff_output=$(run_chezmoi diff)
+    [[ -z "$diff_output" ]] || fail "second apply left a non-empty chezmoi diff"
+
+    local rcm_count shadow_count
+    rcm_count=$(wc -l < "$tmp/all-targets" | tr -d ' ')
+    shadow_count=$(wc -l < "$tmp/expected-map.sorted" | tr -d ' ')
+    printf 'chezmoi parity OK (%s rcm targets, %s exact shadow mappings, idempotent apply)\n' "$rcm_count" "$shadow_count"
+}
+
+main "$@"

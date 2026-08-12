@@ -10,12 +10,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
-- Public executable targets now have chezmoi shadow sources and isolated-HOME
-  equivalence checks; the private NAS executable remains excluded from this
-  public migration ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+- A machine-readable complete rcm inventory and exact chezmoi parity guard. The guard verifies every shadow target/source mapping, rendered bytes, executable modes, isolated idempotent apply, and sabotage fixtures while keeping rcm active ([#248](https://github.com/tgautier/dotfiles/issues/248)).
 - Chezmoi Phase 1 scaffolding: `.chezmoiroot` reserves `home/` for future
-  source state, `docs/chezmoi-inventory.md` records the pre-migration rcm
-  target dispositions, and chezmoi is declared in the macOS/Linux Brewfiles.
+  source state, `docs/chezmoi-targets.tsv` records the pre-migration rcm target
+  dispositions, and chezmoi is declared in the macOS/Linux Brewfiles.
   The rcm cutover remains deferred until shadow-apply and rollback evidence is
   complete ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - `brew "cargo-audit"` in `Brewfile` and `Brewfile.linux`. A project's `just pre-push` invokes `cargo audit`; with the tool absent the recipe fails on the missing subcommand — and until that repo wired the recipe in, the audit simply never ran on this machine, letting four RUSTSEC advisories sit invisible. Declaring it in the bundle makes the gate real on every machine. ([#230](https://github.com/tgautier/dotfiles/pull/230))
@@ -274,6 +272,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- The Linux validation environment now installs `rcm`, whose `lsrc` command is
+  the independent rcm-side oracle for the chezmoi target-map parity guard
+  ([#248](https://github.com/tgautier/dotfiles/issues/248)).
+- The zsh aliases and completion chezmoi source names now render to the paths consumed by `zshrc`. The former names added a second dot and the hand-maintained canary accepted the wrong targets ([#248](https://github.com/tgautier/dotfiles/issues/248)).
 - `docs/homebrew.md`'s Caskroom fallback comparison is a membership test rather
   than a versioned path
   ([#227](https://github.com/tgautier/dotfiles/issues/227)). The Binary-conflict

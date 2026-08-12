@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cleanup_root=
+
+cleanup() {
+    if [[ -n "$cleanup_root" && -d "$cleanup_root" ]]; then
+        rm -rf -- "$cleanup_root"
+    fi
+}
+
+fail() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+expect_failure() {
+    local label=$1
+    local expected=$2
+    shift 2
+    local output
+    if output=$("$@" 2>&1); then
+        fail "$label fixture passed unexpectedly"
+    fi
+    case "$output" in
+        *"$expected"*) ;;
+        *) printf '%s\n' "$output" >&2; fail "$label fixture failed for the wrong reason" ;;
+    esac
+}
+
+make_fixture() {
+    local destination=$1
+    local rcm_source
+    mkdir -p "$destination/docs"
+    cp -p "$repo_root/.chezmoiroot" "$destination/.chezmoiroot"
+    cp -R "$repo_root/home" "$destination/home"
+    cp -p "$manifest" "$destination/docs/chezmoi-targets.tsv"
+    while IFS=$'\t' read -r rcm_source _; do
+        [[ "$rcm_source" == rcm_source ]] && continue
+        mkdir -p "$destination/$(dirname "$rcm_source")"
+        cp -p "$repo_root/$rcm_source" "$destination/$rcm_source"
+    done < "$manifest"
+}
+
+main() {
+    local script_dir repo_root manifest checker tmp
+    script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+    repo_root=$(cd "$script_dir/.." && pwd -P)
+    manifest="$repo_root/docs/chezmoi-targets.tsv"
+    checker="$script_dir/check-chezmoi-targets"
+    [[ -x "$checker" ]] || fail "missing executable parity checker: $checker"
+
+    "$checker" "$repo_root" "$manifest"
+
+    tmp=$(mktemp -d)
+    cleanup_root=$tmp
+    trap cleanup EXIT
+
+    awk 'BEGIN { FS=OFS="\t" } $2 == ".zsh/zaliases" { $2=".zsh/.zaliases" } { print }' "$manifest" > "$tmp/misnamed.tsv"
+    expect_failure misnamed 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/misnamed.tsv"
+
+    awk 'BEGIN { FS=OFS="\t" } $2 != ".zsh/zaliases" { print }' "$manifest" > "$tmp/shadow-omitted.tsv"
+    expect_failure 'shadow omission' 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/shadow-omitted.tsv"
+
+    awk 'BEGIN { FS=OFS="\t" } $2 != ".Brewfile" { print }' "$manifest" > "$tmp/deferred-omitted.tsv"
+    expect_failure 'deferred omission' 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/deferred-omitted.tsv"
+
+    awk 'NR == 2 { print } { print }' "$manifest" > "$tmp/duplicate.tsv"
+    expect_failure duplicate 'duplicate manifest' "$checker" "$repo_root" "$tmp/duplicate.tsv"
+
+    make_fixture "$tmp/missing"
+    rm "$tmp/missing/home/dot_zsh/zaliases"
+    expect_failure missing 'missing chezmoi source' "$checker" "$tmp/missing" "$tmp/missing/docs/chezmoi-targets.tsv"
+
+    make_fixture "$tmp/extra"
+    printf 'unexpected fixture\n' > "$tmp/extra/home/dot_unexpected"
+    expect_failure extra 'target map mismatch' "$checker" "$tmp/extra" "$tmp/extra/docs/chezmoi-targets.tsv"
+
+    printf 'chezmoi canary fixtures OK (misnamed, shadow/deferred omission, duplicate, missing, extra)\n'
+}
+
+main "$@"

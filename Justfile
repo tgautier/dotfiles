@@ -116,6 +116,7 @@ lint-rcrc:
     excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp/nope")
     expect_has   "absent private repo keeps base EXCLUDES" "CHANGELOG.md" "$excludes"
     expect_has   "base EXCLUDES keeps chezmoi metadata private" ".chezmoiroot" "$excludes"
+    expect_has   "base EXCLUDES keeps test harnesses private" "tests" "$excludes"
 
     # The strip helper and its temp var must not leak into the sourcing shell.
     leaked=$(sh -c '. ./rcrc; printf "%s" "${_v-unset}"')
@@ -131,56 +132,7 @@ lint-rcrc:
 
 [doc("Render the chezmoi canary in an isolated HOME and verify source equivalence plus idempotence")]
 test-chezmoi-canary:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    command -v chezmoi >/dev/null || { echo "chezmoi is required for the canary guard" >&2; exit 1; }
-    for pair in 'tmux.conf:dot_tmux.conf' 'zshrc:dot_zshrc' 'zshenv:dot_zshenv' 'zprofile:dot_zprofile' 'zlogin:dot_zlogin' 'psqlrc:dot_psqlrc' 'gitignore:dot_gitignore' 'agignore:dot_agignore' 'editorconfig:dot_editorconfig'; do
-        source=${pair%%:*}
-        chezmoi_file=${pair##*:}
-        test -f "home/$chezmoi_file"
-        cmp -s "$source" "home/$chezmoi_file"
-    done
-    for name in kshow kseal op-ssh-sign obsidian; do
-        test -x "bin/$name"
-        cmp -s "bin/$name" "home/dot_bin/executable_$name"
-    done
-    for pair in 'zsh/zaliases:home/dot_zsh/dot_zaliases' 'zsh/zcompletion:home/dot_zsh/dot_zcompletion' 'zsh/functions/api_key:home/dot_zsh/functions/api_key' 'zsh/functions/b64_decode:home/dot_zsh/functions/b64_decode' 'zsh/functions/b64_encode:home/dot_zsh/functions/b64_encode' 'zsh/functions/cdroot:home/dot_zsh/functions/cdroot' 'zsh/functions/current_tt:home/dot_zsh/functions/current_tt' 'zsh/functions/load_env_kops:home/dot_zsh/functions/load_env_kops' 'zsh/functions/load_env_kubectl:home/dot_zsh/functions/load_env_kubectl' 'zsh/functions/plantuml:home/dot_zsh/functions/plantuml' 'zsh/functions/tt:home/dot_zsh/functions/tt' 'zsh/functions/uuid:home/dot_zsh/functions/uuid'; do
-        source=${pair%%:*}
-        chezmoi_file=${pair##*:}
-        cmp -s "$source" "$chezmoi_file"
-    done
-    cmp -s config/ghostty/config home/dot_config/ghostty/config
-    tmp=$(mktemp -d)
-    trap 'rm -rf "$tmp"' EXIT
-    : > "$tmp/config.toml"
-    mkdir -p "$tmp/home"
-    chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply
-    cmp -s tmux.conf "$tmp/home/.tmux.conf"
-    cmp -s zshrc "$tmp/home/.zshrc"
-    cmp -s zshenv "$tmp/home/.zshenv"
-    cmp -s zprofile "$tmp/home/.zprofile"
-    cmp -s zlogin "$tmp/home/.zlogin"
-    cmp -s psqlrc "$tmp/home/.psqlrc"
-    cmp -s gitignore "$tmp/home/.gitignore"
-    cmp -s agignore "$tmp/home/.agignore"
-    cmp -s editorconfig "$tmp/home/.editorconfig"
-    for name in kshow kseal op-ssh-sign obsidian; do
-        cmp -s "bin/$name" "$tmp/home/.bin/$name"
-        test -x "$tmp/home/.bin/$name"
-    done
-    cmp -s zsh/zaliases "$tmp/home/.zsh/.zaliases"
-    cmp -s zsh/zcompletion "$tmp/home/.zsh/.zcompletion"
-    for name in api_key b64_decode b64_encode cdroot current_tt load_env_kops load_env_kubectl plantuml tt uuid; do
-        cmp -s "zsh/functions/$name" "$tmp/home/.zsh/functions/$name"
-        test ! -x "$tmp/home/.zsh/functions/$name"
-    done
-    cmp -s config/ghostty/config "$tmp/home/.config/ghostty/config"
-    diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
-    test -z "$diff_output"
-    chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" apply
-    diff_output=$(chezmoi --config "$tmp/config.toml" --source "$PWD/home" --destination "$tmp/home" diff)
-    test -z "$diff_output"
-    echo "chezmoi canary OK (equivalent render, second apply is a no-op)"
+    ./tests/test-chezmoi-canary
 
 [doc("Remove the retired iTerm2 symlink after migrating to Ghostty")]
 cleanup-retired-iterm:
@@ -457,6 +409,7 @@ _ensure-profile:
 [doc("Lint shell scripts with ShellCheck")]
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
+    shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary
     shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 

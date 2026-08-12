@@ -272,6 +272,9 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- The Linux validation environment now installs `rcm`, whose `lsrc` command is
+  the independent rcm-side oracle for the chezmoi target-map parity guard
+  ([#248](https://github.com/tgautier/dotfiles/issues/248)).
 - The zsh aliases and completion chezmoi source names now render to the paths consumed by `zshrc`. The former names added a second dot and the hand-maintained canary accepted the wrong targets ([#248](https://github.com/tgautier/dotfiles/issues/248)).
 - `docs/homebrew.md`'s Caskroom fallback comparison is a membership test rather
   than a versioned path

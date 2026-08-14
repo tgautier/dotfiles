@@ -193,10 +193,11 @@ class RcmLinksInventoryTest(unittest.TestCase):
         self._write(self.public, "zshrc")
         self._write(self.public, "missing")
         self._commit(self.public, "add declared sources")
-        self._write(self.private, "placeholder")
-        self._commit(self.private, "add placeholder")
+        self._write(self.private, "agents/skills/example/SKILL.md")
+        self._commit(self.private, "add dedicated source")
         self._link(".zshrc", self.root / "foreign")
         (self.home / ".missing").write_text("collision\n", encoding="utf-8")
+        (self.home / ".agents").write_text("blocking ancestor\n", encoding="utf-8")
 
         completed = self._inventory()
         self.assertEqual(completed.returncode, 0, completed.stderr)
@@ -207,6 +208,13 @@ class RcmLinksInventoryTest(unittest.TestCase):
         )
         self.assertEqual(
             (records[".missing"]["disposition"], records[".missing"]["status"]),
+            ("unclassified", "collision"),
+        )
+        self.assertEqual(
+            (
+                records[".agents/skills/example"]["disposition"],
+                records[".agents/skills/example"]["status"],
+            ),
             ("unclassified", "collision"),
         )
 

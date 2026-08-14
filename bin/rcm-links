@@ -51,6 +51,20 @@ class LinkRecord:
     owner: str
 
 
+def collision_record(
+    relative: PurePosixPath,
+    expected_owner: ExpectedOwner | None,
+) -> LinkRecord:
+    return LinkRecord(
+        "unclassified",
+        "collision",
+        relative.as_posix(),
+        None,
+        str(expected_owner.source) if expected_owner else None,
+        expected_owner.owner if expected_owner else "unclassified",
+    )
+
+
 def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(os.path.normpath(path)))
 
@@ -373,20 +387,14 @@ def inventory(
                 )
             )
             continue
+        except NotADirectoryError:
+            records.append(collision_record(relative, expected_owner))
+            continue
         except OSError as exc:
             raise InventoryError(f"cannot inspect HOME target {path}: {exc}") from exc
 
         if not stat.S_ISLNK(metadata.st_mode):
-            records.append(
-                LinkRecord(
-                    "unclassified",
-                    "collision",
-                    relative.as_posix(),
-                    None,
-                    str(expected_owner.source) if expected_owner else None,
-                    expected_owner.owner if expected_owner else "unclassified",
-                )
-            )
+            records.append(collision_record(relative, expected_owner))
             continue
 
         try:

@@ -666,6 +666,29 @@ class RcmLinksInventoryTest(unittest.TestCase):
         self.assertIn("foreign symlink: .zshrc", refused.stderr)
         self.assertEqual(os.readlink(foreign), str(self.root / "foreign"))
 
+    def test_cutover_backup_rejects_wrong_repository_value_kind(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        backup = self.root / "wrong-repository-kind.json"
+        created = self._cutover_backup(public_manifest, private_manifest, backup)
+        self.assertEqual(created.returncode, 0, created.stderr)
+        payload = json.loads(backup.read_text(encoding="utf-8"))
+        payload["links"][0]["repository"] = []
+        payload["approval_sha256"] = self._plan_digest(payload)
+        backup.write_text(json.dumps(payload), encoding="utf-8")
+        backup.chmod(0o600)
+
+        refused = self._cutover_command(
+            "cutover-backup-verify",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+        )
+
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("cutover backup link 0 fields are invalid", refused.stderr)
+        self.assertNotIn("Traceback", refused.stderr)
+
     def test_cutover_restore_backup_survives_partial_rcup_and_retry(self) -> None:
         public_manifest, private_manifest = self._configure_cutover_fixture()
         backup = self.root / "cutover-backup.json"

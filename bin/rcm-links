@@ -1158,7 +1158,8 @@ def load_cutover_backup(
         target_value = value["target"]
         link_target = value["link_target"]
         if (
-            repository not in {"public", "private"}
+            not isinstance(repository, str)
+            or repository not in {"public", "private"}
             or not isinstance(source_value, str)
             or not isinstance(target_value, str)
             or not isinstance(link_target, str)

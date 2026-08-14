@@ -42,7 +42,7 @@ The guard:
 1. Compares the exact chezmoi target/source map with the `shadow` rows
 1. Applies into the isolated destination and verifies bytes plus executable modes
 1. Applies twice and requires an empty diff after each apply
-1. Runs sabotage fixtures for a misnamed target, omitted shadow and deferred rows, a duplicate row, a missing source, and an extra source
+1. Runs sabotage fixtures for a misnamed target, omitted shadow and deferred rows, a retired disposition, a duplicate row, a missing source, and an extra source
 
 The guard now maps `zsh/zaliases` and `zsh/zcompletion` to `~/.zsh/zaliases` and `~/.zsh/zcompletion`, matching both rcm and `zshrc`. The previous source names rendered an extra dot in each target while the hand-maintained canary still passed.
 

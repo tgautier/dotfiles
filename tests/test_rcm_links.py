@@ -304,7 +304,7 @@ class RcmLinksInventoryTest(unittest.TestCase):
         self.assertIn("dedicated-owner repository is unavailable", completed.stderr)
         self.assertEqual(completed.stdout, "")
 
-    def test_inventory_refuses_shallow_history(self) -> None:
+    def test_inventory_refuses_shallow_repository(self) -> None:
         self._write(self.public, "zshrc")
         self._write(self.public, "missing")
         self._commit(self.public, "add public sources")
@@ -326,8 +326,26 @@ class RcmLinksInventoryTest(unittest.TestCase):
 
         completed = self._inventory()
         self.assertEqual(completed.returncode, 2)
-        self.assertIn("repository history is shallow", completed.stderr)
+        self.assertIn("repository is shallow", completed.stderr)
         self.assertEqual(completed.stdout, "")
+
+    def test_inventory_uses_current_head_history_only(self) -> None:
+        self._write(self.public, "zshrc")
+        self._write(self.public, "missing")
+        self._commit(self.public, "add public sources")
+        current_branch = self._git(self.public, "branch", "--show-current").strip()
+        self._git(self.public, "checkout", "-q", "-b", "unmerged-history")
+        branch_only = self._write(self.public, "branch-only/old")
+        self._commit(self.public, "add branch-only source")
+        self._git(self.public, "checkout", "-q", current_branch)
+        self._write(self.private, "codex/hooks.json", "{}\n")
+        self._commit(self.private, "add exact dedicated source")
+        self._link(".branch-only/old", branch_only)
+
+        completed = self._inventory()
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        targets = {record["target"] for record in json.loads(completed.stdout)["records"]}
+        self.assertNotIn(".branch-only/old", targets)
 
     def test_malformed_owner_manifest_stops_before_inventory(self) -> None:
         self._write(self.public, "zshrc")

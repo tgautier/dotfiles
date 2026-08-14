@@ -319,12 +319,12 @@ def historical_top_levels(repository: Path) -> set[str]:
     ).strip()
     if shallow == b"true":
         raise InventoryError(
-            f"repository history is shallow; fetch complete history before inventory: {repository}"
+            f"repository is shallow; fetch complete history before inventory: {repository}"
         )
     if shallow != b"false":
         raise InventoryError(f"git returned an invalid shallow-repository state in {repository}")
     output = run_bounded(
-        ["git", "log", "--all", "--format=", "--name-only", "-z", "--"],
+        ["git", "log", "--format=", "--name-only", "-z", "HEAD", "--"],
         cwd=repository,
         env=command_environment(),
     )

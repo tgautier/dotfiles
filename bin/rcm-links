@@ -342,6 +342,22 @@ def historical_top_levels(repository: Path) -> set[str]:
     return result
 
 
+def current_top_levels(repository: Path) -> set[str]:
+    if not repository.is_dir():
+        return set()
+    try:
+        with os.scandir(repository) as scanner:
+            names = {entry.name for entry in scanner if not entry.name.startswith(".")}
+    except OSError as exc:
+        raise InventoryError(f"cannot enumerate repository root {repository}: {exc}") from exc
+    for name in names:
+        try:
+            name.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise InventoryError(f"repository top-level path is not valid UTF-8: {repository}") from exc
+    return names
+
+
 def candidate_roots(
     *,
     home: Path,
@@ -349,7 +365,10 @@ def candidate_roots(
     rcm_map: dict[PurePosixPath, Path],
     patterns: Sequence[OwnerPattern],
 ) -> list[Path]:
-    names = set().union(*(historical_top_levels(repository) for repository in repositories))
+    names: set[str] = set()
+    for repository in repositories:
+        names.update(historical_top_levels(repository))
+        names.update(current_top_levels(repository))
     names.update(relative.parts[0].removeprefix(".") for relative in rcm_map)
     names.update(pattern.target.parts[0].removeprefix(".") for pattern in patterns)
     return sorted((home / f".{name}" for name in names if name), key=lambda path: str(path))

@@ -347,6 +347,23 @@ class RcmLinksInventoryTest(unittest.TestCase):
         targets = {record["target"] for record in json.loads(completed.stdout)["records"]}
         self.assertNotIn(".branch-only/old", targets)
 
+    def test_inventory_discovers_untracked_current_top_level(self) -> None:
+        self._write(self.public, "zshrc")
+        self._write(self.public, "missing")
+        self._commit(self.public, "add public sources")
+        untracked = self._write(self.public, "new-root/excluded")
+        self._write(self.private, "codex/hooks.json", "{}\n")
+        self._commit(self.private, "add exact dedicated source")
+        self._link(".new-root/excluded", untracked)
+
+        completed = self._inventory()
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        records = {record["target"]: record for record in json.loads(completed.stdout)["records"]}
+        self.assertEqual(
+            (records[".new-root/excluded"]["disposition"], records[".new-root/excluded"]["status"]),
+            ("obsolete", "linked"),
+        )
+
     def test_malformed_owner_manifest_stops_before_inventory(self) -> None:
         self._write(self.public, "zshrc")
         self._write(self.public, "missing")

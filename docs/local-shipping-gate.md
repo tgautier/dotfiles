@@ -97,18 +97,19 @@ rollback_sha=$(git rev-parse HEAD)
 test -z "$(git status --porcelain=v1 --untracked-files=normal)"
 test "$(git ls-remote --heads origin refs/heads/revert/local-shipping-gate)" = "$rollback_sha$(printf '\t')refs/heads/revert/local-shipping-gate"
 gh api --method POST "repos/tgautier/dotfiles/statuses/$rollback_sha" --field state=success --field context=local/exact-tip --field description='Complete local gate passed for the exact branch tip'
-gh api "repos/tgautier/dotfiles/commits/$rollback_sha/status" --jq '[.statuses[] | select(.context == "local/exact-tip")] | first | [.sha, .state, .context] | @tsv'
+gh api "repos/tgautier/dotfiles/commits/$rollback_sha/status" --jq '. as $response | ([.statuses[] | select(.context == "local/exact-tip")] | first) as $status | [$response.sha, $status.state, $status.context] | @tsv'
 ```
 
 The final command must print the rollback SHA, `success`, and `local/exact-tip`. This manual publication is necessary because the revert intentionally removes `ci-publish`; run it only after `just ci` passes, the checkout is clean, and the rollback SHA has been pushed.
 
-Open and merge the revert pull request. The revert restores the hosted workflow and the earlier pre-commit hook. Then remove the local status requirement, which is repository configuration and therefore is not reverted by Git:
+Open and merge the revert pull request. The revert restores the hosted workflow and the earlier pre-commit hook. Then remove only the local status context, which is repository configuration and therefore is not reverted by Git. GitHub's [context-specific branch-protection endpoint](https://docs.github.com/en/rest/branches/branch-protection#remove-status-check-contexts) preserves strict mode and every unrelated or restored required check:
 
 ```sh
-gh api --method DELETE repos/tgautier/dotfiles/branches/main/protection/required_status_checks
+gh api --method DELETE repos/tgautier/dotfiles/branches/main/protection/required_status_checks/contexts --field 'contexts[]=local/exact-tip'
+gh api repos/tgautier/dotfiles/branches/main/protection/required_status_checks --jq '{strict, contexts, checks}'
 ```
 
-Read branch protection back before accepting further pull requests. The old local attestation file may remain under the Git directory because no restored hook reads it.
+Confirm that `local/exact-tip` is absent from the read-back while strict mode and every other context or check retain their previous values. The old local attestation file may remain under the Git directory because no restored hook reads it.
 
 Rollback does not require an rcm or chezmoi operation. This change never takes ownership of deployed dotfiles or modifies HOME.
 

@@ -112,10 +112,12 @@ status_json=$(gh api "repos/$LOCAL_CI_REPO_SLUG/commits/$head_sha/status" 2>&1) 
   exit 1
 }
 status_record=$(printf '%s\n' "$status_json" | jq -er --arg context "$LOCAL_CI_STATUS_CONTEXT" '
-  [.statuses[] | select(.context == $context)]
-  | sort_by(.created_at, .updated_at)
-  | last
-  | [.sha, .state, .context]
+  . as $response
+  | ([.statuses[] | select(.context == $context)]
+    | sort_by(.created_at, .updated_at)
+    | last) as $status
+  | select($response.sha != null and $status != null)
+  | [$response.sha, $status.state, $status.context]
   | @tsv
 ' 2>/dev/null) || {
   printf '%s\n' "local-ci: GitHub status read-back was missing or malformed" >&2

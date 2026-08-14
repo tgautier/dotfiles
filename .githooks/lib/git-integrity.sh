@@ -77,7 +77,8 @@ git_integrity_has_signature_header() {
 }
 
 git_integrity_check_push_signatures() {
-  local local_sha=$1 remote_sha=$2 range commits sha shallow
+  local local_sha=$1 remote_sha=$2 commits sha shallow
+  local -a revision_args
 
   git_integrity_is_zero_sha "$local_sha" && return 0
   if ! git cat-file -e "$local_sha^{commit}" 2>/dev/null; then
@@ -97,26 +98,29 @@ git_integrity_check_push_signatures() {
     return 1
   fi
 
+  if ! git cat-file -e "$GIT_INTEGRITY_SIGNATURE_BASELINE^{commit}" 2>/dev/null; then
+    printf 'pre-push: signature baseline %s is unavailable; fetch complete main history\n' "$GIT_INTEGRITY_SIGNATURE_BASELINE" >&2
+    return 1
+  fi
+  if ! git merge-base --is-ancestor "$GIT_INTEGRITY_SIGNATURE_BASELINE" "$local_sha"; then
+    printf 'pre-push: branch does not descend from signature baseline %s\n' "$GIT_INTEGRITY_SIGNATURE_BASELINE" >&2
+    return 1
+  fi
+
   if git_integrity_is_zero_sha "$remote_sha"; then
-    if ! git cat-file -e "$GIT_INTEGRITY_SIGNATURE_BASELINE^{commit}" 2>/dev/null; then
-      printf 'pre-push: signature baseline %s is unavailable; fetch complete main history\n' "$GIT_INTEGRITY_SIGNATURE_BASELINE" >&2
-      return 1
-    fi
-    if ! git merge-base --is-ancestor "$GIT_INTEGRITY_SIGNATURE_BASELINE" "$local_sha"; then
-      printf 'pre-push: branch does not descend from signature baseline %s\n' "$GIT_INTEGRITY_SIGNATURE_BASELINE" >&2
-      return 1
-    fi
-    range="$GIT_INTEGRITY_SIGNATURE_BASELINE..$local_sha"
+    revision_args=("$GIT_INTEGRITY_SIGNATURE_BASELINE..$local_sha")
   else
     if ! git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
       printf 'pre-push: remote tip %s is unavailable locally; fetch before pushing\n' "$remote_sha" >&2
       return 1
     fi
-    range="$remote_sha..$local_sha"
+    # A remote branch may predate enforcement. Audit only commits introduced
+    # by this update and outside the deliberately exempt baseline ancestry.
+    revision_args=("$remote_sha..$local_sha" "^$GIT_INTEGRITY_SIGNATURE_BASELINE")
   fi
 
-  if ! commits=$(git rev-list "$range" 2>&1); then
-    printf 'pre-push: could not enumerate pushed ancestry %s: %s\n' "$range" "$commits" >&2
+  if ! commits=$(git rev-list "${revision_args[@]}" 2>&1); then
+    printf 'pre-push: could not enumerate pushed ancestry %s: %s\n' "${revision_args[*]}" "$commits" >&2
     return 1
   fi
   while IFS= read -r sha; do

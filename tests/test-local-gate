@@ -126,7 +126,8 @@ write_merge_commit() {
 }
 
 tree=$(git -C "$repo" write-tree) || exit 1
-baseline=$(write_commit "$tree" '' 1 signed baseline) || exit 1
+legacy=$(write_commit "$tree" '' 0 unsigned 'legacy pre-baseline tip') || exit 1
+baseline=$(write_commit "$tree" "$legacy" 1 unsigned baseline) || exit 1
 git -C "$repo" update-ref refs/heads/feature "$baseline"
 git -C "$repo" symbolic-ref HEAD refs/heads/feature
 
@@ -151,6 +152,8 @@ other_unsigned=$(write_commit "$tree" "$head_sha" 4 unsigned 'unsigned tip') || 
 sha256_signed=$(write_commit "$tree" "$head_sha" 5 signed-sha256 'sha256 signed tip') || exit 1
 unsigned_side=$(write_commit "$tree" "$baseline" 6 unsigned 'unsigned side ancestry') || exit 1
 merge_with_unsigned_side=$(write_merge_commit "$tree" "$head_sha" "$unsigned_side" 7 'signed merge with unsigned side') || exit 1
+unrelated_root=$(write_commit "$tree" '' 9 signed 'unrelated signed root') || exit 1
+unrelated_tip=$(write_commit "$tree" "$unrelated_root" 10 signed 'unrelated signed tip') || exit 1
 zero_sha=$(printf '%040d' 0)
 git_dir=$(git -C "$repo" rev-parse --absolute-git-dir) || exit 1
 marker="$git_dir/local-ci-attestation"
@@ -226,6 +229,20 @@ fi
 
 expect_hook_pass "new signed branch accepts exact-tip evidence"
 
+REMOTE_SHA="$legacy" expect_hook_pass "existing pre-baseline branch excludes exempt ancestry"
+
+if output=$(
+  cd "$repo" || exit 1
+  source .githooks/lib/git-integrity.sh
+  git_integrity_check_push_signatures "$unrelated_tip" "$unrelated_root" 2>&1
+); then
+  record_fail "existing unrelated branch was accepted" "$output"
+elif [[ "$output" == *"does not descend from signature baseline"* ]]; then
+  record_pass "existing unrelated branch must descend from baseline"
+else
+  record_fail "existing unrelated branch diagnostic was missing" "$output"
+fi
+
 if (
   cd "$repo" || exit 1
   source .githooks/lib/git-integrity.sh
@@ -285,8 +302,8 @@ refs/heads/other $other_signed refs/heads/two $zero_sha" \
 printf '%s\n' "$head_sha" >"$marker"
 if output=$(
   cd "$repo" || exit 1
-  HOME="$home" PATH="$tools:/usr/bin:/bin" bash "$source_root/.githooks/pre-push" origin \
-    <<<"refs/heads/feature $head_sha refs/heads/feature $head_sha" 2>&1
+  source "$source_root/.githooks/pre-push"
+  run_local_gate "$head_sha" 2>&1
 ); then
   record_fail "hook from another checkout was accepted" "$output"
 elif [[ "$output" == *"hook root does not match"* ]]; then
@@ -389,6 +406,8 @@ printf '%s\n' "$publish_head" >"$marker"
 git clone --bare "$repo" "$bare_repo" >/dev/null 2>&1
 git -C "$repo" remote add origin "$bare_repo"
 
+# Shape captured from GitHub's combined-status REST documentation on
+# 2026-08-14 for GET repos/{owner}/{repo}/commits/{ref}/status.
 cat >"$tools/gh" <<'STUB'
 #!/bin/sh
 case " $* " in
@@ -399,7 +418,7 @@ case " $* " in
     ;;
   *)
     [ "${GH_GET_FAIL:-0}" -eq 0 ] || exit 1
-    printf '{"statuses":[{"sha":"%s","state":"%s","context":"%s","created_at":"2026-08-14T00:00:00Z","updated_at":"2026-08-14T00:00:00Z"}]}\n' \
+    printf '{"sha":"%s","statuses":[{"state":"%s","context":"%s","created_at":"2026-08-14T00:00:00Z","updated_at":"2026-08-14T00:00:00Z"}]}\n' \
       "$GH_STATUS_SHA" "${GH_STATUS_STATE:-success}" "${GH_STATUS_CONTEXT:-local/exact-tip}"
     ;;
 esac
@@ -472,7 +491,7 @@ GH_POST_FAIL=1 expect_publish_block "failed status publication is rejected" "Git
 GH_GET_FAIL=1 expect_publish_block "failed status read-back is rejected" "could not read back"
 GH_STATUS_STATE=failure expect_publish_block "non-success status read-back is rejected" "did not match"
 GH_STATUS_SHA="$head_sha" expect_publish_block "wrong-SHA status read-back is rejected" "did not match"
-GH_STATUS_CONTEXT=other expect_publish_block "wrong-context status read-back is rejected" "did not match"
+GH_STATUS_CONTEXT=other expect_publish_block "wrong-context status read-back is rejected" "missing or malformed"
 
 printf '\nlocal gate tests: %d passed, %d failed\n' "$pass" "$fail"
 [[ "$fail" -eq 0 ]]

@@ -9,7 +9,7 @@ ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-
 ci-attest:
     @bash .githooks/ci-attest
 
-[doc("Fixture-test identity, pushed signatures, and exact-tip local CI evidence")]
+[doc("Fixture-test identity, pushed signature headers, and exact-tip local CI evidence")]
 test-local-gate:
     ./tests/test-local-gate
 

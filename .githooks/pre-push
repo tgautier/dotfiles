@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Require signed pushed ancestry and exact-tip local CI evidence before transfer.
+# Require signature headers on pushed ancestry and exact-tip local CI evidence.
 
 set -euo pipefail
 

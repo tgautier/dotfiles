@@ -122,7 +122,7 @@ git_integrity_check_push_signatures() {
   while IFS= read -r sha; do
     [[ -n "$sha" ]] || continue
     if ! git_integrity_has_signature_header "$sha"; then
-      printf 'pre-push: commit %s is unsigned; repair signing and recreate the commit before pushing\n' "$sha" >&2
+      printf 'pre-push: commit %s has no Git signature header; repair signing and recreate the commit before pushing\n' "$sha" >&2
       return 1
     fi
   done <<<"$commits"

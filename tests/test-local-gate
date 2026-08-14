@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end fixtures for identity, pushed signatures, and exact-tip CI evidence.
 
-set -uo pipefail
+set -euo pipefail
 
 readonly LEAKED_GIT_VARS=(
   GIT_INDEX_FILE
@@ -14,6 +14,12 @@ readonly LEAKED_GIT_VARS=(
   GIT_COMMON_DIR
 )
 unset "${LEAKED_GIT_VARS[@]}"
+for leaked_git_var in "${LEAKED_GIT_VARS[@]}"; do
+  if printenv "$leaked_git_var" >/dev/null 2>&1; then
+    printf 'FATAL: inherited %s survived fixture isolation\n' "$leaked_git_var" >&2
+    exit 1
+  fi
+done
 
 source_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 fixture_root=$(mktemp -d) || exit 1
@@ -38,6 +44,10 @@ record_fail() {
   printf 'FAIL  - %s\n' "$1"
   [[ -z "${2:-}" ]] || printf '        output: %s\n' "$2"
   fail=$((fail + 1))
+}
+
+file_mode() {
+  stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"
 }
 
 mkdir -p "$repo/.githooks/lib" "$tools" "$home"
@@ -72,8 +82,16 @@ STUB
 chmod 0755 "$tools/mise" "$tools/just" "$repo/.githooks/pre-push" "$repo/.githooks/ci-attest"
 
 git -C "$repo" init -q
-git -C "$repo" config user.name 'Thomas Gautier'
-git -C "$repo" config user.email 'thomas@gautier.gg'
+repo_physical=$(cd -- "$repo" && pwd -P)
+fixture_git_dir=$(git -C "$repo" rev-parse --absolute-git-dir)
+git_dir_physical=$(cd -- "$fixture_git_dir" && pwd -P)
+case "$git_dir_physical" in
+  "$repo_physical"/*) ;;
+  *)
+    printf 'FATAL: fixture Git directory escaped fixture repository: %s\n' "$git_dir_physical" >&2
+    exit 1
+    ;;
+esac
 git -C "$repo" add Justfile tracked .githooks
 
 write_commit() {
@@ -83,7 +101,25 @@ write_commit() {
     [[ -z "$parent" ]] || printf 'parent %s\n' "$parent"
     printf 'author Thomas Gautier <thomas@gautier.gg> %s +0000\n' "$timestamp"
     printf 'committer Thomas Gautier <thomas@gautier.gg> %s +0000\n' "$timestamp"
-    [[ "$signature" != signed ]] || printf '%s\n' 'gpgsig fixture-signature'
+    case "$signature" in
+      signed) printf '%s\n' 'gpgsig fixture-signature' ;;
+      signed-sha256) printf '%s\n' 'gpgsig-sha256 fixture-signature' ;;
+      unsigned) ;;
+      *) printf 'FATAL: unknown fixture signature mode: %s\n' "$signature" >&2; return 1 ;;
+    esac
+    printf '\n%s\n' "$message"
+  } | git -C "$repo" hash-object -t commit -w --stdin
+}
+
+write_merge_commit() {
+  local tree=$1 first_parent=$2 second_parent=$3 timestamp=$4 message=$5
+  {
+    printf 'tree %s\n' "$tree"
+    printf 'parent %s\n' "$first_parent"
+    printf 'parent %s\n' "$second_parent"
+    printf 'author Thomas Gautier <thomas@gautier.gg> %s +0000\n' "$timestamp"
+    printf 'committer Thomas Gautier <thomas@gautier.gg> %s +0000\n' "$timestamp"
+    printf '%s\n' 'gpgsig fixture-signature'
     printf '\n%s\n' "$message"
   } | git -C "$repo" hash-object -t commit -w --stdin
 }
@@ -110,6 +146,9 @@ git -C "$repo" update-ref refs/heads/feature "$head_sha"
 
 other_signed=$(write_commit "$tree" "$head_sha" 3 signed 'other signed tip') || exit 1
 other_unsigned=$(write_commit "$tree" "$head_sha" 4 unsigned 'unsigned tip') || exit 1
+sha256_signed=$(write_commit "$tree" "$head_sha" 5 signed-sha256 'sha256 signed tip') || exit 1
+unsigned_side=$(write_commit "$tree" "$baseline" 6 unsigned 'unsigned side ancestry') || exit 1
+merge_with_unsigned_side=$(write_merge_commit "$tree" "$head_sha" "$unsigned_side" 7 'signed merge with unsigned side') || exit 1
 zero_sha=$(printf '%040d' 0)
 git_dir=$(git -C "$repo" rev-parse --absolute-git-dir) || exit 1
 marker="$git_dir/local-ci-attestation"
@@ -154,6 +193,10 @@ expect_hook_block() {
 run_identity() {
   (
     cd "$repo" || exit 1
+    export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-Thomas Gautier}"
+    export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-thomas@gautier.gg}"
+    export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-Thomas Gautier}"
+    export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-thomas@gautier.gg}"
     source .githooks/lib/git-integrity.sh
     git_integrity_check_identity
   )
@@ -173,13 +216,27 @@ else
 fi
 
 : >"$log"
-if output=$(run_attest 2>&1) && [[ "$(sed -n '1p' "$marker")" == "$head_sha" ]] && [[ "$(sed -n '1p' "$log")" == ci ]]; then
+if output=$(run_attest 2>&1) && [[ "$(sed -n '1p' "$marker")" == "$head_sha" ]] && [[ "$(sed -n '1p' "$log")" == ci ]] && [[ "$(file_mode "$marker")" == 600 ]]; then
   record_pass "complete CI attests the exact clean HEAD"
 else
   record_fail "complete CI did not attest the exact clean HEAD" "$output"
 fi
 
 expect_hook_pass "new signed branch accepts exact-tip evidence"
+
+if (
+  cd "$repo" || exit 1
+  source .githooks/lib/git-integrity.sh
+  git_integrity_has_signature_header "$sha256_signed"
+); then
+  record_pass "SHA-256 signature header is accepted"
+else
+  record_fail "SHA-256 signature header is accepted"
+fi
+
+printf '%s\n' "$head_sha" >"$marker"
+PUSH_SHA="$sha256_signed" REMOTE_SHA="$head_sha" \
+  expect_hook_block "SHA-256 signed tip reaches the exact-tip gate" "is not checked-out HEAD"
 
 rm -f "$marker"
 expect_hook_block "missing evidence blocks push" "run 'just ci-attest'"
@@ -200,7 +257,10 @@ rm -f "$marker"
 
 printf '%s\n' "$head_sha" >"$marker"
 PUSH_SHA="$other_unsigned" REMOTE_SHA="$head_sha" \
-  expect_hook_block "unsigned pushed ancestry is rejected" "is unsigned"
+  expect_hook_block "unsigned pushed ancestry is rejected" "has no Git signature header"
+
+PUSH_SHA="$merge_with_unsigned_side" REMOTE_SHA="$head_sha" \
+  expect_hook_block "unsigned side ancestry is rejected" "has no Git signature header"
 
 printf '%s\n' "$head_sha" >"$marker"
 PUSH_SHA="$other_signed" REMOTE_SHA="$head_sha" \
@@ -252,6 +312,23 @@ elif [[ "$output" == *"mise not found"* && ! -e "$marker" ]]; then
   record_pass "missing mise fails before CI"
 else
   record_fail "missing mise state or diagnostic was wrong" "$output"
+fi
+
+bare_repo="$fixture_root/origin.git"
+shallow_repo="$fixture_root/shallow"
+git clone --bare "$repo" "$bare_repo" >/dev/null 2>&1
+git clone --depth 1 --branch feature "file://$bare_repo" "$shallow_repo" >/dev/null 2>&1
+shallow_head=$(git -C "$shallow_repo" rev-parse HEAD)
+if output=$(
+  cd "$shallow_repo" || exit 1
+  bash .githooks/pre-push origin \
+    <<<"refs/heads/feature $shallow_head refs/heads/feature $zero_sha" 2>&1
+); then
+  record_fail "shallow history was accepted" "$output"
+elif [[ "$output" == *"history is shallow"* ]]; then
+  record_pass "shallow history is rejected before ancestry claims"
+else
+  record_fail "shallow-history diagnostic was missing" "$output"
 fi
 
 printf '%s\n' "$head_sha" >"$marker"

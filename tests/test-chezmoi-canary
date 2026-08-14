@@ -69,6 +69,26 @@ main() {
     expect_failure 'non-directory private path' 'private checkout path is not a directory' \
         env DOTFILES_PRIVATE_DIR="$tmp/non-directory-private" "$checker" "$repo_root" "$manifest"
 
+    mkdir -p "$tmp/accepting-private/shared/chezmoi"
+    : > "$tmp/accepting-private/shared/chezmoi/__init__.py"
+    cat > "$tmp/accepting-private/shared/chezmoi/check_target_ownership.py" <<'PY'
+from pathlib import Path
+import sys
+
+if len(sys.argv) != 3 or sys.argv[1] != "--public-targets" or not Path(sys.argv[2]).is_file():
+    print("fixture checker received the wrong public manifest contract", file=sys.stderr)
+    raise SystemExit(24)
+print("fixture ownership accepted")
+PY
+    if ! output=$(cd "$repo_root" && DOTFILES_PRIVATE_DIR="$tmp/accepting-private" "$checker" "$repo_root" docs/chezmoi-targets.tsv 2>&1); then
+        printf '%s\n' "$output" >&2
+        fail "accepting private checker did not preserve the canary"
+    fi
+    case "$output" in
+        *'fixture ownership accepted'*'chezmoi parity OK'*) ;;
+        *) printf '%s\n' "$output" >&2; fail "accepting private checker did not run through the canary" ;;
+    esac
+
     mkdir -p "$tmp/stale-private"
     expect_failure 'stale private checkout' 'private checkout is missing the target ownership checker' \
         env DOTFILES_PRIVATE_DIR="$tmp/stale-private" "$checker" "$repo_root" "$manifest"

@@ -237,7 +237,7 @@ def tracked_children(repository: Path, source_parent: PurePosixPath) -> set[str]
     if not repository.is_dir():
         return set()
     output = run_bounded(
-        ["git", "ls-files", "-z", "--", source_parent.as_posix()],
+        ["git", "ls-files", "-z", "--", f":(literal){source_parent.as_posix()}"],
         cwd=repository,
         env=command_environment(),
     )
@@ -259,6 +259,32 @@ def tracked_children(repository: Path, source_parent: PurePosixPath) -> set[str]
     return children
 
 
+def require_tracked_source(repository: Path, source: PurePosixPath) -> None:
+    if not repository.is_dir():
+        raise InventoryError(f"dedicated-owner repository is unavailable: {repository}")
+    source_value = source.as_posix()
+    try:
+        output = run_bounded(
+            ["git", "ls-files", "--error-unmatch", "-z", "--", f":(literal){source_value}"],
+            cwd=repository,
+            env=command_environment(),
+        )
+    except InventoryError as exc:
+        raise InventoryError(
+            f"dedicated-owner source is not tracked in {repository}: {source}"
+        ) from exc
+    prefix = source_value.rstrip("/") + "/"
+    for value in output.split(b"\0"):
+        if not value:
+            continue
+        try:
+            tracked = value.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise InventoryError(f"tracked path is not valid UTF-8 in {repository}") from exc
+        if tracked != source_value and not tracked.startswith(prefix):
+            raise InventoryError(f"git returned a path outside {source}: {tracked}")
+
+
 def expand_owner_patterns(
     patterns: Sequence[OwnerPattern], *, public: Path, private: Path
 ) -> dict[PurePosixPath, ExpectedOwner]:
@@ -274,6 +300,7 @@ def expand_owner_patterns(
                 (target_parent / child, lexical_absolute(root / source_parent / child)) for child in children
             )
         else:
+            require_tracked_source(root, pattern.source)
             mappings = ((pattern.target, lexical_absolute(root / pattern.source)),)
         for target, source in mappings:
             if target in expected:

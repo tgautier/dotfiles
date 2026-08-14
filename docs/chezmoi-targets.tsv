@@ -13,7 +13,6 @@ bin/rcm-links	.bin/rcm-links	retire-at-cutover	-	executable
 config/ghostty/config	.config/ghostty/config	shadow	dot_config/ghostty/config	file
 config/mise/config.toml	.config/mise/config.toml	defer-machine-overrides	-	file
 editorconfig	.editorconfig	shadow	dot_editorconfig	file
-git_template/hooks/gitkeep	.git_template/hooks/gitkeep	drop-empty-placeholder	-	file
 gitconfig	.gitconfig	defer-private-overlay	-	file
 gitignore	.gitignore	shadow	dot_gitignore	file
 psqlrc	.psqlrc	shadow	dot_psqlrc	file

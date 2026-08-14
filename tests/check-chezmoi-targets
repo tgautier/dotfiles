@@ -92,7 +92,7 @@ main() {
                     [[ -f "$repo_root/home/$chezmoi_source" ]] || fail "missing chezmoi source at line $line_no: $chezmoi_source"
                     printf '%s\t%s\n' "$target" "$chezmoi_source" >> "$tmp/expected-map"
                     ;;
-                defer-homebrew-link|repository-only|defer-machine-overrides|drop-empty-placeholder|defer-private-overlay|retire-at-cutover)
+                defer-homebrew-link|repository-only|defer-machine-overrides|defer-private-overlay|retire-at-cutover)
                     [[ "$chezmoi_source" == - ]] || fail "deferred target has a chezmoi source at line $line_no: $target"
                     ;;
                 *) fail "unknown disposition at line $line_no: $disposition" ;;

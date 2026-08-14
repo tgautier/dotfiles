@@ -1,0 +1,500 @@
+#!/usr/bin/env python3
+"""Inventory live HOME links before the rcm-to-chezmoi cutover."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import stat
+import subprocess
+import sys
+import tempfile
+from dataclasses import asdict, dataclass
+from pathlib import Path, PurePosixPath
+from typing import Iterable, Sequence
+
+SCHEMA_VERSION = 1
+SUBPROCESS_TIMEOUT_SECONDS = 30
+MAX_SUBPROCESS_OUTPUT_BYTES = 16 * 1024 * 1024
+OWNER_MANIFEST_HEADER = ("owner", "target", "source_root", "source")
+SOURCE_ROOTS = frozenset({"public", "private"})
+
+
+class InventoryError(Exception):
+    """Raised when a complete, trustworthy inventory cannot be produced."""
+
+
+@dataclass(frozen=True)
+class OwnerPattern:
+    owner: str
+    target: PurePosixPath
+    source_root: str
+    source: PurePosixPath
+    wildcard: bool
+
+
+@dataclass(frozen=True)
+class ExpectedOwner:
+    disposition: str
+    owner: str
+    source: Path
+
+
+@dataclass(frozen=True)
+class LinkRecord:
+    disposition: str
+    status: str
+    target: str
+    link_target: str | None
+    expected_target: str | None
+    owner: str
+
+
+def lexical_absolute(path: Path) -> Path:
+    return Path(os.path.abspath(os.path.normpath(path)))
+
+
+def command_environment(overrides: dict[str, str] | None = None) -> dict[str, str]:
+    environment = {
+        name: value for name, value in os.environ.items() if not name.startswith("GIT_")
+    }
+    if overrides:
+        environment.update(overrides)
+    return environment
+
+
+def require_relative_path(value: str, *, label: str, wildcard: bool) -> PurePosixPath:
+    if not value or any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise InventoryError(f"{label} is empty or contains a control delimiter: {value!r}")
+    path = PurePosixPath(value)
+    if path.is_absolute() or ".." in path.parts or "." in path.parts:
+        raise InventoryError(f"{label} must be a safe relative path: {value}")
+    stars = sum(part.count("*") for part in path.parts)
+    if wildcard:
+        if stars != 1 or path.parts[-1] != "*":
+            raise InventoryError(f"{label} wildcard must be one terminal path component: {value}")
+    elif stars:
+        raise InventoryError(f"{label} cannot contain a wildcard: {value}")
+    return path
+
+
+def load_owner_patterns(path: Path) -> list[OwnerPattern]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise InventoryError(f"cannot read dedicated-owner manifest {path}: {exc}") from exc
+    if not lines:
+        raise InventoryError(f"dedicated-owner manifest is empty: {path}")
+    if tuple(lines[0].split("\t")) != OWNER_MANIFEST_HEADER:
+        raise InventoryError(f"dedicated-owner manifest has the wrong header: {path}")
+
+    patterns: list[OwnerPattern] = []
+    seen_targets: set[PurePosixPath] = set()
+    for line_number, line in enumerate(lines[1:], start=2):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != len(OWNER_MANIFEST_HEADER):
+            raise InventoryError(f"dedicated-owner manifest line {line_number} has {len(fields)} fields")
+        owner, target_value, source_root, source_value = fields
+        if not owner or any(character.isspace() for character in owner):
+            raise InventoryError(f"invalid owner identifier at line {line_number}: {owner!r}")
+        if source_root not in SOURCE_ROOTS:
+            raise InventoryError(f"invalid source root at line {line_number}: {source_root}")
+        wildcard = target_value.endswith("/*") or source_value.endswith("/*")
+        if target_value.endswith("/*") != source_value.endswith("/*"):
+            raise InventoryError(f"target/source wildcard mismatch at line {line_number}")
+        target = require_relative_path(target_value, label=f"target at line {line_number}", wildcard=wildcard)
+        source = require_relative_path(source_value, label=f"source at line {line_number}", wildcard=wildcard)
+        if not target.parts[0].startswith("."):
+            raise InventoryError(f"HOME target must start with a dot at line {line_number}: {target}")
+        if target in seen_targets:
+            raise InventoryError(f"duplicate dedicated target pattern at line {line_number}: {target}")
+        seen_targets.add(target)
+        patterns.append(OwnerPattern(owner, target, source_root, source, wildcard))
+    if not patterns:
+        raise InventoryError(f"dedicated-owner manifest has no entries: {path}")
+    return patterns
+
+
+def run_bounded(command: Sequence[str], *, cwd: Path, env: dict[str, str] | None = None) -> bytes:
+    try:
+        with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
+            completed = subprocess.run(
+                command,
+                cwd=cwd,
+                env=env,
+                check=False,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                timeout=SUBPROCESS_TIMEOUT_SECONDS,
+            )
+            if stdout_file.tell() > MAX_SUBPROCESS_OUTPUT_BYTES or stderr_file.tell() > MAX_SUBPROCESS_OUTPUT_BYTES:
+                raise InventoryError(f"command output exceeded the inventory limit: {command[0]}")
+            stdout_file.seek(0)
+            stderr_file.seek(0)
+            stdout = stdout_file.read()
+            stderr = stderr_file.read()
+    except FileNotFoundError as exc:
+        raise InventoryError(f"missing required command: {command[0]}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise InventoryError(f"command exceeded {SUBPROCESS_TIMEOUT_SECONDS}s: {command[0]}") from exc
+    except OSError as exc:
+        raise InventoryError(f"cannot run required command {command[0]}: {exc}") from exc
+    if completed.returncode != 0:
+        diagnostic = stderr.decode("utf-8", errors="replace").strip()
+        raise InventoryError(f"command failed ({completed.returncode}): {command[0]}: {diagnostic}")
+    return stdout
+
+
+def parse_lsrc_map(output: bytes, *, home: Path, repositories: Sequence[Path]) -> dict[PurePosixPath, Path]:
+    try:
+        text = output.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise InventoryError("lsrc output is not valid UTF-8") from exc
+    result: dict[PurePosixPath, Path] = {}
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        target_value, separator, source_value = line.partition(":")
+        if not separator or not target_value or not source_value:
+            raise InventoryError(f"malformed lsrc row {line_number}: {line!r}")
+        target = lexical_absolute(Path(target_value))
+        source = lexical_absolute(Path(source_value))
+        try:
+            relative = PurePosixPath(target.relative_to(home).as_posix())
+        except ValueError as exc:
+            raise InventoryError(f"lsrc target escapes HOME at row {line_number}: {target}") from exc
+        if relative == PurePosixPath(".") or not any(source == root or root in source.parents for root in repositories):
+            raise InventoryError(f"lsrc row {line_number} escapes the configured repositories")
+        if relative in result:
+            raise InventoryError(f"duplicate lsrc target at row {line_number}: {relative}")
+        result[relative] = source
+    if not result:
+        raise InventoryError("lsrc returned no managed targets")
+    return result
+
+
+def load_rcm_map(*, lsrc: str, home: Path, public: Path, private: Path) -> dict[PurePosixPath, Path]:
+    repositories = [public]
+    command = [lsrc, "-d", str(public)]
+    if private.is_dir():
+        repositories.append(private)
+        command.extend(("-d", str(private)))
+    environment = command_environment(
+        {
+            "HOME": str(home),
+            "RCRC": str(public / "rcrc"),
+            "DOTFILES_DIR": str(public),
+            "DOTFILES_PRIVATE_DIR": str(private),
+        }
+    )
+    output = run_bounded(command, cwd=public, env=environment)
+    return parse_lsrc_map(output, home=home, repositories=repositories)
+
+
+def tracked_children(repository: Path, source_parent: PurePosixPath) -> set[str]:
+    if not repository.is_dir():
+        return set()
+    output = run_bounded(
+        ["git", "ls-files", "-z", "--", source_parent.as_posix()],
+        cwd=repository,
+        env=command_environment(),
+    )
+    prefix = source_parent.as_posix().rstrip("/") + "/"
+    children: set[str] = set()
+    for value in output.split(b"\0"):
+        if not value:
+            continue
+        try:
+            tracked = value.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise InventoryError(f"tracked path is not valid UTF-8 in {repository}") from exc
+        if not tracked.startswith(prefix):
+            raise InventoryError(f"git returned a path outside {source_parent}: {tracked}")
+        child = tracked[len(prefix) :].partition("/")[0]
+        if not child or child in {".", ".."}:
+            raise InventoryError(f"git returned an invalid child below {source_parent}: {tracked}")
+        children.add(child)
+    return children
+
+
+def expand_owner_patterns(
+    patterns: Sequence[OwnerPattern], *, public: Path, private: Path
+) -> dict[PurePosixPath, ExpectedOwner]:
+    roots = {"public": public, "private": private}
+    expected: dict[PurePosixPath, ExpectedOwner] = {}
+    for pattern in patterns:
+        root = roots[pattern.source_root]
+        if pattern.wildcard:
+            target_parent = pattern.target.parent
+            source_parent = pattern.source.parent
+            children = tracked_children(root, source_parent)
+            mappings = (
+                (target_parent / child, lexical_absolute(root / source_parent / child)) for child in children
+            )
+        else:
+            mappings = ((pattern.target, lexical_absolute(root / pattern.source)),)
+        for target, source in mappings:
+            if target in expected:
+                raise InventoryError(f"dedicated-owner patterns overlap at target: {target}")
+            expected[target] = ExpectedOwner("dedicated", pattern.owner, source)
+    return expected
+
+
+def historical_top_levels(repository: Path) -> set[str]:
+    if not repository.is_dir():
+        return set()
+    output = run_bounded(
+        ["git", "log", "--all", "--format=", "--name-only", "-z", "--"],
+        cwd=repository,
+        env=command_environment(),
+    )
+    result: set[str] = set()
+    for value in output.split(b"\0"):
+        if not value:
+            continue
+        try:
+            name = value.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise InventoryError(f"historical path is not valid UTF-8 in {repository}") from exc
+        top_level = PurePosixPath(name).parts[0]
+        if top_level and not top_level.startswith("."):
+            result.add(top_level)
+    return result
+
+
+def candidate_roots(
+    *,
+    home: Path,
+    repositories: Sequence[Path],
+    rcm_map: dict[PurePosixPath, Path],
+    patterns: Sequence[OwnerPattern],
+) -> list[Path]:
+    names = set().union(*(historical_top_levels(repository) for repository in repositories))
+    names.update(relative.parts[0].removeprefix(".") for relative in rcm_map)
+    names.update(pattern.target.parts[0].removeprefix(".") for pattern in patterns)
+    return sorted((home / f".{name}" for name in names if name), key=lambda path: str(path))
+
+
+def walk_links(root: Path) -> set[Path]:
+    try:
+        metadata = root.lstat()
+    except FileNotFoundError:
+        return set()
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect candidate HOME root {root}: {exc}") from exc
+    if stat.S_ISLNK(metadata.st_mode):
+        return {root}
+    if not stat.S_ISDIR(metadata.st_mode):
+        return set()
+
+    links: set[Path] = set()
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as scanner:
+                entries = sorted(scanner, key=lambda entry: entry.name, reverse=True)
+        except OSError as exc:
+            raise InventoryError(f"cannot enumerate candidate HOME directory {directory}: {exc}") from exc
+        for entry in entries:
+            path = Path(entry.path)
+            try:
+                if entry.is_symlink():
+                    links.add(path)
+                elif entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+            except OSError as exc:
+                raise InventoryError(f"cannot inspect candidate HOME entry {path}: {exc}") from exc
+    return links
+
+
+def link_status(path: Path) -> str:
+    try:
+        path.stat()
+    except FileNotFoundError:
+        return "broken"
+    except OSError as exc:
+        raise InventoryError(f"cannot follow live link {path}: {exc}") from exc
+    return "linked"
+
+
+def points_into_dotfiles(path: Path, repositories: Sequence[Path]) -> bool:
+    return any(path == repository or repository in path.parents for repository in repositories)
+
+
+def inventory(
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    patterns: Sequence[OwnerPattern],
+    rcm_map: dict[PurePosixPath, Path],
+) -> list[LinkRecord]:
+    repositories = [public]
+    if private.is_dir():
+        repositories.append(private)
+    expected: dict[PurePosixPath, ExpectedOwner] = {
+        target: ExpectedOwner("rcm", "rcm", source) for target, source in rcm_map.items()
+    }
+    for target, owner in expand_owner_patterns(patterns, public=public, private=private).items():
+        if target in expected:
+            raise InventoryError(f"rcm and dedicated ownership overlap at target: {target}")
+        expected[target] = owner
+
+    discovered: set[Path] = set()
+    for root in candidate_roots(
+        home=home,
+        repositories=repositories,
+        rcm_map=rcm_map,
+        patterns=patterns,
+    ):
+        discovered.update(walk_links(root))
+    relative_discovered = {PurePosixPath(path.relative_to(home).as_posix()): path for path in discovered}
+    candidates = sorted(set(relative_discovered) | set(expected), key=str)
+
+    records: list[LinkRecord] = []
+    for relative in candidates:
+        path = home / relative
+        expected_owner = expected.get(relative)
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            if expected_owner is None:
+                continue
+            records.append(
+                LinkRecord(
+                    expected_owner.disposition,
+                    "missing",
+                    relative.as_posix(),
+                    None,
+                    str(expected_owner.source),
+                    expected_owner.owner,
+                )
+            )
+            continue
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect HOME target {path}: {exc}") from exc
+
+        if not stat.S_ISLNK(metadata.st_mode):
+            records.append(
+                LinkRecord(
+                    "unclassified",
+                    "collision",
+                    relative.as_posix(),
+                    None,
+                    str(expected_owner.source) if expected_owner else None,
+                    expected_owner.owner if expected_owner else "unclassified",
+                )
+            )
+            continue
+
+        try:
+            raw_target = os.readlink(path)
+        except OSError as exc:
+            raise InventoryError(f"cannot read HOME link {path}: {exc}") from exc
+        resolved_target = lexical_absolute(Path(raw_target) if os.path.isabs(raw_target) else path.parent / raw_target)
+        status_value = link_status(path)
+        if expected_owner and resolved_target == expected_owner.source:
+            disposition = expected_owner.disposition
+            owner_name = expected_owner.owner
+            expected_target = str(expected_owner.source)
+        elif expected_owner:
+            disposition = "unclassified"
+            status_value = "changed"
+            owner_name = expected_owner.owner
+            expected_target = str(expected_owner.source)
+        elif points_into_dotfiles(resolved_target, repositories):
+            disposition = "obsolete"
+            owner_name = "obsolete"
+            expected_target = None
+        else:
+            disposition = "unclassified"
+            owner_name = "unclassified"
+            expected_target = None
+        records.append(
+            LinkRecord(
+                disposition,
+                status_value,
+                relative.as_posix(),
+                raw_target,
+                expected_target,
+                owner_name,
+            )
+        )
+    return records
+
+
+def render_table(records: Sequence[LinkRecord]) -> None:
+    print("disposition\tstatus\ttarget\tlink_target\texpected_target\towner")
+    for record in records:
+        values = (
+            record.disposition,
+            record.status,
+            record.target,
+            record.link_target or "-",
+            record.expected_target or "-",
+            record.owner,
+        )
+        if any(any(ord(character) < 32 or ord(character) == 127 for character in value) for value in values):
+            raise InventoryError(f"table output cannot represent path delimiters safely: {record.target!r}")
+        print("\t".join(values))
+
+
+def render_json(records: Sequence[LinkRecord]) -> None:
+    payload = {"schema": SCHEMA_VERSION, "records": [asdict(record) for record in records]}
+    json.dump(payload, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
+    print()
+
+
+def parse_args(argv: Sequence[str]) -> argparse.Namespace:
+    repository = Path(__file__).resolve().parent.parent
+    public_default = Path(
+        os.environ.get(
+            "DOTFILES_DIR",
+            Path.home() / "Workspace/tgautier/dotfiles",
+        )
+    )
+    private_default = Path(
+        os.environ.get(
+            "DOTFILES_PRIVATE_DIR",
+            Path.home() / "Workspace/tgautier/dotfiles-private",
+        )
+    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    inventory_parser = subparsers.add_parser("inventory", help="print a read-only HOME link inventory")
+    inventory_parser.add_argument("--home", type=Path, default=Path.home())
+    inventory_parser.add_argument("--public-dir", type=Path, default=public_default)
+    inventory_parser.add_argument("--private-dir", type=Path, default=private_default)
+    inventory_parser.add_argument("--owners", type=Path, default=repository / "docs/rcm-link-owners.tsv")
+    inventory_parser.add_argument("--lsrc", default="lsrc")
+    inventory_parser.add_argument("--format", choices=("table", "json"), default="table")
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        home = lexical_absolute(args.home)
+        public = lexical_absolute(args.public_dir)
+        private = lexical_absolute(args.private_dir)
+        if not home.is_dir():
+            raise InventoryError(f"HOME inventory root is not a directory: {home}")
+        if not public.is_dir() or not (public / "rcrc").is_file():
+            raise InventoryError(f"public dotfiles repository is incomplete: {public}")
+        patterns = load_owner_patterns(lexical_absolute(args.owners))
+        rcm_map = load_rcm_map(lsrc=args.lsrc, home=home, public=public, private=private)
+        records = inventory(home=home, public=public, private=private, patterns=patterns, rcm_map=rcm_map)
+        if args.format == "json":
+            render_json(records)
+        else:
+            render_table(records)
+        return 0
+    except InventoryError as exc:
+        print(f"rcm-links: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

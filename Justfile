@@ -3,7 +3,19 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-chezmoi-canary
+ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-chezmoi-canary
+
+[doc("Compile tracked Python helpers with warnings promoted to errors")]
+lint-python:
+    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/rcm-links", "tests/test_rcm_links.py")]'
+
+[doc("Fixture-test the read-only rcm link ownership inventory")]
+test-rcm-links:
+    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_rcm_links.py' -v
+
+[doc("Print the read-only ownership inventory for current and historical rcm HOME targets")]
+link-inventory:
+    python3 bin/rcm-links inventory --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
 
 # Assert `rcrc` resolves the way README documents, on both halves of the
 # override contract: DOTFILES_DIRS, which reaches the operator's real $HOME

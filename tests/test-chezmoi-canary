@@ -43,7 +43,7 @@ make_fixture() {
 }
 
 main() {
-    local script_dir repo_root manifest checker tmp
+    local script_dir repo_root manifest checker tmp output probe_output venv_site
     script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
     repo_root=$(cd "$script_dir/.." && pwd -P)
     manifest="$repo_root/docs/chezmoi-targets.tsv"
@@ -53,8 +53,107 @@ main() {
     "$checker" "$repo_root" "$manifest"
 
     tmp=$(mktemp -d)
+    tmp=$(cd "$tmp" && pwd -P)
     cleanup_root=$tmp
     trap cleanup EXIT
+
+    if ! output=$(cd "$repo_root" && DOTFILES_PRIVATE_DIR="$tmp/absent-private" "$checker" "$repo_root" docs/chezmoi-targets.tsv 2>&1); then
+        printf '%s\n' "$output" >&2
+        fail "absent private checkout did not preserve the public-only canary"
+    fi
+    case "$output" in
+        *'cross-repository target ownership: skipped'*) ;;
+        *) printf '%s\n' "$output" >&2; fail "absent private checkout did not report the public-only skip" ;;
+    esac
+
+    : > "$tmp/non-directory-private"
+    expect_failure 'non-directory private path' 'private checkout path is not a directory' \
+        env DOTFILES_PRIVATE_DIR="$tmp/non-directory-private" "$checker" "$repo_root" "$manifest"
+
+    mkdir -p "$tmp/accepting-private/shared/chezmoi"
+    : > "$tmp/accepting-private/shared/chezmoi/__init__.py"
+    cat > "$tmp/accepting-private/shared/chezmoi/check_target_ownership.py" <<'PY'
+from pathlib import Path
+import sys
+
+if len(sys.argv) != 3 or sys.argv[1] != "--public-targets" or not Path(sys.argv[2]).is_file():
+    print("fixture checker received the wrong public manifest contract", file=sys.stderr)
+    raise SystemExit(24)
+print("fixture ownership accepted")
+PY
+    mkdir -p "$tmp/conflicting-pythonpath/shared/chezmoi"
+    : > "$tmp/conflicting-pythonpath/shared/__init__.py"
+    : > "$tmp/conflicting-pythonpath/shared/chezmoi/__init__.py"
+    cat > "$tmp/conflicting-pythonpath/shared/chezmoi/check_target_ownership.py" <<'PY'
+print("conflicting shared package ran")
+PY
+    if ! probe_output=$(cd "$tmp/accepting-private" && PYTHONPATH="$tmp/conflicting-pythonpath" python3 -S -B -m shared.chezmoi.check_target_ownership 2>&1); then
+        printf '%s\n' "$probe_output" >&2
+        fail "conflicting Python path fixture could not reach its shadow package"
+    fi
+    case "$probe_output" in
+        *'conflicting shared package ran'*) ;;
+        *) printf '%s\n' "$probe_output" >&2; fail "conflicting Python path fixture was not load-bearing" ;;
+    esac
+    if ! python3 -m venv "$tmp/conflicting-venv"; then
+        fail "could not create the conflicting site-package fixture"
+    fi
+    if ! venv_site=$("$tmp/conflicting-venv/bin/python3" -c 'import sysconfig; print(sysconfig.get_path("purelib"))' 2>&1); then
+        printf '%s\n' "$venv_site" >&2
+        fail "could not resolve the conflicting virtual environment's site-packages"
+    fi
+    case "$venv_site" in
+        "$tmp/conflicting-venv"/*) ;;
+        *) fail "conflicting virtual environment resolved site-packages outside its fixture: $venv_site" ;;
+    esac
+    mkdir -p "$venv_site/shared/chezmoi"
+    : > "$venv_site/shared/__init__.py"
+    : > "$venv_site/shared/chezmoi/__init__.py"
+    cat > "$venv_site/shared/chezmoi/check_target_ownership.py" <<'PY'
+print("conflicting site package ran")
+PY
+    if ! probe_output=$(cd "$tmp/accepting-private" && "$tmp/conflicting-venv/bin/python3" -E -B -m shared.chezmoi.check_target_ownership 2>&1); then
+        printf '%s\n' "$probe_output" >&2
+        fail "conflicting site-package fixture could not reach its shadow package"
+    fi
+    case "$probe_output" in
+        *'conflicting site package ran'*) ;;
+        *) printf '%s\n' "$probe_output" >&2; fail "conflicting site-package fixture was not load-bearing" ;;
+    esac
+    if ! output=$(cd "$repo_root" && PATH="$tmp/conflicting-venv/bin:$PATH" PYTHONPATH="$tmp/conflicting-pythonpath" DOTFILES_PRIVATE_DIR="$tmp/accepting-private" "$checker" "$repo_root" docs/chezmoi-targets.tsv 2>&1); then
+        printf '%s\n' "$output" >&2
+        fail "accepting private checker did not preserve the canary"
+    fi
+    case "$output" in
+        *'fixture ownership accepted'*'chezmoi parity OK'*) ;;
+        *) printf '%s\n' "$output" >&2; fail "accepting private checker did not run through the canary" ;;
+    esac
+    case "$output" in
+        *'conflicting shared package ran'*) printf '%s\n' "$output" >&2; fail "Python path shadowed the selected private checker" ;;
+        *'conflicting site package ran'*) printf '%s\n' "$output" >&2; fail "Python site-packages shadowed the selected private checker" ;;
+    esac
+    [[ ! -e "$tmp/accepting-private/shared/chezmoi/__pycache__" ]] || fail "accepting private checker wrote bytecode into the selected checkout"
+
+    mkdir -p "$tmp/stale-private"
+    expect_failure 'stale private checkout' 'private checkout is missing the target ownership checker' \
+        env DOTFILES_PRIVATE_DIR="$tmp/stale-private" "$checker" "$repo_root" "$manifest"
+
+    mkdir -p "$tmp/rejecting-private/shared/chezmoi"
+    : > "$tmp/rejecting-private/shared/chezmoi/__init__.py"
+    cat > "$tmp/rejecting-private/shared/chezmoi/check_target_ownership.py" <<'PY'
+from pathlib import Path
+import sys
+
+if len(sys.argv) != 3 or sys.argv[1] != "--public-targets" or not Path(sys.argv[2]).is_file():
+    print("fixture checker received the wrong public manifest contract", file=sys.stderr)
+    raise SystemExit(24)
+print("fixture overlap detected", file=sys.stderr)
+raise SystemExit(23)
+PY
+    pushd "$repo_root" >/dev/null
+    expect_failure 'rejected ownership' 'fixture overlap detected' \
+        env DOTFILES_PRIVATE_DIR="$tmp/rejecting-private" "$checker" "$repo_root" docs/chezmoi-targets.tsv
+    popd >/dev/null
 
     awk 'BEGIN { FS=OFS="\t" } $2 == ".zsh/zaliases" { $2=".zsh/.zaliases" } { print }' "$manifest" > "$tmp/misnamed.tsv"
     expect_failure misnamed 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/misnamed.tsv"
@@ -79,7 +178,7 @@ main() {
     printf 'unexpected fixture\n' > "$tmp/extra/home/dot_unexpected"
     expect_failure extra 'target map mismatch' "$checker" "$tmp/extra" "$tmp/extra/docs/chezmoi-targets.tsv"
 
-    printf 'chezmoi canary fixtures OK (misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra)\n'
+    printf 'chezmoi canary fixtures OK (private available/conflicting-package/absent/non-directory/stale/rejected, misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra)\n'
 }
 
 main "$@"

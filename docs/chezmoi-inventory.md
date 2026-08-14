@@ -42,16 +42,18 @@ The guard:
 1. Compares the exact chezmoi target/source map with the `shadow` rows
 1. Applies into the isolated destination and verifies bytes plus executable modes
 1. Applies twice and requires an empty diff after each apply
-1. Runs sabotage fixtures for a misnamed target, omitted shadow and deferred rows, a retired disposition, a duplicate row, a missing source, and an extra source
+1. Runs private-checkout available, conflicting-package, absent, non-directory, stale, and rejection fixtures plus sabotage fixtures for a misnamed target, omitted shadow and deferred rows, a retired disposition, a duplicate row, a missing source, and an extra source
+
+The guard resolves the private companion checkout from `DOTFILES_PRIVATE_DIR`, defaulting to `~/Workspace/tgautier/dotfiles-private`. If that path is absent, it reports an explicit skip and continues the public-only canary. If the checkout exists, the guard requires its target-ownership checker and invokes it before the first isolated `chezmoi apply`. Python-specific environment overrides and site-package discovery are disabled for that invocation, keeping module resolution inside the selected checkout and the standard library. A stale or partial private checkout fails instead of silently dropping the cross-repository gate.
 
 The guard now maps `zsh/zaliases` and `zsh/zcompletion` to `~/.zsh/zaliases` and `~/.zsh/zcompletion`, matching both rcm and `zshrc`. The previous source names rendered an extra dot in each target while the hand-maintained canary still passed.
 
 ## Upgrade and rollback
 
-Pull the repository and run `just ci`; keep using `just link` for active rcm deployment. Do not run chezmoi against the real home as part of this phase.
+Pull the private companion repository first when it is installed, then pull this repository and run `just test-chezmoi-canary`. The command changes no HOME file: both chezmoi applies still target the temporary destination. A machine without the private repository continues to run the complete public-only parity canary. Keep using `just link` for active rcm deployment, and run `just ci` before publishing changes.
 
 The removed empty Git-template marker may leave `~/.git_template/hooks/gitkeep` as an obsolete rcm symlink. Run `just link-inventory` after pulling. If the inventory reports that exact target as obsolete, follow the approval-bound plan, cleanup, and verification steps in [Rcm link reconciliation](rcm-link-reconciliation.md). Review every path in the generated plan because it can include other obsolete links.
 
-Before HOME cleanup, rollback is a repository revert followed by `just ci` and `just link`. After cleanup, restore the retained approved plan before reverting the repository, as described in the reconciliation guide. Every chezmoi apply in the guard remains confined to a temporary destination.
+To roll back this checkpoint before HOME cleanup, restore the earlier public revision and run `just ci`. No HOME action or private-repository rollback is needed for the overlap-gate integration. After cleanup, restore the retained approved plan before reverting the repository, as described in the reconciliation guide. Every chezmoi apply in the guard remains confined to a temporary destination.
 
 The future cutover remains blocked until the exact guard passes from a fresh checkout, `just link-inventory` reconciles current and historical rcm HOME links with no unresolved obsolete set after the approval-bound cleanup decision, and the cutover PR records the backup, apply, verification, and rcm rollback sequence for macOS, Linux, and WSL2.

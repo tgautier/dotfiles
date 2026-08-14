@@ -358,6 +358,50 @@ def current_top_levels(repository: Path) -> set[str]:
     return names
 
 
+def actual_home_relative(home: Path, path: Path) -> PurePosixPath:
+    requested = PurePosixPath(path.relative_to(home).as_posix())
+    current = home
+    actual_parts: list[str] = []
+    for index, part in enumerate(requested.parts):
+        try:
+            with os.scandir(current) as scanner:
+                entries = list(scanner)
+        except OSError as exc:
+            raise InventoryError(f"cannot resolve HOME entry spelling below {current}: {exc}") from exc
+        exact = [entry for entry in entries if entry.name == part]
+        matches = exact or [entry for entry in entries if entry.name.casefold() == part.casefold()]
+        if len(matches) != 1:
+            raise InventoryError(f"cannot resolve one HOME entry spelling for {path}")
+        entry = matches[0]
+        actual_parts.append(entry.name)
+        if index < len(requested.parts) - 1:
+            try:
+                is_directory = entry.is_dir(follow_symlinks=False)
+            except OSError as exc:
+                raise InventoryError(f"cannot inspect HOME ancestor {entry.path}: {exc}") from exc
+            if not is_directory:
+                raise InventoryError(f"HOME ancestor is not a real directory: {entry.path}")
+            current /= entry.name
+    return PurePosixPath(*actual_parts)
+
+
+def existing_expected_relative(
+    home: Path,
+    target: PurePosixPath,
+    spelling_resolver: Callable[[Path, Path], PurePosixPath],
+) -> PurePosixPath:
+    if has_blocking_home_ancestor(home, target):
+        return target
+    path = home / target
+    try:
+        path.lstat()
+    except (FileNotFoundError, NotADirectoryError):
+        return target
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect expected HOME target {path}: {exc}") from exc
+    return spelling_resolver(home, path)
+
+
 def candidate_roots(
     *,
     home: Path,
@@ -445,16 +489,34 @@ def inventory(
     private: Path,
     patterns: Sequence[OwnerPattern],
     rcm_map: dict[PurePosixPath, Path],
+    spelling_resolver: Callable[[Path, Path], PurePosixPath] = actual_home_relative,
+    expected_spelling_resolver: Callable[[Path, PurePosixPath], PurePosixPath] | None = None,
 ) -> list[LinkRecord]:
     repositories = [public]
     if private.is_dir():
         repositories.append(private)
-    expected: dict[PurePosixPath, ExpectedOwner] = {
+    declared_expected: dict[PurePosixPath, ExpectedOwner] = {
         target: ExpectedOwner("rcm", "rcm", source) for target, source in rcm_map.items()
     }
     for target, owner in expand_owner_patterns(patterns, public=public, private=private).items():
-        if target in expected:
+        if target in declared_expected:
             raise InventoryError(f"rcm and dedicated ownership overlap at target: {target}")
+        declared_expected[target] = owner
+
+    normalize_expected = expected_spelling_resolver or (
+        lambda configured_home, target: existing_expected_relative(
+            configured_home,
+            target,
+            spelling_resolver,
+        )
+    )
+    expected: dict[PurePosixPath, ExpectedOwner] = {}
+    for declared_target, owner in declared_expected.items():
+        target = normalize_expected(home, declared_target)
+        if target in expected:
+            raise InventoryError(
+                f"expected ownership aliases overlap at stored HOME target: {target}"
+            )
         expected[target] = owner
 
     discovered: set[Path] = set()
@@ -465,8 +527,8 @@ def inventory(
         patterns=patterns,
     ):
         discovered.update(walk_links(root))
-    relative_discovered = {PurePosixPath(path.relative_to(home).as_posix()): path for path in discovered}
-    candidates = sorted(set(relative_discovered) | set(expected), key=str)
+    relative_discovered = {spelling_resolver(home, path) for path in discovered}
+    candidates = sorted(relative_discovered | set(expected), key=str)
 
     records: list[LinkRecord] = []
     for relative in candidates:

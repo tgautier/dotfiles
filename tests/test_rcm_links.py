@@ -364,6 +364,93 @@ class RcmLinksInventoryTest(unittest.TestCase):
             ("obsolete", "linked"),
         )
 
+    def test_inventory_normalizes_case_aliases_to_stored_home_spelling(self) -> None:
+        self._write(self.public, "Justfile")
+        private_justfile = self._write(self.private, "justfile")
+        self._write(self.private, "codex/hooks.json", "{}\n")
+        self._commit(self.public, "add case-colliding public source")
+        self._commit(self.private, "add current private source")
+        self._link(".justfile", private_justfile)
+
+        original_walk_links = RCM_LINKS.walk_links
+
+        def walk_links_with_case_alias(root: Path) -> set[Path]:
+            links = original_walk_links(root)
+            if root == self.home / ".Justfile":
+                links.add(root)
+            return links
+
+        def stored_spelling(home: Path, path: Path) -> PurePosixPath:
+            if path == home / ".Justfile":
+                return PurePosixPath(".justfile")
+            return RCM_LINKS.actual_home_relative(home, path)
+
+        with mock.patch.object(RCM_LINKS, "walk_links", side_effect=walk_links_with_case_alias):
+            inventory_records = RCM_LINKS.inventory(
+                home=self.home,
+                public=self.public,
+                private=self.private,
+                patterns=RCM_LINKS.load_owner_patterns(self.owners),
+                rcm_map={PurePosixPath(".justfile"): private_justfile},
+                spelling_resolver=stored_spelling,
+            )
+        records = {record.target: record for record in inventory_records}
+        self.assertNotIn(".Justfile", records)
+        self.assertEqual(
+            (records[".justfile"].disposition, records[".justfile"].status),
+            ("rcm", "linked"),
+        )
+
+    def test_inventory_normalizes_inverse_expected_case_alias_and_rejects_overlap(self) -> None:
+        self._write(self.public, "Justfile")
+        private_justfile = self._write(self.private, "justfile")
+        self._write(self.private, "codex/hooks.json", "{}\n")
+        self._commit(self.public, "add historical public spelling")
+        self._commit(self.private, "add current private source")
+        self._link(".justfile", private_justfile)
+        patterns = RCM_LINKS.load_owner_patterns(self.owners)
+
+        def stored_spelling(_home: Path, _path: Path) -> PurePosixPath:
+            return PurePosixPath(".justfile")
+
+        def stored_expected(_home: Path, _target: PurePosixPath) -> PurePosixPath:
+            if _target in {PurePosixPath(".Justfile"), PurePosixPath(".justfile")}:
+                return PurePosixPath(".justfile")
+            return _target
+
+        records = RCM_LINKS.inventory(
+            home=self.home,
+            public=self.public,
+            private=self.private,
+            patterns=patterns,
+            rcm_map={PurePosixPath(".Justfile"): private_justfile},
+            spelling_resolver=stored_spelling,
+            expected_spelling_resolver=stored_expected,
+        )
+        by_target = {record.target: record for record in records}
+        self.assertEqual(set(by_target) & {".Justfile", ".justfile"}, {".justfile"})
+        self.assertEqual(
+            (by_target[".justfile"].disposition, by_target[".justfile"].status),
+            ("rcm", "linked"),
+        )
+
+        with self.assertRaisesRegex(
+            RCM_LINKS.InventoryError,
+            "expected ownership aliases overlap",
+        ):
+            RCM_LINKS.inventory(
+                home=self.home,
+                public=self.public,
+                private=self.private,
+                patterns=patterns,
+                rcm_map={
+                    PurePosixPath(".Justfile"): private_justfile,
+                    PurePosixPath(".justfile"): private_justfile,
+                },
+                spelling_resolver=stored_spelling,
+                expected_spelling_resolver=stored_expected,
+            )
+
     def test_malformed_owner_manifest_stops_before_inventory(self) -> None:
         self._write(self.public, "zshrc")
         self._write(self.public, "missing")

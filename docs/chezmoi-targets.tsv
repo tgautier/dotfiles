@@ -9,6 +9,7 @@ bin/kseal	.bin/kseal	shadow	dot_bin/executable_kseal	executable
 bin/kshow	.bin/kshow	shadow	dot_bin/executable_kshow	executable
 bin/obsidian	.bin/obsidian	shadow	dot_bin/executable_obsidian	executable
 bin/op-ssh-sign	.bin/op-ssh-sign	shadow	dot_bin/executable_op-ssh-sign	executable
+bin/rcm-links	.bin/rcm-links	retire-at-cutover	-	executable
 config/ghostty/config	.config/ghostty/config	shadow	dot_config/ghostty/config	file
 config/mise/config.toml	.config/mise/config.toml	defer-machine-overrides	-	file
 editorconfig	.editorconfig	shadow	dot_editorconfig	file

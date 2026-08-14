@@ -1,0 +1,1232 @@
+#!/usr/bin/env python3
+"""Inventory live HOME links before the rcm-to-chezmoi cutover."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import stat
+import subprocess
+import sys
+import tempfile
+from contextlib import contextmanager
+from dataclasses import asdict, dataclass
+from pathlib import Path, PurePosixPath
+from typing import Callable, Iterable, Iterator, Sequence
+
+SCHEMA_VERSION = 1
+CLEANUP_PLAN_SCHEMA_VERSION = 1
+SUBPROCESS_TIMEOUT_SECONDS = 30
+MAX_SUBPROCESS_OUTPUT_BYTES = 16 * 1024 * 1024
+MAX_CLEANUP_PLAN_BYTES = 1024 * 1024
+OWNER_MANIFEST_HEADER = ("owner", "target", "source_root", "source")
+SOURCE_ROOTS = frozenset({"public", "private"})
+
+
+class InventoryError(Exception):
+    """Raised when a complete, trustworthy inventory cannot be produced."""
+
+
+@dataclass(frozen=True)
+class OwnerPattern:
+    owner: str
+    target: PurePosixPath
+    source_root: str
+    source: PurePosixPath
+    wildcard: bool
+
+
+@dataclass(frozen=True)
+class ExpectedOwner:
+    disposition: str
+    owner: str
+    source: Path
+
+
+@dataclass(frozen=True)
+class LinkRecord:
+    disposition: str
+    status: str
+    target: str
+    link_target: str | None
+    expected_target: str | None
+    owner: str
+
+
+@dataclass(frozen=True)
+class ApprovedLink:
+    target: PurePosixPath
+    link_target: str
+
+
+@dataclass(frozen=True)
+class CleanupPlan:
+    home: Path
+    public: Path
+    private: Path
+    links: tuple[ApprovedLink, ...]
+    approval_sha256: str
+
+
+@dataclass(frozen=True)
+class MutationResult:
+    changed: tuple[PurePosixPath, ...]
+    unchanged: tuple[PurePosixPath, ...]
+
+
+def collision_record(
+    relative: PurePosixPath,
+    expected_owner: ExpectedOwner | None,
+) -> LinkRecord:
+    return LinkRecord(
+        "unclassified",
+        "collision",
+        relative.as_posix(),
+        None,
+        str(expected_owner.source) if expected_owner else None,
+        expected_owner.owner if expected_owner else "unclassified",
+    )
+
+
+def lexical_absolute(path: Path) -> Path:
+    return Path(os.path.abspath(os.path.normpath(path)))
+
+
+def command_environment(overrides: dict[str, str] | None = None) -> dict[str, str]:
+    environment = {
+        name: value for name, value in os.environ.items() if not name.startswith("GIT_")
+    }
+    if overrides:
+        environment.update(overrides)
+    return environment
+
+
+def require_relative_path(value: str, *, label: str, wildcard: bool) -> PurePosixPath:
+    if not value or any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise InventoryError(f"{label} is empty or contains a control delimiter: {value!r}")
+    path = PurePosixPath(value)
+    if not path.parts or path.is_absolute() or ".." in path.parts or "." in path.parts:
+        raise InventoryError(f"{label} must be a safe relative path: {value}")
+    stars = sum(part.count("*") for part in path.parts)
+    if wildcard:
+        if stars != 1 or path.parts[-1] != "*":
+            raise InventoryError(f"{label} wildcard must be one terminal path component: {value}")
+    elif stars:
+        raise InventoryError(f"{label} cannot contain a wildcard: {value}")
+    return path
+
+
+def load_owner_patterns(path: Path) -> list[OwnerPattern]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as exc:
+        raise InventoryError(f"cannot read dedicated-owner manifest {path}: {exc}") from exc
+    if not lines:
+        raise InventoryError(f"dedicated-owner manifest is empty: {path}")
+    if tuple(lines[0].split("\t")) != OWNER_MANIFEST_HEADER:
+        raise InventoryError(f"dedicated-owner manifest has the wrong header: {path}")
+
+    patterns: list[OwnerPattern] = []
+    seen_targets: set[PurePosixPath] = set()
+    for line_number, line in enumerate(lines[1:], start=2):
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) != len(OWNER_MANIFEST_HEADER):
+            raise InventoryError(f"dedicated-owner manifest line {line_number} has {len(fields)} fields")
+        owner, target_value, source_root, source_value = fields
+        if not owner or any(character.isspace() for character in owner):
+            raise InventoryError(f"invalid owner identifier at line {line_number}: {owner!r}")
+        if source_root not in SOURCE_ROOTS:
+            raise InventoryError(f"invalid source root at line {line_number}: {source_root}")
+        wildcard = target_value.endswith("/*") or source_value.endswith("/*")
+        if target_value.endswith("/*") != source_value.endswith("/*"):
+            raise InventoryError(f"target/source wildcard mismatch at line {line_number}")
+        target = require_relative_path(target_value, label=f"target at line {line_number}", wildcard=wildcard)
+        source = require_relative_path(source_value, label=f"source at line {line_number}", wildcard=wildcard)
+        if not target.parts[0].startswith("."):
+            raise InventoryError(f"HOME target must start with a dot at line {line_number}: {target}")
+        if target in seen_targets:
+            raise InventoryError(f"duplicate dedicated target pattern at line {line_number}: {target}")
+        seen_targets.add(target)
+        patterns.append(OwnerPattern(owner, target, source_root, source, wildcard))
+    if not patterns:
+        raise InventoryError(f"dedicated-owner manifest has no entries: {path}")
+    return patterns
+
+
+def run_bounded(command: Sequence[str], *, cwd: Path, env: dict[str, str] | None = None) -> bytes:
+    try:
+        with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
+            completed = subprocess.run(
+                command,
+                cwd=cwd,
+                env=env,
+                check=False,
+                stdout=stdout_file,
+                stderr=stderr_file,
+                timeout=SUBPROCESS_TIMEOUT_SECONDS,
+            )
+            if stdout_file.tell() > MAX_SUBPROCESS_OUTPUT_BYTES or stderr_file.tell() > MAX_SUBPROCESS_OUTPUT_BYTES:
+                raise InventoryError(f"command output exceeded the inventory limit: {command[0]}")
+            stdout_file.seek(0)
+            stderr_file.seek(0)
+            stdout = stdout_file.read()
+            stderr = stderr_file.read()
+    except FileNotFoundError as exc:
+        raise InventoryError(f"missing required command: {command[0]}") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise InventoryError(f"command exceeded {SUBPROCESS_TIMEOUT_SECONDS}s: {command[0]}") from exc
+    except OSError as exc:
+        raise InventoryError(f"cannot run required command {command[0]}: {exc}") from exc
+    if completed.returncode != 0:
+        diagnostic = stderr.decode("utf-8", errors="replace").strip()
+        raise InventoryError(f"command failed ({completed.returncode}): {command[0]}: {diagnostic}")
+    return stdout
+
+
+def parse_lsrc_map(output: bytes, *, home: Path, repositories: Sequence[Path]) -> dict[PurePosixPath, Path]:
+    try:
+        text = output.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise InventoryError("lsrc output is not valid UTF-8") from exc
+    result: dict[PurePosixPath, Path] = {}
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        target_value, separator, source_value = line.partition(":")
+        if not separator or not target_value or not source_value:
+            raise InventoryError(f"malformed lsrc row {line_number}: {line!r}")
+        target = lexical_absolute(Path(target_value))
+        source = lexical_absolute(Path(source_value))
+        try:
+            relative = PurePosixPath(target.relative_to(home).as_posix())
+        except ValueError as exc:
+            raise InventoryError(f"lsrc target escapes HOME at row {line_number}: {target}") from exc
+        if relative == PurePosixPath(".") or not any(source == root or root in source.parents for root in repositories):
+            raise InventoryError(f"lsrc row {line_number} escapes the configured repositories")
+        if relative in result:
+            raise InventoryError(f"duplicate lsrc target at row {line_number}: {relative}")
+        result[relative] = source
+    if not result:
+        raise InventoryError("lsrc returned no managed targets")
+    return result
+
+
+def load_rcm_map(*, lsrc: str, home: Path, public: Path, private: Path) -> dict[PurePosixPath, Path]:
+    repositories = [public]
+    command = [lsrc, "-d", str(public)]
+    if private.is_dir():
+        repositories.append(private)
+        command.extend(("-d", str(private)))
+    environment = command_environment(
+        {
+            "HOME": str(home),
+            "RCRC": str(public / "rcrc"),
+            "DOTFILES_DIR": str(public),
+            "DOTFILES_PRIVATE_DIR": str(private),
+        }
+    )
+    output = run_bounded(command, cwd=public, env=environment)
+    return parse_lsrc_map(output, home=home, repositories=repositories)
+
+
+def tracked_children(repository: Path, source_parent: PurePosixPath) -> set[str]:
+    if not repository.is_dir():
+        return set()
+    output = run_bounded(
+        ["git", "ls-files", "-z", "--", f":(literal){source_parent.as_posix()}"],
+        cwd=repository,
+        env=command_environment(),
+    )
+    prefix = source_parent.as_posix().rstrip("/") + "/"
+    children: set[str] = set()
+    for value in output.split(b"\0"):
+        if not value:
+            continue
+        try:
+            tracked = value.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise InventoryError(f"tracked path is not valid UTF-8 in {repository}") from exc
+        if not tracked.startswith(prefix):
+            raise InventoryError(f"git returned a path outside {source_parent}: {tracked}")
+        child = tracked[len(prefix) :].partition("/")[0]
+        if not child or child in {".", ".."}:
+            raise InventoryError(f"git returned an invalid child below {source_parent}: {tracked}")
+        children.add(child)
+    return children
+
+
+def require_tracked_source(repository: Path, source: PurePosixPath) -> None:
+    if not repository.is_dir():
+        raise InventoryError(f"dedicated-owner repository is unavailable: {repository}")
+    source_value = source.as_posix()
+    try:
+        output = run_bounded(
+            ["git", "ls-files", "--error-unmatch", "-z", "--", f":(literal){source_value}"],
+            cwd=repository,
+            env=command_environment(),
+        )
+    except InventoryError as exc:
+        raise InventoryError(
+            f"dedicated-owner source is not tracked in {repository}: {source}"
+        ) from exc
+    prefix = source_value.rstrip("/") + "/"
+    for value in output.split(b"\0"):
+        if not value:
+            continue
+        try:
+            tracked = value.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise InventoryError(f"tracked path is not valid UTF-8 in {repository}") from exc
+        if tracked != source_value and not tracked.startswith(prefix):
+            raise InventoryError(f"git returned a path outside {source}: {tracked}")
+
+
+def expand_owner_patterns(
+    patterns: Sequence[OwnerPattern], *, public: Path, private: Path
+) -> dict[PurePosixPath, ExpectedOwner]:
+    roots = {"public": public, "private": private}
+    expected: dict[PurePosixPath, ExpectedOwner] = {}
+    for pattern in patterns:
+        root = roots[pattern.source_root]
+        if pattern.wildcard:
+            target_parent = pattern.target.parent
+            source_parent = pattern.source.parent
+            children = tracked_children(root, source_parent)
+            mappings = (
+                (target_parent / child, lexical_absolute(root / source_parent / child)) for child in children
+            )
+        else:
+            require_tracked_source(root, pattern.source)
+            mappings = ((pattern.target, lexical_absolute(root / pattern.source)),)
+        for target, source in mappings:
+            if target in expected:
+                raise InventoryError(f"dedicated-owner patterns overlap at target: {target}")
+            expected[target] = ExpectedOwner("dedicated", pattern.owner, source)
+    return expected
+
+
+def historical_top_levels(repository: Path) -> set[str]:
+    if not repository.is_dir():
+        return set()
+    shallow = run_bounded(
+        ["git", "rev-parse", "--is-shallow-repository"],
+        cwd=repository,
+        env=command_environment(),
+    ).strip()
+    if shallow == b"true":
+        raise InventoryError(
+            f"repository is shallow; fetch complete history before inventory: {repository}"
+        )
+    if shallow != b"false":
+        raise InventoryError(f"git returned an invalid shallow-repository state in {repository}")
+    output = run_bounded(
+        ["git", "log", "--format=", "--name-only", "-z", "HEAD", "--"],
+        cwd=repository,
+        env=command_environment(),
+    )
+    result: set[str] = set()
+    for value in output.split(b"\0"):
+        if not value:
+            continue
+        try:
+            name = value.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise InventoryError(f"historical path is not valid UTF-8 in {repository}") from exc
+        top_level = PurePosixPath(name).parts[0]
+        if top_level and not top_level.startswith("."):
+            result.add(top_level)
+    return result
+
+
+def current_top_levels(repository: Path) -> set[str]:
+    if not repository.is_dir():
+        return set()
+    try:
+        with os.scandir(repository) as scanner:
+            names = {entry.name for entry in scanner if not entry.name.startswith(".")}
+    except OSError as exc:
+        raise InventoryError(f"cannot enumerate repository root {repository}: {exc}") from exc
+    for name in names:
+        try:
+            name.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise InventoryError(f"repository top-level path is not valid UTF-8: {repository}") from exc
+    return names
+
+
+def actual_home_relative(home: Path, path: Path) -> PurePosixPath:
+    requested = PurePosixPath(path.relative_to(home).as_posix())
+    current = home
+    actual_parts: list[str] = []
+    for index, part in enumerate(requested.parts):
+        try:
+            with os.scandir(current) as scanner:
+                entries = list(scanner)
+        except OSError as exc:
+            raise InventoryError(f"cannot resolve HOME entry spelling below {current}: {exc}") from exc
+        exact = [entry for entry in entries if entry.name == part]
+        matches = exact or [entry for entry in entries if entry.name.casefold() == part.casefold()]
+        if len(matches) != 1:
+            raise InventoryError(f"cannot resolve one HOME entry spelling for {path}")
+        entry = matches[0]
+        actual_parts.append(entry.name)
+        if index < len(requested.parts) - 1:
+            try:
+                is_directory = entry.is_dir(follow_symlinks=False)
+            except OSError as exc:
+                raise InventoryError(f"cannot inspect HOME ancestor {entry.path}: {exc}") from exc
+            if not is_directory:
+                raise InventoryError(f"HOME ancestor is not a real directory: {entry.path}")
+            current /= entry.name
+    return PurePosixPath(*actual_parts)
+
+
+def existing_expected_relative(
+    home: Path,
+    target: PurePosixPath,
+    spelling_resolver: Callable[[Path, Path], PurePosixPath],
+) -> PurePosixPath:
+    if has_blocking_home_ancestor(home, target):
+        return target
+    path = home / target
+    try:
+        path.lstat()
+    except (FileNotFoundError, NotADirectoryError):
+        return target
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect expected HOME target {path}: {exc}") from exc
+    return spelling_resolver(home, path)
+
+
+def candidate_roots(
+    *,
+    home: Path,
+    repositories: Sequence[Path],
+    rcm_map: dict[PurePosixPath, Path],
+    patterns: Sequence[OwnerPattern],
+) -> list[Path]:
+    names: set[str] = set()
+    for repository in repositories:
+        names.update(historical_top_levels(repository))
+        names.update(current_top_levels(repository))
+    names.update(relative.parts[0].removeprefix(".") for relative in rcm_map)
+    names.update(pattern.target.parts[0].removeprefix(".") for pattern in patterns)
+    return sorted((home / f".{name}" for name in names if name), key=lambda path: str(path))
+
+
+def walk_links(root: Path) -> set[Path]:
+    try:
+        metadata = root.lstat()
+    except FileNotFoundError:
+        return set()
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect candidate HOME root {root}: {exc}") from exc
+    if stat.S_ISLNK(metadata.st_mode):
+        return {root}
+    if not stat.S_ISDIR(metadata.st_mode):
+        return set()
+
+    links: set[Path] = set()
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as scanner:
+                entries = sorted(scanner, key=lambda entry: entry.name, reverse=True)
+        except OSError as exc:
+            raise InventoryError(f"cannot enumerate candidate HOME directory {directory}: {exc}") from exc
+        for entry in entries:
+            path = Path(entry.path)
+            try:
+                if entry.is_symlink():
+                    links.add(path)
+                elif entry.is_dir(follow_symlinks=False):
+                    pending.append(path)
+            except OSError as exc:
+                raise InventoryError(f"cannot inspect candidate HOME entry {path}: {exc}") from exc
+    return links
+
+
+def link_status(path: Path) -> str:
+    try:
+        path.stat()
+    except FileNotFoundError:
+        return "broken"
+    except OSError as exc:
+        raise InventoryError(f"cannot follow live link {path}: {exc}") from exc
+    return "linked"
+
+
+def points_into_dotfiles(path: Path, repositories: Sequence[Path]) -> bool:
+    return any(path == repository or repository in path.parents for repository in repositories)
+
+
+def has_blocking_home_ancestor(home: Path, relative: PurePosixPath) -> bool:
+    current = home
+    for part in relative.parts[:-1]:
+        current /= part
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            return False
+        except NotADirectoryError:
+            return True
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect HOME ancestor {current}: {exc}") from exc
+        if not stat.S_ISDIR(metadata.st_mode):
+            return True
+    return False
+
+
+def inventory(
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    patterns: Sequence[OwnerPattern],
+    rcm_map: dict[PurePosixPath, Path],
+    spelling_resolver: Callable[[Path, Path], PurePosixPath] = actual_home_relative,
+    expected_spelling_resolver: Callable[[Path, PurePosixPath], PurePosixPath] | None = None,
+) -> list[LinkRecord]:
+    repositories = [public]
+    if private.is_dir():
+        repositories.append(private)
+    declared_expected: dict[PurePosixPath, ExpectedOwner] = {
+        target: ExpectedOwner("rcm", "rcm", source) for target, source in rcm_map.items()
+    }
+    for target, owner in expand_owner_patterns(patterns, public=public, private=private).items():
+        if target in declared_expected:
+            raise InventoryError(f"rcm and dedicated ownership overlap at target: {target}")
+        declared_expected[target] = owner
+
+    normalize_expected = expected_spelling_resolver or (
+        lambda configured_home, target: existing_expected_relative(
+            configured_home,
+            target,
+            spelling_resolver,
+        )
+    )
+    expected: dict[PurePosixPath, ExpectedOwner] = {}
+    for declared_target, owner in declared_expected.items():
+        target = normalize_expected(home, declared_target)
+        if target in expected:
+            raise InventoryError(
+                f"expected ownership aliases overlap at stored HOME target: {target}"
+            )
+        expected[target] = owner
+
+    discovered: set[Path] = set()
+    for root in candidate_roots(
+        home=home,
+        repositories=repositories,
+        rcm_map=rcm_map,
+        patterns=patterns,
+    ):
+        discovered.update(walk_links(root))
+    relative_discovered = {spelling_resolver(home, path) for path in discovered}
+    candidates = sorted(relative_discovered | set(expected), key=str)
+
+    records: list[LinkRecord] = []
+    for relative in candidates:
+        path = home / relative
+        expected_owner = expected.get(relative)
+        if has_blocking_home_ancestor(home, relative):
+            records.append(collision_record(relative, expected_owner))
+            continue
+        try:
+            metadata = path.lstat()
+        except FileNotFoundError:
+            if expected_owner is None:
+                continue
+            records.append(
+                LinkRecord(
+                    expected_owner.disposition,
+                    "missing",
+                    relative.as_posix(),
+                    None,
+                    str(expected_owner.source),
+                    expected_owner.owner,
+                )
+            )
+            continue
+        except NotADirectoryError:
+            records.append(collision_record(relative, expected_owner))
+            continue
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect HOME target {path}: {exc}") from exc
+
+        if not stat.S_ISLNK(metadata.st_mode):
+            records.append(collision_record(relative, expected_owner))
+            continue
+
+        try:
+            raw_target = os.readlink(path)
+        except OSError as exc:
+            raise InventoryError(f"cannot read HOME link {path}: {exc}") from exc
+        resolved_target = lexical_absolute(Path(raw_target) if os.path.isabs(raw_target) else path.parent / raw_target)
+        status_value = link_status(path)
+        if expected_owner and resolved_target == expected_owner.source:
+            disposition = expected_owner.disposition
+            owner_name = expected_owner.owner
+            expected_target = str(expected_owner.source)
+        elif expected_owner:
+            disposition = "unclassified"
+            status_value = "changed"
+            owner_name = expected_owner.owner
+            expected_target = str(expected_owner.source)
+        elif points_into_dotfiles(resolved_target, repositories):
+            disposition = "obsolete"
+            owner_name = "obsolete"
+            expected_target = None
+        else:
+            disposition = "unclassified"
+            owner_name = "unclassified"
+            expected_target = None
+        records.append(
+            LinkRecord(
+                disposition,
+                status_value,
+                relative.as_posix(),
+                raw_target,
+                expected_target,
+                owner_name,
+            )
+        )
+    return records
+
+
+def render_table(records: Sequence[LinkRecord]) -> None:
+    print("disposition\tstatus\ttarget\tlink_target\texpected_target\towner")
+    for record in records:
+        values = (
+            record.disposition,
+            record.status,
+            record.target,
+            record.link_target or "-",
+            record.expected_target or "-",
+            record.owner,
+        )
+        if any(any(ord(character) < 32 or ord(character) == 127 for character in value) for value in values):
+            raise InventoryError(f"table output cannot represent path delimiters safely: {record.target!r}")
+        print("\t".join(values))
+
+
+def render_json(records: Sequence[LinkRecord]) -> None:
+    payload = {"schema": SCHEMA_VERSION, "records": [asdict(record) for record in records]}
+    json.dump(payload, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
+    print()
+
+
+def cleanup_plan_payload(
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    links: Sequence[ApprovedLink],
+) -> dict[str, object]:
+    return {
+        "schema": CLEANUP_PLAN_SCHEMA_VERSION,
+        "home": str(home),
+        "public": str(public),
+        "private": str(private),
+        "links": [
+            {"target": link.target.as_posix(), "link_target": link.link_target}
+            for link in links
+        ],
+    }
+
+
+def cleanup_plan_digest(payload: dict[str, object]) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def render_cleanup_plan(
+    records: Sequence[LinkRecord],
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+) -> None:
+    links: list[ApprovedLink] = []
+    for record in records:
+        if record.disposition != "obsolete":
+            continue
+        if record.status not in {"linked", "broken"} or record.link_target is None:
+            raise InventoryError(f"obsolete record has an unsafe cleanup shape: {record.target}")
+        relative = require_relative_path(record.target, label="obsolete target", wildcard=False)
+        if not relative.parts[0].startswith("."):
+            raise InventoryError(f"obsolete HOME target must start with a dot: {record.target}")
+        if any(ord(character) < 32 or ord(character) == 127 for character in record.link_target):
+            raise InventoryError(f"obsolete link target contains a control character: {record.target}")
+        links.append(ApprovedLink(relative, record.link_target))
+
+    payload = cleanup_plan_payload(
+        home=home,
+        public=public,
+        private=private,
+        links=links,
+    )
+    payload["approval_sha256"] = cleanup_plan_digest(payload)
+    json.dump(payload, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
+    print()
+
+
+def unique_json_object(pairs: Sequence[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise InventoryError(f"cleanup plan contains a duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def load_cleanup_plan(
+    path: Path,
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    confirmed_digest: str,
+) -> CleanupPlan:
+    try:
+        with path.open("rb") as plan_file:
+            raw = plan_file.read(MAX_CLEANUP_PLAN_BYTES + 1)
+    except OSError as exc:
+        raise InventoryError(f"cannot read cleanup plan {path}: {exc}") from exc
+    if len(raw) > MAX_CLEANUP_PLAN_BYTES:
+        raise InventoryError(f"cleanup plan exceeds {MAX_CLEANUP_PLAN_BYTES} bytes: {path}")
+    try:
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_json_object)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise InventoryError(f"cleanup plan is not valid UTF-8 JSON: {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise InventoryError("cleanup plan root must be a JSON object")
+    expected_keys = {"schema", "home", "public", "private", "links", "approval_sha256"}
+    if set(payload) != expected_keys:
+        raise InventoryError("cleanup plan must contain exactly the documented schema keys")
+    if type(payload["schema"]) is not int or payload["schema"] != CLEANUP_PLAN_SCHEMA_VERSION:
+        raise InventoryError(f"unsupported cleanup plan schema: {payload['schema']!r}")
+
+    for field, expected in (("home", home), ("public", public), ("private", private)):
+        if not isinstance(payload[field], str) or payload[field] != str(expected):
+            raise InventoryError(f"cleanup plan {field} does not match this invocation")
+    if not isinstance(payload["links"], list) or not payload["links"]:
+        raise InventoryError("cleanup plan must contain at least one approved link")
+    if not isinstance(payload["approval_sha256"], str):
+        raise InventoryError("cleanup plan approval_sha256 must be a string")
+
+    links: list[ApprovedLink] = []
+    seen_targets: set[PurePosixPath] = set()
+    for index, value in enumerate(payload["links"]):
+        if not isinstance(value, dict) or set(value) != {"target", "link_target"}:
+            raise InventoryError(f"cleanup plan link {index} has the wrong schema")
+        target_value = value["target"]
+        link_target = value["link_target"]
+        if not isinstance(target_value, str) or not isinstance(link_target, str):
+            raise InventoryError(f"cleanup plan link {index} fields must be strings")
+        relative = require_relative_path(
+            target_value,
+            label=f"cleanup plan target {index}",
+            wildcard=False,
+        )
+        if not relative.parts[0].startswith("."):
+            raise InventoryError(f"cleanup plan HOME target must start with a dot: {relative}")
+        if not link_target or any(ord(character) < 32 or ord(character) == 127 for character in link_target):
+            raise InventoryError(f"cleanup plan link target contains a control character: {relative}")
+        if relative in seen_targets:
+            raise InventoryError(f"cleanup plan contains a duplicate target: {relative}")
+        seen_targets.add(relative)
+        links.append(ApprovedLink(relative, link_target))
+
+    digest_payload = {key: value for key, value in payload.items() if key != "approval_sha256"}
+    actual_digest = cleanup_plan_digest(digest_payload)
+    stored_digest = payload["approval_sha256"]
+    if len(stored_digest) != 64 or any(character not in "0123456789abcdef" for character in stored_digest):
+        raise InventoryError("cleanup plan approval_sha256 must be a lowercase SHA-256 digest")
+    if not hmac.compare_digest(stored_digest, actual_digest):
+        raise InventoryError("cleanup plan content does not match its approval_sha256")
+    if not hmac.compare_digest(confirmed_digest, stored_digest):
+        raise InventoryError("--confirm does not match the cleanup plan approval_sha256")
+    return CleanupPlan(home, public, private, tuple(links), stored_digest)
+
+
+@contextmanager
+def open_home_parent(home: Path, relative: PurePosixPath) -> Iterator[tuple[int, str]]:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptors: list[int] = []
+    try:
+        descriptors.append(os.open(home, flags))
+        for part in relative.parts[:-1]:
+            descriptors.append(os.open(part, flags, dir_fd=descriptors[-1]))
+    except OSError as exc:
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        raise InventoryError(f"cannot open real HOME parent for {relative}: {exc}") from exc
+    try:
+        yield descriptors[-1], relative.name
+    finally:
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
+def require_approved_link_at(
+    parent_descriptor: int,
+    name: str,
+    link: ApprovedLink,
+) -> tuple[int, ...]:
+    try:
+        before = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except FileNotFoundError as exc:
+        raise InventoryError(f"approved link is no longer present: {link.target}") from exc
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect approved link {link.target}: {exc}") from exc
+    metadata_identity = link_identity(before)
+    if not stat.S_ISLNK(before.st_mode):
+        raise InventoryError(f"approved target is no longer a symlink: {link.target}")
+    try:
+        current_target = os.readlink(name, dir_fd=parent_descriptor)
+        after = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except OSError as exc:
+        raise InventoryError(f"cannot read approved link {link.target}: {exc}") from exc
+    after_identity = link_identity(after)
+    if metadata_identity != after_identity:
+        raise InventoryError(f"approved link changed while it was being checked: {link.target}")
+    if current_target != link.link_target:
+        raise InventoryError(f"approved link target changed after review: {link.target}")
+    return metadata_identity
+
+
+def link_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    identity = (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_size)
+    if hasattr(metadata, "st_mtime_ns"):
+        identity += (metadata.st_mtime_ns,)
+    return identity
+
+
+def require_current_approved_link(link: ApprovedLink, *, home: Path) -> None:
+    with open_home_parent(home, link.target) as (parent_descriptor, name):
+        require_approved_link_at(parent_descriptor, name, link)
+
+
+def cleanup_approved_links(
+    plan: CleanupPlan,
+    *,
+    records: Sequence[LinkRecord],
+    refresh_records: Callable[[], list[LinkRecord]],
+) -> MutationResult:
+    records_by_target = {record.target: record for record in records}
+    pending: list[ApprovedLink] = []
+    already_absent: list[PurePosixPath] = []
+    for link in plan.links:
+        record = records_by_target.get(link.target.as_posix())
+        if record is None:
+            require_available_restore_path(link, home=plan.home)
+            already_absent.append(link.target)
+            continue
+        if record.disposition != "obsolete":
+            raise InventoryError(f"approved target is not currently obsolete: {link.target}")
+        if record.status not in {"linked", "broken"} or record.link_target != link.link_target:
+            raise InventoryError(f"approved inventory evidence changed after review: {link.target}")
+        require_current_approved_link(link, home=plan.home)
+        pending.append(link)
+
+    removed: list[PurePosixPath] = []
+    for link in pending:
+        refreshed = {record.target: record for record in refresh_records()}
+        current_record = refreshed.get(link.target.as_posix())
+        if current_record is None:
+            require_available_restore_path(link, home=plan.home)
+            already_absent.append(link.target)
+            continue
+        if (
+            current_record.disposition != "obsolete"
+            or current_record.status not in {"linked", "broken"}
+            or current_record.link_target != link.link_target
+        ):
+            raise InventoryError(f"approved target changed ownership before cleanup: {link.target}")
+        with open_home_parent(plan.home, link.target) as (parent_descriptor, name):
+            approved_identity = require_approved_link_at(parent_descriptor, name, link)
+            quarantine_name = f".rcm-links-quarantine-{secrets.token_hex(16)}"
+            quarantine_entry = "approved-link"
+            try:
+                os.mkdir(quarantine_name, mode=0o700, dir_fd=parent_descriptor)
+            except OSError as exc:
+                raise InventoryError(
+                    f"cleanup stopped after {len(removed)} removals; "
+                    f"cannot create quarantine for {link.target}: {exc}"
+                ) from exc
+            try:
+                quarantine_descriptor = os.open(
+                    quarantine_name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=parent_descriptor,
+                )
+            except OSError as exc:
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_descriptor)
+                except OSError:
+                    pass
+                raise InventoryError(
+                    f"cleanup stopped after {len(removed)} removals; "
+                    f"cannot open quarantine for {link.target}: {exc}"
+                ) from exc
+            try:
+                try:
+                    os.rename(
+                        name,
+                        quarantine_entry,
+                        src_dir_fd=parent_descriptor,
+                        dst_dir_fd=quarantine_descriptor,
+                    )
+                except OSError as exc:
+                    raise InventoryError(
+                        f"cleanup stopped after {len(removed)} removals; "
+                        f"cannot quarantine {link.target}: {exc}"
+                    ) from exc
+                try:
+                    moved = os.stat(
+                        quarantine_entry,
+                        dir_fd=quarantine_descriptor,
+                        follow_symlinks=False,
+                    )
+                except OSError as exc:
+                    raise InventoryError(
+                        f"cleanup quarantined {link.target} but cannot verify it: {exc}"
+                    ) from exc
+                if not stat.S_ISLNK(moved.st_mode) or link_identity(moved) != approved_identity:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved a raced entry at {quarantine_relative}; "
+                        f"it did not match the approved link {link.target}"
+                    )
+                try:
+                    moved_target = os.readlink(quarantine_entry, dir_fd=quarantine_descriptor)
+                except OSError as exc:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved an unreadable link at {quarantine_relative}: {exc}"
+                    ) from exc
+                if moved_target != link.link_target:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved a raced link at {quarantine_relative}; "
+                        f"its raw target did not match {link.target}"
+                    )
+                try:
+                    os.unlink(quarantine_entry, dir_fd=quarantine_descriptor)
+                except OSError as exc:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved the approved link at {quarantine_relative}; "
+                        f"cannot delete it: {exc}"
+                    ) from exc
+            finally:
+                try:
+                    os.close(quarantine_descriptor)
+                except OSError:
+                    pass
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_descriptor)
+                except OSError:
+                    pass
+            try:
+                os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise InventoryError(
+                    f"cleanup removed {link.target} but cannot verify its absence: {exc}"
+                ) from exc
+            else:
+                raise InventoryError(f"cleanup target reappeared after quarantine: {link.target}")
+        removed.append(link.target)
+    return MutationResult(tuple(removed), tuple(already_absent))
+
+
+def require_available_restore_path(
+    link: ApprovedLink,
+    *,
+    home: Path,
+) -> None:
+    with open_home_parent(home, link.target) as (parent_descriptor, name):
+        try:
+            os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect restore target {link.target}: {exc}") from exc
+        raise InventoryError(f"restore target is no longer absent: {link.target}")
+
+
+def restore_approved_links(
+    plan: CleanupPlan,
+    *,
+    records: Sequence[LinkRecord],
+    refresh_records: Callable[[], list[LinkRecord]],
+) -> MutationResult:
+    records_by_target = {record.target: record for record in records}
+    pending: list[ApprovedLink] = []
+    already_restored: list[PurePosixPath] = []
+    for link in plan.links:
+        record = records_by_target.get(link.target.as_posix())
+        if record is None:
+            require_available_restore_path(link, home=plan.home)
+            pending.append(link)
+            continue
+        if (
+            record.disposition == "obsolete"
+            and record.status in {"linked", "broken"}
+            and record.link_target == link.link_target
+        ):
+            require_current_approved_link(link, home=plan.home)
+            already_restored.append(link.target)
+            continue
+        raise InventoryError(
+            f"restore target is present in current inventory "
+            f"({record.disposition}/{record.status}): {link.target}"
+        )
+
+    restored: list[PurePosixPath] = []
+    for link in pending:
+        refreshed = {record.target: record for record in refresh_records()}
+        current_record = refreshed.get(link.target.as_posix())
+        if current_record is not None:
+            if (
+                current_record.disposition == "obsolete"
+                and current_record.status in {"linked", "broken"}
+                and current_record.link_target == link.link_target
+            ):
+                require_current_approved_link(link, home=plan.home)
+                already_restored.append(link.target)
+                continue
+            raise InventoryError(f"restore target changed ownership before restore: {link.target}")
+        with open_home_parent(plan.home, link.target) as (parent_descriptor, name):
+            try:
+                os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise InventoryError(f"cannot recheck restore target {link.target}: {exc}") from exc
+            else:
+                raise InventoryError(f"restore target is no longer absent: {link.target}")
+            try:
+                os.symlink(link.link_target, name, dir_fd=parent_descriptor)
+            except OSError as exc:
+                raise InventoryError(
+                    f"restore stopped after {len(restored)} links; cannot create {link.target}: {exc}"
+                ) from exc
+            try:
+                metadata = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+                restored_target = os.readlink(name, dir_fd=parent_descriptor)
+            except OSError as exc:
+                raise InventoryError(f"restored {link.target} but cannot verify it: {exc}") from exc
+            if not stat.S_ISLNK(metadata.st_mode) or restored_target != link.link_target:
+                raise InventoryError(f"restored link does not match approved evidence: {link.target}")
+        restored.append(link.target)
+    return MutationResult(tuple(restored), tuple(already_restored))
+
+
+def add_common_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    repository: Path,
+    public_default: Path,
+    private_default: Path,
+) -> None:
+    parser.add_argument("--home", type=Path, default=Path.home())
+    parser.add_argument("--public-dir", type=Path, default=public_default)
+    parser.add_argument("--private-dir", type=Path, default=private_default)
+    parser.add_argument("--owners", type=Path, default=repository / "docs/rcm-link-owners.tsv")
+    parser.add_argument("--lsrc", default="lsrc")
+
+
+def load_current_records(
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    owners: Path,
+    lsrc: str,
+) -> list[LinkRecord]:
+    patterns = load_owner_patterns(owners)
+    rcm_map = load_rcm_map(lsrc=lsrc, home=home, public=public, private=private)
+    return inventory(
+        home=home,
+        public=public,
+        private=private,
+        patterns=patterns,
+        rcm_map=rcm_map,
+    )
+
+
+def parse_args(argv: Sequence[str]) -> argparse.Namespace:
+    repository = Path(__file__).resolve().parent.parent
+    public_default = Path(
+        os.environ.get(
+            "DOTFILES_DIR",
+            Path.home() / "Workspace/tgautier/dotfiles",
+        )
+    )
+    private_default = Path(
+        os.environ.get(
+            "DOTFILES_PRIVATE_DIR",
+            Path.home() / "Workspace/tgautier/dotfiles-private",
+        )
+    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    inventory_parser = subparsers.add_parser("inventory", help="print a read-only HOME link inventory")
+    add_common_arguments(
+        inventory_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    inventory_parser.add_argument("--format", choices=("table", "json"), default="table")
+    plan_parser = subparsers.add_parser("plan", help="print a digest-bound obsolete-link cleanup plan")
+    add_common_arguments(
+        plan_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    cleanup_parser = subparsers.add_parser("cleanup", help="apply an explicitly approved cleanup plan")
+    add_common_arguments(
+        cleanup_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    cleanup_parser.add_argument("--plan", type=Path, required=True)
+    cleanup_parser.add_argument("--confirm", required=True)
+    restore_parser = subparsers.add_parser("restore", help="restore links from an approved cleanup plan")
+    add_common_arguments(
+        restore_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    restore_parser.add_argument("--plan", type=Path, required=True)
+    restore_parser.add_argument("--confirm", required=True)
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    try:
+        home = lexical_absolute(args.home)
+        public = lexical_absolute(args.public_dir)
+        private = lexical_absolute(args.private_dir)
+        if not home.is_dir():
+            raise InventoryError(f"HOME inventory root is not a directory: {home}")
+        if not public.is_dir() or not (public / "rcrc").is_file():
+            raise InventoryError(f"public dotfiles repository is incomplete: {public}")
+        owners = lexical_absolute(args.owners)
+
+        def refresh_records() -> list[LinkRecord]:
+            return load_current_records(
+                home=home,
+                public=public,
+                private=private,
+                owners=owners,
+                lsrc=args.lsrc,
+            )
+
+        records = refresh_records()
+        if args.command == "inventory" and args.format == "json":
+            render_json(records)
+        elif args.command == "inventory":
+            render_table(records)
+        elif args.command == "plan":
+            render_cleanup_plan(records, home=home, public=public, private=private)
+        elif args.command == "cleanup":
+            plan = load_cleanup_plan(
+                lexical_absolute(args.plan),
+                home=home,
+                public=public,
+                private=private,
+                confirmed_digest=args.confirm,
+            )
+            cleanup_result = cleanup_approved_links(
+                plan,
+                records=records,
+                refresh_records=refresh_records,
+            )
+            try:
+                verified_records = refresh_records()
+            except InventoryError as exc:
+                raise InventoryError(
+                    f"removed {len(cleanup_result.changed)} approved links but final inventory failed: {exc}"
+                ) from exc
+            remaining = {record.target for record in verified_records}
+            changed = set(cleanup_result.changed)
+            for link in plan.links:
+                relative = link.target
+                if relative.as_posix() in remaining:
+                    raise InventoryError(f"removed target reappeared during final inventory: {relative}")
+                require_available_restore_path(link, home=home)
+                action = "removed" if relative in changed else "already absent"
+                print(f"{action}\t{relative.as_posix()}")
+            print(
+                f"cleanup complete\tchanged={len(cleanup_result.changed)}\t"
+                f"already_absent={len(cleanup_result.unchanged)}"
+            )
+        else:
+            plan = load_cleanup_plan(
+                lexical_absolute(args.plan),
+                home=home,
+                public=public,
+                private=private,
+                confirmed_digest=args.confirm,
+            )
+            restore_result = restore_approved_links(
+                plan,
+                records=records,
+                refresh_records=refresh_records,
+            )
+            try:
+                verified_records = refresh_records()
+            except InventoryError as exc:
+                raise InventoryError(
+                    f"restored {len(restore_result.changed)} approved links but final inventory failed: {exc}"
+                ) from exc
+            verified_by_target = {record.target: record for record in verified_records}
+            changed = set(restore_result.changed)
+            for link in plan.links:
+                record = verified_by_target.get(link.target.as_posix())
+                if (
+                    record is None
+                    or record.disposition != "obsolete"
+                    or record.link_target != link.link_target
+                ):
+                    raise InventoryError(f"restored target failed final inventory: {link.target}")
+                action = "restored" if link.target in changed else "already restored"
+                print(f"{action}\t{link.target.as_posix()}")
+            print(
+                f"restore complete\tchanged={len(restore_result.changed)}\t"
+                f"already_restored={len(restore_result.unchanged)}"
+            )
+        return 0
+    except InventoryError as exc:
+        print(f"rcm-links: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

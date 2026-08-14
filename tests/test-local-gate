@@ -154,6 +154,8 @@ unsigned_side=$(write_commit "$tree" "$baseline" 6 unsigned 'unsigned side ances
 merge_with_unsigned_side=$(write_merge_commit "$tree" "$head_sha" "$unsigned_side" 7 'signed merge with unsigned side') || exit 1
 unrelated_root=$(write_commit "$tree" '' 9 signed 'unrelated signed root') || exit 1
 unrelated_tip=$(write_commit "$tree" "$unrelated_root" 10 signed 'unrelated signed tip') || exit 1
+unsigned_rewind=$(write_commit "$tree" "$baseline" 11 unsigned 'unsigned rewind tip') || exit 1
+signed_remote_descendant=$(write_commit "$tree" "$unsigned_rewind" 12 signed 'signed remote descendant') || exit 1
 zero_sha=$(printf '%040d' 0)
 git_dir=$(git -C "$repo" rev-parse --absolute-git-dir) || exit 1
 marker="$git_dir/local-ci-attestation"
@@ -241,6 +243,18 @@ elif [[ "$output" == *"does not descend from signature baseline"* ]]; then
   record_pass "existing unrelated branch must descend from baseline"
 else
   record_fail "existing unrelated branch diagnostic was missing" "$output"
+fi
+
+if output=$(
+  cd "$repo" || exit 1
+  source .githooks/lib/git-integrity.sh
+  git_integrity_check_push_signatures "$unsigned_rewind" "$signed_remote_descendant" 2>&1
+); then
+  record_fail "unsigned backward force-push was accepted" "$output"
+elif [[ "$output" == *"has no Git signature header"* ]]; then
+  record_pass "backward force-push audits complete enforced ancestry"
+else
+  record_fail "backward force-push diagnostic was missing" "$output"
 fi
 
 if (

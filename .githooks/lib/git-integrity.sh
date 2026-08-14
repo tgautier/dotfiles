@@ -107,17 +107,18 @@ git_integrity_check_push_signatures() {
     return 1
   fi
 
-  if git_integrity_is_zero_sha "$remote_sha"; then
-    revision_args=("$GIT_INTEGRITY_SIGNATURE_BASELINE..$local_sha")
-  else
+  if ! git_integrity_is_zero_sha "$remote_sha"; then
     if ! git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
       printf 'pre-push: remote tip %s is unavailable locally; fetch before pushing\n' "$remote_sha" >&2
       return 1
     fi
-    # A remote branch may predate enforcement. Audit only commits introduced
-    # by this update and outside the deliberately exempt baseline ancestry.
-    revision_args=("$remote_sha..$local_sha" "^$GIT_INTEGRITY_SIGNATURE_BASELINE")
   fi
+
+  # Audit the complete enforced ancestry for every update. A remote-relative
+  # range is empty during a backward force-push and would let an unsigned local
+  # ancestor bypass validation. The baseline itself and its ancestors remain
+  # deliberately exempt.
+  revision_args=("$GIT_INTEGRITY_SIGNATURE_BASELINE..$local_sha")
 
   if ! commits=$(git rev-list "${revision_args[@]}" 2>&1); then
     printf 'pre-push: could not enumerate pushed ancestry %s: %s\n' "${revision_args[*]}" "$commits" >&2

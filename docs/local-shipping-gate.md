@@ -102,14 +102,29 @@ gh api "repos/tgautier/dotfiles/commits/$rollback_sha/status" --jq '. as $respon
 
 The final command must print the rollback SHA, `success`, and `local/exact-tip`. This manual publication is necessary because the revert intentionally removes `ci-publish`; run it only after `just ci` passes, the checkout is clean, and the rollback SHA has been pushed.
 
-Open and merge the revert pull request. The revert restores the hosted workflow and the earlier pre-commit hook. Then remove only the local status context, which is repository configuration and therefore is not reverted by Git. GitHub's [context-specific branch-protection endpoint](https://docs.github.com/en/rest/branches/branch-protection#remove-status-check-contexts) preserves strict mode and every unrelated or restored required check:
+Open and merge the revert pull request. The revert restores the hosted workflow and the earlier pre-commit hook. Wait for the resulting `main` commit's hosted `Lint` check to pass, then add and verify that required context while `local/exact-tip` still protects the branch:
+
+```sh
+main_sha=$(gh api repos/tgautier/dotfiles/commits/main --jq .sha)
+lint_record=$(gh api "repos/tgautier/dotfiles/commits/$main_sha/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "Lint" and .status == "completed" and .conclusion == "success")] | first | [.head_sha, .name, .conclusion] | @tsv')
+test "$lint_record" = "$main_sha$(printf '\t')Lint$(printf '\t')success"
+gh api --method POST repos/tgautier/dotfiles/branches/main/protection/required_status_checks/contexts --field 'contexts[]=Lint'
+protection=$(gh api repos/tgautier/dotfiles/branches/main/protection/required_status_checks)
+test "$(printf '%s\n' "$protection" | jq -r .strict)" = true
+test "$(printf '%s\n' "$protection" | jq -r '[.contexts[] | select(. == "Lint")] | length')" -eq 1
+```
+
+Only after those checks pass, remove the local status context. GitHub's [context-specific branch-protection endpoint](https://docs.github.com/en/rest/branches/branch-protection#remove-status-check-contexts) preserves strict mode and every unrelated or restored required check:
 
 ```sh
 gh api --method DELETE repos/tgautier/dotfiles/branches/main/protection/required_status_checks/contexts --field 'contexts[]=local/exact-tip'
-gh api repos/tgautier/dotfiles/branches/main/protection/required_status_checks --jq '{strict, contexts, checks}'
+protection=$(gh api repos/tgautier/dotfiles/branches/main/protection/required_status_checks)
+test "$(printf '%s\n' "$protection" | jq -r .strict)" = true
+test "$(printf '%s\n' "$protection" | jq -r '[.contexts[] | select(. == "Lint")] | length')" -eq 1
+test "$(printf '%s\n' "$protection" | jq -r '[.contexts[] | select(. == "local/exact-tip")] | length')" -eq 0
 ```
 
-Confirm that `local/exact-tip` is absent from the read-back while strict mode and every other context or check retain their previous values. The old local attestation file may remain under the Git directory because no restored hook reads it.
+The old local attestation file may remain under the Git directory because no restored hook reads it.
 
 Rollback does not require an rcm or chezmoi operation. This change never takes ownership of deployed dotfiles or modifies HOME.
 

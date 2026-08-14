@@ -30,7 +30,7 @@ BACKUP_DIGEST=$(jq -er '.approval_sha256 | select(type == "string" and test("^[0
 just link-cutover-backup-verify "$backup_file"
 ```
 
-The backup command creates one regular file with mode `0600`. It refuses an existing destination and publishes the completed file atomically. The artifact records rcm's exact link ownership state; repository content remains in the public and private source checkouts. The file contains local absolute paths. Keep it outside both repositories and public issue or pull-request text.
+The backup command creates one regular file with mode `0600`. It refuses an existing destination and publishes the completed file atomically. The artifact records rcm's exact link ownership state; repository content remains in the public and private source checkouts. A genuinely absent private checkout enables public-only capture, while an existing file, broken link, or unreadable path fails closed. The file contains local absolute paths. Keep it outside both repositories and public issue or pull-request text.
 
 Review the target list and keep the printed SHA-256 digest with the file. The digest confirms the reviewed artifact during restore. It does not replace local review of the target list.
 

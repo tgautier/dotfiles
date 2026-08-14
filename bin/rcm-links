@@ -140,6 +140,22 @@ def lexical_absolute(path: Path) -> Path:
     return Path(os.path.abspath(os.path.normpath(path)))
 
 
+def optional_directory(path: Path, *, label: str) -> Path | None:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect {label} {path}: {exc}") from exc
+    try:
+        metadata = path.stat()
+    except OSError as exc:
+        raise InventoryError(f"cannot resolve {label} {path}: {exc}") from exc
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise InventoryError(f"{label} is not a directory: {path}")
+    return path
+
+
 def command_environment(overrides: dict[str, str] | None = None) -> dict[str, str]:
     environment = {
         name: value for name, value in os.environ.items() if not name.startswith("GIT_")
@@ -1653,21 +1669,16 @@ def add_common_arguments(
     parser.add_argument("--lsrc", default="lsrc")
 
 
-def add_cutover_arguments(
-    parser: argparse.ArgumentParser,
-    *,
-    repository: Path,
-    private_default: Path,
-) -> None:
+def add_cutover_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--public-targets",
         type=Path,
-        default=repository / "docs/chezmoi-targets.tsv",
+        default=None,
     )
     parser.add_argument(
         "--private-targets",
         type=Path,
-        default=private_default / "docs/chezmoi-private-targets.tsv",
+        default=None,
     )
 
 
@@ -1749,11 +1760,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         public_default=public_default,
         private_default=private_default,
     )
-    add_cutover_arguments(
-        backup_parser,
-        repository=repository,
-        private_default=private_default,
-    )
+    add_cutover_arguments(backup_parser)
     backup_parser.add_argument("--output", type=Path, required=True)
     verify_backup_parser = subparsers.add_parser(
         "cutover-backup-verify",
@@ -1765,11 +1772,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         public_default=public_default,
         private_default=private_default,
     )
-    add_cutover_arguments(
-        verify_backup_parser,
-        repository=repository,
-        private_default=private_default,
-    )
+    add_cutover_arguments(verify_backup_parser)
     verify_backup_parser.add_argument("--backup", type=Path, required=True)
     cutover_restore_parser = subparsers.add_parser(
         "cutover-restore",
@@ -1781,15 +1784,21 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         public_default=public_default,
         private_default=private_default,
     )
-    add_cutover_arguments(
-        cutover_restore_parser,
-        repository=repository,
-        private_default=private_default,
-    )
+    add_cutover_arguments(cutover_restore_parser)
     cutover_restore_parser.add_argument("--backup", type=Path, required=True)
     cutover_restore_parser.add_argument("--confirm", required=True)
     cutover_restore_parser.add_argument("--rcup", default="rcup")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.command in {
+        "cutover-backup",
+        "cutover-backup-verify",
+        "cutover-restore",
+    }:
+        if args.public_targets is None:
+            args.public_targets = args.public_dir / "docs/chezmoi-targets.tsv"
+        if args.private_targets is None:
+            args.private_targets = args.private_dir / "docs/chezmoi-private-targets.tsv"
+    return args
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -1802,7 +1811,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise InventoryError(f"HOME inventory root is not a directory: {home}")
         if not public.is_dir() or not (public / "rcrc").is_file():
             raise InventoryError(f"public dotfiles repository is incomplete: {public}")
-        private_available = private if private.is_dir() else None
+        private_available = optional_directory(
+            private,
+            label="private dotfiles repository",
+        )
         if args.command in {
             "cutover-backup",
             "cutover-backup-verify",

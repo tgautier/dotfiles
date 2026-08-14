@@ -350,6 +350,63 @@ class RcmLinksInventoryTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 2)
         self.assertIn("source must not look like an option: -option", completed.stderr)
 
+    def test_cutover_commands_derive_manifests_from_effective_repositories(self) -> None:
+        public_override = self.root / "public-override"
+        private_override = self.root / "private-override"
+
+        args = RCM_LINKS.parse_args(
+            (
+                "cutover-backup",
+                "--public-dir",
+                str(public_override),
+                "--private-dir",
+                str(private_override),
+                "--output",
+                str(self.root / "backup.json"),
+            )
+        )
+
+        self.assertEqual(
+            args.public_targets,
+            public_override / "docs/chezmoi-targets.tsv",
+        )
+        self.assertEqual(
+            args.private_targets,
+            private_override / "docs/chezmoi-private-targets.tsv",
+        )
+
+    def test_cutover_backup_rejects_invalid_existing_private_paths(self) -> None:
+        zshrc = self._write(self.public, "zshrc", "public zshrc\n")
+        self._commit(self.public, "add public-only invalid-private fixture")
+        public_manifest = self.root / "public-invalid-private.tsv"
+        public_manifest.write_text(
+            "rcm_source\ttarget\tdisposition\tchezmoi_source\tmode\n"
+            "zshrc\t.zshrc\tshadow\tdot_zshrc\tfile\n",
+            encoding="utf-8",
+        )
+        self._write_fake_lsrc(((".zshrc", zshrc),))
+        self._link(".zshrc", zshrc)
+
+        regular_file = self.root / "private-regular-file"
+        regular_file.write_text("not a checkout\n", encoding="utf-8")
+        broken_symlink = self.root / "private-broken-link"
+        broken_symlink.symlink_to(self.root / "missing-private-target")
+        for private_path, expected in (
+            (regular_file, "private dotfiles repository is not a directory"),
+            (broken_symlink, "cannot resolve private dotfiles repository"),
+        ):
+            with self.subTest(private_path=private_path.name):
+                completed = self._cutover_command(
+                    "cutover-backup",
+                    public_manifest,
+                    private_path / "docs/chezmoi-private-targets.tsv",
+                    "--output",
+                    str(self.root / f"{private_path.name}.json"),
+                    private_dir=private_path,
+                )
+                self.assertEqual(completed.returncode, 2)
+                self.assertIn(expected, completed.stderr)
+
     def test_cutover_backup_rechecks_the_complete_snapshot(self) -> None:
         first_link = RCM_LINKS.CutoverLink(
             "public",

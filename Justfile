@@ -3,7 +3,19 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-chezmoi-canary
+ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-chezmoi-canary test-local-gate
+
+[doc("Run the complete local gate and attest the exact clean HEAD")]
+ci-attest:
+    @bash .githooks/ci-attest
+
+[doc("Publish the pushed exact-tip attestation for GitHub branch protection")]
+ci-publish:
+    @bash .githooks/ci-publish
+
+[doc("Fixture-test identity, pushed signature headers, and exact-tip local CI evidence")]
+test-local-gate:
+    ./tests/test-local-gate
 
 [doc("Compile tracked Python helpers with warnings promoted to errors")]
 lint-python:
@@ -318,7 +330,7 @@ setup: _ensure-profile
     fi
 
     # 4. Git hooks + review tooling.
-    git config --local core.hooksPath .githooks
+    just git-hooks
     if command -v roborev >/dev/null 2>&1; then roborev install-hook; fi
 
     # 5. Native-installer tools (self-update through their own channels).
@@ -330,6 +342,11 @@ setup: _ensure-profile
 
     # 7. Linux/WSL: symlink libsqlite3 for Dart/Flutter FFI (no-op on macOS).
     {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
+
+[doc("Wire the tracked Git hooks in this checkout or worktree")]
+git-hooks:
+    git config --local core.hooksPath .githooks
+    @echo "Git hooks wired for this checkout"
 
 # Run this after editing any dotfile rcm links into $HOME (gitconfig, zshrc,
 # zshenv, tmux.conf, …) — the edit lands in this repo, but the running machine
@@ -433,7 +450,8 @@ _ensure-profile:
 [doc("Lint shell scripts with ShellCheck")]
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
-    shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary
+    shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary tests/test-local-gate
+    shellcheck --severity=warning .githooks/pre-commit .githooks/pre-push .githooks/ci-attest .githooks/ci-publish .githooks/lib/*.sh
     shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 

@@ -36,8 +36,17 @@ just setup
 # interactive `just setup` prompts for it on first run (default: work)
 just set-profile personal
 
-# Run all linters locally (same as CI)
+# Run every repository check locally
 just ci
+
+# Attest the final clean commit before push
+just ci-attest
+
+# After the SSH push, publish exact-tip evidence for branch protection
+just ci-publish
+
+# Wire the tracked hooks in this checkout or worktree
+just git-hooks
 
 # Update everything (brew, mas, mise, rust)
 just update
@@ -82,14 +91,15 @@ Shell startup is optimized with caching (kubectl context, environment vars). Avo
 
 ### CI / Linting
 
-The `Justfile` defines local CI targets mirroring the GitHub Actions workflow:
+The `Justfile` defines the authoritative local shipping gate:
 
-- `just ci` — runs every lint (the individual targets are listed in
-  `README.md`'s CI / Linting table)
-- `just setup` — full machine bootstrap (profile, packages, symlinks, runtimes, hooks, tools)
+- `just ci` runs every repository check. The individual targets are listed in `README.md`'s CI / Linting table.
+- `just ci-attest` reruns that complete gate and records the exact unchanged clean `HEAD` for pre-push.
+- `just ci-publish` verifies the pushed SHA and current `main` ancestry, then publishes and reads back the required `local/exact-tip` commit status.
+- `just git-hooks` wires the tracked pre-commit and pre-push hooks in the current checkout.
+- `just setup` runs the full machine bootstrap and includes `just git-hooks`.
 
-Duplicating that target list here has drifted from the table before — keep the
-single enumeration in `README.md`.
+GitHub Actions is disabled. Push through SSH, then publish fresh exact-tip local evidence. Strict branch protection requires that status and an up-to-date branch before squash merge.
 
 ### tmux
 
@@ -139,4 +149,5 @@ entries not yet dated.
 Detailed guides live in `docs/`:
 
 - `docs/homebrew.md` — update flow, cask-upgrade recovery, `just update` troubleshooting
+- `docs/local-shipping-gate.md` — per-checkout hook setup, exact-tip operation, recovery, upgrade, and rollback
 - `docs/tmux.md` — configuration overview, cheat sheet, troubleshooting

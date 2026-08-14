@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
+# Validate identity and run the complete local gate before Git creates a commit.
+
 set -euo pipefail
 
-# Only run if just and the Justfile are available
-if command -v just &>/dev/null && [ -f Justfile ]; then
-  mise x -- just ci
+hook_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+cd "$hook_root"
+
+# shellcheck source=lib/git-integrity.sh
+source "$hook_root/.githooks/lib/git-integrity.sh"
+
+git_integrity_check_identity
+mise_cmd=$(git_integrity_resolve_mise)
+if ! "$mise_cmd" x -- just ci; then
+  printf "%s\n" "pre-commit: complete local gate failed; reproduce with 'just ci'" >&2
+  exit 1
 fi

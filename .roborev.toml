@@ -32,7 +32,7 @@ Dotfiles repo: cross-platform shell config, Homebrew, mise, tmux, git config. Th
 HARD INVARIANTS — flag violations as blockers:
 
 1. Secrets: never commit credentials, tokens, API keys, or secrets. This repo is public on GitHub.
-2. Personal/sensitive content: never include PII, employer name, colleague names, broker/financial figures, internal product/project names, or memory-file references that hint at sensitive content. Examples and placeholders count. This repo is public.
+2. Personal/sensitive content: never include PII, employer name, colleague names, broker/financial figures, internal product/project names, or memory-file references that hint at sensitive content. Examples and placeholders count. This repo is public. The repository owner's public author identity, `Thomas Gautier <thomas@gautier.gg>`, is the sole explicit exception when Git integrity checks require it.
 3. Shell compatibility: Claude Code's Bash tool passes through zsh, which corrupts `!` to `\!` in file content. Files must not contain `\!` — flag any occurrence as corruption.
 4. Cross-platform: any shell, tmux, or tool config change must consider macOS, Linux, and WSL2. Guard platform-specific code with `$PLATFORM` checks. Brewfile edits must be mirrored in `Brewfile.linux` for CLI tools.
 5. Project-local rule (`.claude/rules/brewfile.md`): dual-Brewfile sync + alphabetical sorting inside sections.
@@ -41,7 +41,7 @@ SCOPE CONTEXT — understand before flagging:
 
 - rcup symlinks: tracked files are symlinked into $HOME by rcm based on `rcrc`. Both this repo and `dotfiles-private` are merged via `DOTFILES_DIRS`. Their paths default to `$HOME/Workspace/tgautier/` and are overridable with `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR`, a contract shared by `rcrc`, the `Justfile` vars, and `_scan-stale-symlinks`.
 - Versioning: SemVer and changelog policy are defined in the global Claude Code config (in `dotfiles-private`) and auto-load via rcm. Don't expect a `versioning.md` file in this repo's tree.
-- CI: `just ci` runs shell, markdown, Brewfile, mise, Justfile, rcrc and stale-symlink-scanner lints, plus the exact chezmoi target-map parity guard — the same checks run in GitHub Actions.
+- CI: `just ci` runs the authoritative local repository checks. GitHub Actions is disabled. `just ci-attest` binds the complete gate to the exact unchanged clean `HEAD`, pre-push requires that evidence before transfer, and `just ci-publish` verifies the pushed SSH tip before publishing the branch-protection status.
 
 DO NOT FLAG:
 

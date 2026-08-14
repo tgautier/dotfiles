@@ -11,7 +11,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
 - Runtime version management via [mise](https://mise.jdx.dev/)
 - Optimized shell startup with intelligent caching
 - [tmux](docs/tmux.md) with vi-style bindings and platform-aware clipboard
-- CI with [just](https://just.systems/) + GitHub Actions
+- Exact-tip local shipping gate with [just](https://just.systems/), commit signature-header checks, and no hosted CI minutes
 - One-command system updates via `just update`
 
 ## Quick Start
@@ -219,6 +219,7 @@ Detailed guides live in the `docs/` folder:
 
 - [Homebrew](docs/homebrew.md) — update flow, cask-upgrade recovery, and `just update` troubleshooting
 - [Chezmoi migration inventory](docs/chezmoi-inventory.md) — complete rcm target map, explicit dispositions, parity guard, and rollback boundary
+- [Local shipping gate](docs/local-shipping-gate.md) — per-checkout setup, exact-tip operation, recovery, upgrade, and rollback
 - [Rcm link reconciliation](docs/rcm-link-reconciliation.md) — read-only ownership inventory before the chezmoi backup rehearsal
 - [tmux](docs/tmux.md) — configuration overview, cheat sheet, and troubleshooting
 
@@ -253,7 +254,7 @@ Brewfile.linux          # Linux Homebrew packages
 home/                   # Shadow chezmoi sources; rcm still owns deployment
 tests/                  # Isolated parity checker and sabotage fixtures
 Justfile                # Bootstrap, CI and update recipes
-.githooks/              # pre-commit, post-commit, post-rewrite (enabled by just setup)
+.githooks/              # Local identity, complete-CI, signature, and exact-tip push gate
 CLAUDE.md               # Repo guidance for Claude Code (see Project-Local Rules)
 .claude/                # Repo-local Claude Code rules
 .roborev.toml           # Review-tool scope context
@@ -261,7 +262,6 @@ CLAUDE.md               # Repo guidance for Claude Code (see Project-Local Rules
 .markdownlint-cli2.yaml # markdownlint file globs
 docs/                   # Detailed guides, migration inventory, and target manifest
 CHANGELOG.md            # Date-based rolling changelog
-.github/workflows/ci.yml
 ```
 
 Every tracked top-level entry appears above except `README.md` and `.gitignore`,
@@ -312,16 +312,17 @@ file, so every one is available as a command.
 | `ls`   | `ls -G` / `ls --color`    | BSD flag on macOS, GNU elsewhere |
 | `ts`   | Tailscale.app CLI binary  | macOS only                       |
 
-## Git hooks (`.githooks/`)
+## Local shipping gate (`.githooks/`)
 
-`just setup` points `core.hooksPath` here, so they are repo-local and need no
-per-clone installation.
+Run `just git-hooks` once in each checkout or worktree. The full machine bootstrap also wires these tracked hooks.
 
-| Hook            | Runs                                                              |
-| --------------- | ----------------------------------------------------------------- |
-| `pre-commit`    | `mise x -- just ci` — every lint, skipped if `just` is absent     |
-| `post-commit`   | Queues a roborev review of the new commit                         |
-| `post-rewrite`  | Remaps roborev reviews after a rebase or amend                    |
+| Entry | Runs |
+| --- | --- |
+| `pre-commit` | Checks the effective Git identity and runs the complete `mise x -- just ci` gate |
+| `pre-push` | Rejects direct protected-branch pushes, ancestry without signature headers, dirty or wrong checkout state, and missing or stale exact-tip evidence |
+| `ci-attest` | Runs the complete gate and atomically records the unchanged clean `HEAD` under the checkout's Git directory |
+| `ci-publish` | Verifies the exact pushed SSH branch tip and current `main` ancestry, then publishes and reads back the required GitHub commit status |
+| `lib/git-integrity.sh` | Shares identity, signature, mise, and attestation validation across the executables |
 
 ## Configuration files
 
@@ -390,24 +391,36 @@ just ci
 
 Individual targets:
 
-| Target                         | Description                                    |
-| ------------------------------ | ---------------------------------------------- |
-| `just lint-shell`              | ShellCheck on scripts, tests, `rcrc`, and zsh  |
-| `just lint-python`             | Compile Python helpers with warnings as errors |
-| `just lint-markdown`           | markdownlint-cli2                              |
-| `just lint-brewfile`           | Ruby syntax check on Brewfiles                 |
-| `just lint-mise`               | Validate mise config                           |
-| `just lint-just`               | Check in-body `just <recipe>` calls resolve    |
-| `just lint-rcrc`               | Check `rcrc` dirs, excludes, normalisation     |
-| `just lint-cleanup-symlinks`   | Fixture-test the stale-symlink scanner         |
-| `just test-rcm-links`          | Fixture-test the HOME link ownership inventory |
-| `just test-chezmoi-canary`     | Compare exact maps in an isolated HOME         |
+| Target | Description |
+| --- | --- |
+| `just lint-shell` | ShellCheck on scripts, tests, `rcrc`, and zsh |
+| `just lint-python` | Compile Python helpers with warnings as errors |
+| `just lint-markdown` | markdownlint-cli2 |
+| `just lint-brewfile` | Ruby syntax check on Brewfiles |
+| `just lint-mise` | Validate mise config |
+| `just lint-just` | Check in-body `just <recipe>` calls resolve |
+| `just lint-rcrc` | Check `rcrc` dirs, excludes, normalisation |
+| `just lint-cleanup-symlinks` | Fixture-test the stale-symlink scanner |
+| `just test-rcm-links` | Fixture-test the HOME link ownership inventory |
+| `just test-chezmoi-canary` | Compare exact maps in an isolated HOME |
+| `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
+| `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |
 
-The pre-commit hook is enabled by the bootstrap (idempotent — safe to re-run):
+Wire the hooks after cloning, adding a worktree, or pulling hook changes:
 
 ```sh
-just setup
+just git-hooks
 ```
+
+Before each push, attest the final clean commit:
+
+```sh
+just ci-attest
+git push
+just ci-publish
+```
+
+GitHub Actions remains disabled. The required external status and strict up-to-date rule block squash merge when the exact branch tip has not completed this flow. See [Local shipping gate](docs/local-shipping-gate.md) for normal operation, recovery, upgrade, rollback, and evidence limits.
 
 ## Troubleshooting
 

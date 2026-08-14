@@ -4,19 +4,25 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import json
 import os
+import secrets
 import stat
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Iterator, Sequence
 
 SCHEMA_VERSION = 1
+CLEANUP_PLAN_SCHEMA_VERSION = 1
 SUBPROCESS_TIMEOUT_SECONDS = 30
 MAX_SUBPROCESS_OUTPUT_BYTES = 16 * 1024 * 1024
+MAX_CLEANUP_PLAN_BYTES = 1024 * 1024
 OWNER_MANIFEST_HEADER = ("owner", "target", "source_root", "source")
 SOURCE_ROOTS = frozenset({"public", "private"})
 
@@ -51,6 +57,27 @@ class LinkRecord:
     owner: str
 
 
+@dataclass(frozen=True)
+class ApprovedLink:
+    target: PurePosixPath
+    link_target: str
+
+
+@dataclass(frozen=True)
+class CleanupPlan:
+    home: Path
+    public: Path
+    private: Path
+    links: tuple[ApprovedLink, ...]
+    approval_sha256: str
+
+
+@dataclass(frozen=True)
+class MutationResult:
+    changed: tuple[PurePosixPath, ...]
+    unchanged: tuple[PurePosixPath, ...]
+
+
 def collision_record(
     relative: PurePosixPath,
     expected_owner: ExpectedOwner | None,
@@ -82,7 +109,7 @@ def require_relative_path(value: str, *, label: str, wildcard: bool) -> PurePosi
     if not value or any(ord(character) < 32 or ord(character) == 127 for character in value):
         raise InventoryError(f"{label} is empty or contains a control delimiter: {value!r}")
     path = PurePosixPath(value)
-    if path.is_absolute() or ".." in path.parts or "." in path.parts:
+    if not path.parts or path.is_absolute() or ".." in path.parts or "." in path.parts:
         raise InventoryError(f"{label} must be a safe relative path: {value}")
     stars = sum(part.count("*") for part in path.parts)
     if wildcard:
@@ -337,6 +364,23 @@ def points_into_dotfiles(path: Path, repositories: Sequence[Path]) -> bool:
     return any(path == repository or repository in path.parents for repository in repositories)
 
 
+def has_blocking_home_ancestor(home: Path, relative: PurePosixPath) -> bool:
+    current = home
+    for part in relative.parts[:-1]:
+        current /= part
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            return False
+        except NotADirectoryError:
+            return True
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect HOME ancestor {current}: {exc}") from exc
+        if not stat.S_ISDIR(metadata.st_mode):
+            return True
+    return False
+
+
 def inventory(
     *,
     home: Path,
@@ -371,6 +415,9 @@ def inventory(
     for relative in candidates:
         path = home / relative
         expected_owner = expected.get(relative)
+        if has_blocking_home_ancestor(home, relative):
+            records.append(collision_record(relative, expected_owner))
+            continue
         try:
             metadata = path.lstat()
         except FileNotFoundError:
@@ -455,6 +502,460 @@ def render_json(records: Sequence[LinkRecord]) -> None:
     print()
 
 
+def cleanup_plan_payload(
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    links: Sequence[ApprovedLink],
+) -> dict[str, object]:
+    return {
+        "schema": CLEANUP_PLAN_SCHEMA_VERSION,
+        "home": str(home),
+        "public": str(public),
+        "private": str(private),
+        "links": [
+            {"target": link.target.as_posix(), "link_target": link.link_target}
+            for link in links
+        ],
+    }
+
+
+def cleanup_plan_digest(payload: dict[str, object]) -> str:
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def render_cleanup_plan(
+    records: Sequence[LinkRecord],
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+) -> None:
+    links: list[ApprovedLink] = []
+    for record in records:
+        if record.disposition != "obsolete":
+            continue
+        if record.status not in {"linked", "broken"} or record.link_target is None:
+            raise InventoryError(f"obsolete record has an unsafe cleanup shape: {record.target}")
+        relative = require_relative_path(record.target, label="obsolete target", wildcard=False)
+        if not relative.parts[0].startswith("."):
+            raise InventoryError(f"obsolete HOME target must start with a dot: {record.target}")
+        if any(ord(character) < 32 or ord(character) == 127 for character in record.link_target):
+            raise InventoryError(f"obsolete link target contains a control character: {record.target}")
+        links.append(ApprovedLink(relative, record.link_target))
+
+    payload = cleanup_plan_payload(
+        home=home,
+        public=public,
+        private=private,
+        links=links,
+    )
+    payload["approval_sha256"] = cleanup_plan_digest(payload)
+    json.dump(payload, sys.stdout, ensure_ascii=False, indent=2, sort_keys=True)
+    print()
+
+
+def unique_json_object(pairs: Sequence[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise InventoryError(f"cleanup plan contains a duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def load_cleanup_plan(
+    path: Path,
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    confirmed_digest: str,
+) -> CleanupPlan:
+    try:
+        with path.open("rb") as plan_file:
+            raw = plan_file.read(MAX_CLEANUP_PLAN_BYTES + 1)
+    except OSError as exc:
+        raise InventoryError(f"cannot read cleanup plan {path}: {exc}") from exc
+    if len(raw) > MAX_CLEANUP_PLAN_BYTES:
+        raise InventoryError(f"cleanup plan exceeds {MAX_CLEANUP_PLAN_BYTES} bytes: {path}")
+    try:
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_json_object)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise InventoryError(f"cleanup plan is not valid UTF-8 JSON: {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise InventoryError("cleanup plan root must be a JSON object")
+    expected_keys = {"schema", "home", "public", "private", "links", "approval_sha256"}
+    if set(payload) != expected_keys:
+        raise InventoryError("cleanup plan must contain exactly the documented schema keys")
+    if type(payload["schema"]) is not int or payload["schema"] != CLEANUP_PLAN_SCHEMA_VERSION:
+        raise InventoryError(f"unsupported cleanup plan schema: {payload['schema']!r}")
+
+    for field, expected in (("home", home), ("public", public), ("private", private)):
+        if not isinstance(payload[field], str) or payload[field] != str(expected):
+            raise InventoryError(f"cleanup plan {field} does not match this invocation")
+    if not isinstance(payload["links"], list) or not payload["links"]:
+        raise InventoryError("cleanup plan must contain at least one approved link")
+    if not isinstance(payload["approval_sha256"], str):
+        raise InventoryError("cleanup plan approval_sha256 must be a string")
+
+    links: list[ApprovedLink] = []
+    seen_targets: set[PurePosixPath] = set()
+    for index, value in enumerate(payload["links"]):
+        if not isinstance(value, dict) or set(value) != {"target", "link_target"}:
+            raise InventoryError(f"cleanup plan link {index} has the wrong schema")
+        target_value = value["target"]
+        link_target = value["link_target"]
+        if not isinstance(target_value, str) or not isinstance(link_target, str):
+            raise InventoryError(f"cleanup plan link {index} fields must be strings")
+        relative = require_relative_path(
+            target_value,
+            label=f"cleanup plan target {index}",
+            wildcard=False,
+        )
+        if not relative.parts[0].startswith("."):
+            raise InventoryError(f"cleanup plan HOME target must start with a dot: {relative}")
+        if not link_target or any(ord(character) < 32 or ord(character) == 127 for character in link_target):
+            raise InventoryError(f"cleanup plan link target contains a control character: {relative}")
+        if relative in seen_targets:
+            raise InventoryError(f"cleanup plan contains a duplicate target: {relative}")
+        seen_targets.add(relative)
+        links.append(ApprovedLink(relative, link_target))
+
+    digest_payload = {key: value for key, value in payload.items() if key != "approval_sha256"}
+    actual_digest = cleanup_plan_digest(digest_payload)
+    stored_digest = payload["approval_sha256"]
+    if len(stored_digest) != 64 or any(character not in "0123456789abcdef" for character in stored_digest):
+        raise InventoryError("cleanup plan approval_sha256 must be a lowercase SHA-256 digest")
+    if not hmac.compare_digest(stored_digest, actual_digest):
+        raise InventoryError("cleanup plan content does not match its approval_sha256")
+    if not hmac.compare_digest(confirmed_digest, stored_digest):
+        raise InventoryError("--confirm does not match the cleanup plan approval_sha256")
+    return CleanupPlan(home, public, private, tuple(links), stored_digest)
+
+
+@contextmanager
+def open_home_parent(home: Path, relative: PurePosixPath) -> Iterator[tuple[int, str]]:
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptors: list[int] = []
+    try:
+        descriptors.append(os.open(home, flags))
+        for part in relative.parts[:-1]:
+            descriptors.append(os.open(part, flags, dir_fd=descriptors[-1]))
+    except OSError as exc:
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        raise InventoryError(f"cannot open real HOME parent for {relative}: {exc}") from exc
+    try:
+        yield descriptors[-1], relative.name
+    finally:
+        for descriptor in reversed(descriptors):
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+
+
+def require_approved_link_at(
+    parent_descriptor: int,
+    name: str,
+    link: ApprovedLink,
+) -> tuple[int, ...]:
+    try:
+        before = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except FileNotFoundError as exc:
+        raise InventoryError(f"approved link is no longer present: {link.target}") from exc
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect approved link {link.target}: {exc}") from exc
+    metadata_identity = link_identity(before)
+    if not stat.S_ISLNK(before.st_mode):
+        raise InventoryError(f"approved target is no longer a symlink: {link.target}")
+    try:
+        current_target = os.readlink(name, dir_fd=parent_descriptor)
+        after = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except OSError as exc:
+        raise InventoryError(f"cannot read approved link {link.target}: {exc}") from exc
+    after_identity = link_identity(after)
+    if metadata_identity != after_identity:
+        raise InventoryError(f"approved link changed while it was being checked: {link.target}")
+    if current_target != link.link_target:
+        raise InventoryError(f"approved link target changed after review: {link.target}")
+    return metadata_identity
+
+
+def link_identity(metadata: os.stat_result) -> tuple[int, ...]:
+    identity = (metadata.st_dev, metadata.st_ino, metadata.st_mode, metadata.st_size)
+    if hasattr(metadata, "st_mtime_ns"):
+        identity += (metadata.st_mtime_ns,)
+    return identity
+
+
+def require_current_approved_link(link: ApprovedLink, *, home: Path) -> None:
+    with open_home_parent(home, link.target) as (parent_descriptor, name):
+        require_approved_link_at(parent_descriptor, name, link)
+
+
+def cleanup_approved_links(
+    plan: CleanupPlan,
+    *,
+    records: Sequence[LinkRecord],
+    refresh_records: Callable[[], list[LinkRecord]],
+) -> MutationResult:
+    records_by_target = {record.target: record for record in records}
+    pending: list[ApprovedLink] = []
+    already_absent: list[PurePosixPath] = []
+    for link in plan.links:
+        record = records_by_target.get(link.target.as_posix())
+        if record is None:
+            require_available_restore_path(link, home=plan.home)
+            already_absent.append(link.target)
+            continue
+        if record.disposition != "obsolete":
+            raise InventoryError(f"approved target is not currently obsolete: {link.target}")
+        if record.status not in {"linked", "broken"} or record.link_target != link.link_target:
+            raise InventoryError(f"approved inventory evidence changed after review: {link.target}")
+        require_current_approved_link(link, home=plan.home)
+        pending.append(link)
+
+    removed: list[PurePosixPath] = []
+    for link in pending:
+        refreshed = {record.target: record for record in refresh_records()}
+        current_record = refreshed.get(link.target.as_posix())
+        if current_record is None:
+            require_available_restore_path(link, home=plan.home)
+            already_absent.append(link.target)
+            continue
+        if (
+            current_record.disposition != "obsolete"
+            or current_record.status not in {"linked", "broken"}
+            or current_record.link_target != link.link_target
+        ):
+            raise InventoryError(f"approved target changed ownership before cleanup: {link.target}")
+        with open_home_parent(plan.home, link.target) as (parent_descriptor, name):
+            approved_identity = require_approved_link_at(parent_descriptor, name, link)
+            quarantine_name = f".rcm-links-quarantine-{secrets.token_hex(16)}"
+            quarantine_entry = "approved-link"
+            try:
+                os.mkdir(quarantine_name, mode=0o700, dir_fd=parent_descriptor)
+            except OSError as exc:
+                raise InventoryError(
+                    f"cleanup stopped after {len(removed)} removals; "
+                    f"cannot create quarantine for {link.target}: {exc}"
+                ) from exc
+            try:
+                quarantine_descriptor = os.open(
+                    quarantine_name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=parent_descriptor,
+                )
+            except OSError as exc:
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_descriptor)
+                except OSError:
+                    pass
+                raise InventoryError(
+                    f"cleanup stopped after {len(removed)} removals; "
+                    f"cannot open quarantine for {link.target}: {exc}"
+                ) from exc
+            try:
+                try:
+                    os.rename(
+                        name,
+                        quarantine_entry,
+                        src_dir_fd=parent_descriptor,
+                        dst_dir_fd=quarantine_descriptor,
+                    )
+                except OSError as exc:
+                    raise InventoryError(
+                        f"cleanup stopped after {len(removed)} removals; "
+                        f"cannot quarantine {link.target}: {exc}"
+                    ) from exc
+                try:
+                    moved = os.stat(
+                        quarantine_entry,
+                        dir_fd=quarantine_descriptor,
+                        follow_symlinks=False,
+                    )
+                except OSError as exc:
+                    raise InventoryError(
+                        f"cleanup quarantined {link.target} but cannot verify it: {exc}"
+                    ) from exc
+                if not stat.S_ISLNK(moved.st_mode) or link_identity(moved) != approved_identity:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved a raced entry at {quarantine_relative}; "
+                        f"it did not match the approved link {link.target}"
+                    )
+                try:
+                    moved_target = os.readlink(quarantine_entry, dir_fd=quarantine_descriptor)
+                except OSError as exc:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved an unreadable link at {quarantine_relative}: {exc}"
+                    ) from exc
+                if moved_target != link.link_target:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved a raced link at {quarantine_relative}; "
+                        f"its raw target did not match {link.target}"
+                    )
+                try:
+                    os.unlink(quarantine_entry, dir_fd=quarantine_descriptor)
+                except OSError as exc:
+                    quarantine_relative = link.target.parent / quarantine_name / quarantine_entry
+                    raise InventoryError(
+                        f"cleanup preserved the approved link at {quarantine_relative}; "
+                        f"cannot delete it: {exc}"
+                    ) from exc
+            finally:
+                try:
+                    os.close(quarantine_descriptor)
+                except OSError:
+                    pass
+                try:
+                    os.rmdir(quarantine_name, dir_fd=parent_descriptor)
+                except OSError:
+                    pass
+            try:
+                os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise InventoryError(
+                    f"cleanup removed {link.target} but cannot verify its absence: {exc}"
+                ) from exc
+            else:
+                raise InventoryError(f"cleanup target reappeared after quarantine: {link.target}")
+        removed.append(link.target)
+    return MutationResult(tuple(removed), tuple(already_absent))
+
+
+def require_available_restore_path(
+    link: ApprovedLink,
+    *,
+    home: Path,
+) -> None:
+    with open_home_parent(home, link.target) as (parent_descriptor, name):
+        try:
+            os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect restore target {link.target}: {exc}") from exc
+        raise InventoryError(f"restore target is no longer absent: {link.target}")
+
+
+def restore_approved_links(
+    plan: CleanupPlan,
+    *,
+    records: Sequence[LinkRecord],
+    refresh_records: Callable[[], list[LinkRecord]],
+) -> MutationResult:
+    records_by_target = {record.target: record for record in records}
+    pending: list[ApprovedLink] = []
+    already_restored: list[PurePosixPath] = []
+    for link in plan.links:
+        record = records_by_target.get(link.target.as_posix())
+        if record is None:
+            require_available_restore_path(link, home=plan.home)
+            pending.append(link)
+            continue
+        if (
+            record.disposition == "obsolete"
+            and record.status in {"linked", "broken"}
+            and record.link_target == link.link_target
+        ):
+            require_current_approved_link(link, home=plan.home)
+            already_restored.append(link.target)
+            continue
+        raise InventoryError(
+            f"restore target is present in current inventory "
+            f"({record.disposition}/{record.status}): {link.target}"
+        )
+
+    restored: list[PurePosixPath] = []
+    for link in pending:
+        refreshed = {record.target: record for record in refresh_records()}
+        current_record = refreshed.get(link.target.as_posix())
+        if current_record is not None:
+            if (
+                current_record.disposition == "obsolete"
+                and current_record.status in {"linked", "broken"}
+                and current_record.link_target == link.link_target
+            ):
+                require_current_approved_link(link, home=plan.home)
+                already_restored.append(link.target)
+                continue
+            raise InventoryError(f"restore target changed ownership before restore: {link.target}")
+        with open_home_parent(plan.home, link.target) as (parent_descriptor, name):
+            try:
+                os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                raise InventoryError(f"cannot recheck restore target {link.target}: {exc}") from exc
+            else:
+                raise InventoryError(f"restore target is no longer absent: {link.target}")
+            try:
+                os.symlink(link.link_target, name, dir_fd=parent_descriptor)
+            except OSError as exc:
+                raise InventoryError(
+                    f"restore stopped after {len(restored)} links; cannot create {link.target}: {exc}"
+                ) from exc
+            try:
+                metadata = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+                restored_target = os.readlink(name, dir_fd=parent_descriptor)
+            except OSError as exc:
+                raise InventoryError(f"restored {link.target} but cannot verify it: {exc}") from exc
+            if not stat.S_ISLNK(metadata.st_mode) or restored_target != link.link_target:
+                raise InventoryError(f"restored link does not match approved evidence: {link.target}")
+        restored.append(link.target)
+    return MutationResult(tuple(restored), tuple(already_restored))
+
+
+def add_common_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    repository: Path,
+    public_default: Path,
+    private_default: Path,
+) -> None:
+    parser.add_argument("--home", type=Path, default=Path.home())
+    parser.add_argument("--public-dir", type=Path, default=public_default)
+    parser.add_argument("--private-dir", type=Path, default=private_default)
+    parser.add_argument("--owners", type=Path, default=repository / "docs/rcm-link-owners.tsv")
+    parser.add_argument("--lsrc", default="lsrc")
+
+
+def load_current_records(
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    owners: Path,
+    lsrc: str,
+) -> list[LinkRecord]:
+    patterns = load_owner_patterns(owners)
+    rcm_map = load_rcm_map(lsrc=lsrc, home=home, public=public, private=private)
+    return inventory(
+        home=home,
+        public=public,
+        private=private,
+        patterns=patterns,
+        rcm_map=rcm_map,
+    )
+
+
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     repository = Path(__file__).resolve().parent.parent
     public_default = Path(
@@ -472,12 +973,38 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     inventory_parser = subparsers.add_parser("inventory", help="print a read-only HOME link inventory")
-    inventory_parser.add_argument("--home", type=Path, default=Path.home())
-    inventory_parser.add_argument("--public-dir", type=Path, default=public_default)
-    inventory_parser.add_argument("--private-dir", type=Path, default=private_default)
-    inventory_parser.add_argument("--owners", type=Path, default=repository / "docs/rcm-link-owners.tsv")
-    inventory_parser.add_argument("--lsrc", default="lsrc")
+    add_common_arguments(
+        inventory_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
     inventory_parser.add_argument("--format", choices=("table", "json"), default="table")
+    plan_parser = subparsers.add_parser("plan", help="print a digest-bound obsolete-link cleanup plan")
+    add_common_arguments(
+        plan_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    cleanup_parser = subparsers.add_parser("cleanup", help="apply an explicitly approved cleanup plan")
+    add_common_arguments(
+        cleanup_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    cleanup_parser.add_argument("--plan", type=Path, required=True)
+    cleanup_parser.add_argument("--confirm", required=True)
+    restore_parser = subparsers.add_parser("restore", help="restore links from an approved cleanup plan")
+    add_common_arguments(
+        restore_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    restore_parser.add_argument("--plan", type=Path, required=True)
+    restore_parser.add_argument("--confirm", required=True)
     return parser.parse_args(argv)
 
 
@@ -491,13 +1018,91 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise InventoryError(f"HOME inventory root is not a directory: {home}")
         if not public.is_dir() or not (public / "rcrc").is_file():
             raise InventoryError(f"public dotfiles repository is incomplete: {public}")
-        patterns = load_owner_patterns(lexical_absolute(args.owners))
-        rcm_map = load_rcm_map(lsrc=args.lsrc, home=home, public=public, private=private)
-        records = inventory(home=home, public=public, private=private, patterns=patterns, rcm_map=rcm_map)
-        if args.format == "json":
+        owners = lexical_absolute(args.owners)
+
+        def refresh_records() -> list[LinkRecord]:
+            return load_current_records(
+                home=home,
+                public=public,
+                private=private,
+                owners=owners,
+                lsrc=args.lsrc,
+            )
+
+        records = refresh_records()
+        if args.command == "inventory" and args.format == "json":
             render_json(records)
-        else:
+        elif args.command == "inventory":
             render_table(records)
+        elif args.command == "plan":
+            render_cleanup_plan(records, home=home, public=public, private=private)
+        elif args.command == "cleanup":
+            plan = load_cleanup_plan(
+                lexical_absolute(args.plan),
+                home=home,
+                public=public,
+                private=private,
+                confirmed_digest=args.confirm,
+            )
+            cleanup_result = cleanup_approved_links(
+                plan,
+                records=records,
+                refresh_records=refresh_records,
+            )
+            try:
+                verified_records = refresh_records()
+            except InventoryError as exc:
+                raise InventoryError(
+                    f"removed {len(cleanup_result.changed)} approved links but final inventory failed: {exc}"
+                ) from exc
+            remaining = {record.target for record in verified_records}
+            changed = set(cleanup_result.changed)
+            for link in plan.links:
+                relative = link.target
+                if relative.as_posix() in remaining:
+                    raise InventoryError(f"removed target reappeared during final inventory: {relative}")
+                require_available_restore_path(link, home=home)
+                action = "removed" if relative in changed else "already absent"
+                print(f"{action}\t{relative.as_posix()}")
+            print(
+                f"cleanup complete\tchanged={len(cleanup_result.changed)}\t"
+                f"already_absent={len(cleanup_result.unchanged)}"
+            )
+        else:
+            plan = load_cleanup_plan(
+                lexical_absolute(args.plan),
+                home=home,
+                public=public,
+                private=private,
+                confirmed_digest=args.confirm,
+            )
+            restore_result = restore_approved_links(
+                plan,
+                records=records,
+                refresh_records=refresh_records,
+            )
+            try:
+                verified_records = refresh_records()
+            except InventoryError as exc:
+                raise InventoryError(
+                    f"restored {len(restore_result.changed)} approved links but final inventory failed: {exc}"
+                ) from exc
+            verified_by_target = {record.target: record for record in verified_records}
+            changed = set(restore_result.changed)
+            for link in plan.links:
+                record = verified_by_target.get(link.target.as_posix())
+                if (
+                    record is None
+                    or record.disposition != "obsolete"
+                    or record.link_target != link.link_target
+                ):
+                    raise InventoryError(f"restored target failed final inventory: {link.target}")
+                action = "restored" if link.target in changed else "already restored"
+                print(f"{action}\t{link.target.as_posix()}")
+            print(
+                f"restore complete\tchanged={len(restore_result.changed)}\t"
+                f"already_restored={len(restore_result.unchanged)}"
+            )
         return 0
     except InventoryError as exc:
         print(f"rcm-links: {exc}", file=sys.stderr)

@@ -10,7 +10,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Added
 
-- A read-only rcm link ownership inventory that compares exact `lsrc` mappings with current and historical HOME roots, preserves declared dedicated installer links, and distinguishes obsolete links from unclassified collisions before the chezmoi backup rehearsal ([#249](https://github.com/tgautier/dotfiles/issues/249)).
+- A read-only rcm link ownership inventory that compares exact `lsrc` mappings with current and historical HOME roots, preserves declared dedicated installer links, and distinguishes obsolete links from unclassified collisions before the chezmoi backup rehearsal. Digest-bound cleanup and restore commands revalidate the configured repositories, ownership disposition, raw link targets, and real-directory ancestors before changing HOME ([#249](https://github.com/tgautier/dotfiles/issues/249)).
 - A machine-readable complete rcm inventory and exact chezmoi parity guard. The guard verifies every shadow target/source mapping, rendered bytes, executable modes, isolated idempotent apply, and sabotage fixtures while keeping rcm active ([#248](https://github.com/tgautier/dotfiles/issues/248)).
 - Chezmoi Phase 1 scaffolding: `.chezmoiroot` reserves `home/` for future
   source state, `docs/chezmoi-targets.tsv` records the pre-migration rcm target

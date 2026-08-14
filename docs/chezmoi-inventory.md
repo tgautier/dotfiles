@@ -53,4 +53,4 @@ This shadow change does not alter installed dotfiles. Pull the repository and ru
 
 Rollback is a repository revert only: restore the previous revision and rerun `just ci`. Existing rcm links and their targets remain untouched because every chezmoi apply in the guard is confined to a temporary destination.
 
-The future cutover remains blocked until the exact guard passes from a fresh checkout, `just link-inventory` reconciles current and historical rcm HOME links, and the cutover PR records the backup, apply, verification, and rcm rollback sequence for macOS, Linux, and WSL2.
+The future cutover remains blocked until the exact guard passes from a fresh checkout, `just link-inventory` reconciles current and historical rcm HOME links with no unresolved obsolete set after the approval-bound cleanup decision, and the cutover PR records the backup, apply, verification, and rcm rollback sequence for macOS, Linux, and WSL2.

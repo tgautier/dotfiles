@@ -17,6 +17,18 @@ test-rcm-links:
 link-inventory:
     python3 bin/rcm-links inventory --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
 
+[doc("Print a digest-bound cleanup plan containing only current obsolete rcm links")]
+link-cleanup-plan:
+    python3 bin/rcm-links plan --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
+
+[doc("Remove only obsolete links matching an explicitly approved cleanup plan and digest")]
+link-cleanup plan confirm:
+    python3 bin/rcm-links cleanup --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --plan {{quote(plan)}} --confirm {{quote(confirm)}}
+
+[doc("Restore absent links from the same explicitly approved cleanup plan and digest")]
+link-restore plan confirm:
+    python3 bin/rcm-links restore --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --plan {{quote(plan)}} --confirm {{quote(confirm)}}
+
 # Assert `rcrc` resolves the way README documents, on both halves of the
 # override contract: DOTFILES_DIRS, which reaches the operator's real $HOME
 # through rcm (a stray trailing slash becomes a doubled separator and rcm derives

@@ -278,7 +278,7 @@ rcm links each script into `~/.bin`, which `zshenv` adds to `PATH` (alongside
 | `kshow`       | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)     |
 | `obsidian`    | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+)   |
 | `op-ssh-sign` | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)   |
-| `rcm-links`   | Inventory live rcm, dedicated, obsolete, and unclassified HOME link states  |
+| `rcm-links`   | Inventory and apply or restore explicitly approved HOME link cleanup        |
 
 ## Shell functions (`zsh/functions/`)
 

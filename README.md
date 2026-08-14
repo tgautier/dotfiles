@@ -241,7 +241,6 @@ config/
 tmux.conf               # tmux config (C-a prefix, vi mode, platform clipboard)
 gitconfig               # SSH signing via 1Password, rebase-based pulls
 gitignore               # Global gitignore (OS, editor, build noise)
-git_template/           # Git init template directory
 agignore                # ack/ag ignore patterns
 editorconfig            # Cross-editor whitespace defaults
 psqlrc                  # psql prompt and output defaults
@@ -330,7 +329,6 @@ Run `just git-hooks` once in each checkout or worktree. The full machine bootstr
 | ------------------------- | ---------- | ----------------------------------------------------------------- |
 | `gitconfig`               | Git        | SSH signing via 1Password, `pull.ff=only`, `gh` credential helper |
 | `gitignore`               | Git        | Global ignores — OS, editor and build noise                       |
-| `git_template/`           | Git        | Init template dir — linked, but not wired to `init.templateDir`   |
 | `tmux.conf`               | tmux       | `C-a` prefix, vi copy mode, platform-aware clipboard              |
 | `editorconfig`            | Editors    | UTF-8, LF, 2-space indent; tabs for `Makefile`                    |
 | `psqlrc`                  | psql       | Unicode borders, timing, `¤` for null, coloured prompt            |

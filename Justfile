@@ -21,7 +21,7 @@ test-local-gate:
 lint-python:
     PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/rcm-links", "tests/test_rcm_links.py")]'
 
-[doc("Fixture-test the read-only rcm link ownership inventory")]
+[doc("Fixture-test rcm link inventory, cleanup, cutover backup, and restore")]
 test-rcm-links:
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_rcm_links.py' -v
 
@@ -40,6 +40,18 @@ link-cleanup plan confirm:
 [doc("Restore absent links from the same explicitly approved cleanup plan and digest")]
 link-restore plan confirm:
     python3 bin/rcm-links restore --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --plan {{quote(plan)}} --confirm {{quote(confirm)}}
+
+[doc("Capture every manifested live rcm link in a private digest-bound cutover backup")]
+link-cutover-backup output:
+    python3 bin/rcm-links cutover-backup --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --output {{quote(output)}}
+
+[doc("Verify a cutover backup against current manifests and live rcm links")]
+link-cutover-backup-verify backup:
+    python3 bin/rcm-links cutover-backup-verify --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}}
+
+[doc("Restore the exact backed-up link set through rcm after digest confirmation")]
+link-cutover-restore backup confirm:
+    python3 bin/rcm-links cutover-restore --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}} --confirm {{quote(confirm)}}
 
 # Assert `rcrc` resolves the way README documents, on both halves of the
 # override contract: DOTFILES_DIRS, which reaches the operator's real $HOME

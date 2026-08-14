@@ -1,6 +1,6 @@
 # Chezmoi migration inventory
 
-This document records the public rcm-to-chezmoi migration boundary for issue #232. Rcm remains the deployment owner until every target is classified, the shadow guard passes from a fresh checkout, and a separate cutover change documents backup and rollback commands.
+This document records the public rcm-to-chezmoi migration boundary for issue #232. Rcm remains the deployment owner until every target is classified, the shadow guard passes from a fresh checkout, and the live backup and rollback sequence is approved.
 
 ## Authoritative target map
 
@@ -52,8 +52,10 @@ The guard now maps `zsh/zaliases` and `zsh/zcompletion` to `~/.zsh/zaliases` and
 
 Pull the private companion repository first when it is installed, then pull this repository and run `just test-chezmoi-canary`. The command changes no HOME file: both chezmoi applies still target the temporary destination. A machine without the private repository continues to run the complete public-only parity canary. Keep using `just link` for active rcm deployment, and run `just ci` before publishing changes.
 
+Before the first real apply, create and verify the exact rcm link backup described in [Chezmoi cutover backup and rcm restore](chezmoi-cutover-backup.md). The backup and verification recipes are read-only for HOME. The restore recipe requires the reviewed digest and mutates HOME only during rollback.
+
 The removed empty Git-template marker may leave `~/.git_template/hooks/gitkeep` as an obsolete rcm symlink. Run `just link-inventory` after pulling. If the inventory reports that exact target as obsolete, follow the approval-bound plan, cleanup, and verification steps in [Rcm link reconciliation](rcm-link-reconciliation.md). Review every path in the generated plan because it can include other obsolete links.
 
 To roll back this checkpoint before HOME cleanup, restore the earlier public revision and run `just ci`. No HOME action or private-repository rollback is needed for the overlap-gate integration. After cleanup, restore the retained approved plan before reverting the repository, as described in the reconciliation guide. Every chezmoi apply in the guard remains confined to a temporary destination.
 
-The future cutover remains blocked until the exact guard passes from a fresh checkout, `just link-inventory` reconciles current and historical rcm HOME links with no unresolved obsolete set after the approval-bound cleanup decision, and the cutover PR records the backup, apply, verification, and rcm rollback sequence for macOS, Linux, and WSL2.
+The future cutover remains blocked until the exact guard passes from a fresh checkout, `just link-inventory` reports the approved live baseline, a live backup passes verification, and the cutover PR records the apply and post-apply checks for macOS, Linux, and WSL2.

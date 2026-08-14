@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -133,6 +134,7 @@ class RcmLinksInventoryTest(unittest.TestCase):
         command: str,
         *arguments: str,
         owners: Path | None = None,
+        private_dir: Path | None = None,
     ) -> subprocess.CompletedProcess[str]:
         environment = os.environ.copy()
         environment.update(
@@ -152,7 +154,7 @@ class RcmLinksInventoryTest(unittest.TestCase):
                 "--public-dir",
                 str(self.public),
                 "--private-dir",
-                str(self.private),
+                str(private_dir or self.private),
                 "--owners",
                 str(owners or self.owners),
                 "--lsrc",
@@ -180,6 +182,88 @@ class RcmLinksInventoryTest(unittest.TestCase):
     def _restore(self, plan: Path, digest: str) -> subprocess.CompletedProcess[str]:
         return self._command("restore", "--plan", str(plan), "--confirm", digest)
 
+    def _configure_cutover_fixture(self) -> tuple[Path, Path]:
+        zshrc = self._write(self.public, "zshrc", "public zshrc\n")
+        missing = self._write(self.public, "missing", "public second file\n")
+        local = self._write(self.private, "zshrc.local", "private zshrc\n")
+        (self.public / "rcrc").write_text(
+            'DOTFILES_DIRS="${DOTFILES_DIR} ${DOTFILES_PRIVATE_DIR}"\n',
+            encoding="utf-8",
+        )
+        self._commit(self.public, "add cutover fixture")
+        self._commit(self.private, "add private cutover fixture")
+
+        public_manifest = self.root / "public-targets.tsv"
+        public_manifest.write_text(
+            "rcm_source\ttarget\tdisposition\tchezmoi_source\tmode\n"
+            "missing\t.missing\tretire-at-cutover\t-\tfile\n"
+            "zshrc\t.zshrc\tshadow\tdot_zshrc\tfile\n",
+            encoding="utf-8",
+        )
+        private_manifest = self.root / "private-targets.tsv"
+        private_manifest.write_text(
+            "rcm_source\ttarget\tcurrent_owner\tdisposition\tfuture_owner\ttarget_shape\tmode\n"
+            "zshrc.local\t.zshrc.local\tprivate-rcm\tmigrate\tprivate-chezmoi\tprivate-file\t0600\n",
+            encoding="utf-8",
+        )
+        self._write_fake_lsrc(
+            (
+                (".missing", missing),
+                (".zshrc", zshrc),
+                (".zshrc.local", local),
+            )
+        )
+        self._link(".missing", missing)
+        self._link(".zshrc", zshrc)
+        self._link(".zshrc.local", local)
+        return public_manifest, private_manifest
+
+    def _write_fake_lsrc(self, rows: tuple[tuple[str, Path], ...]) -> None:
+        serialized = repr(tuple((target, str(source)) for target, source in rows))
+        self.fake_lsrc.write_text(
+            f"#!{sys.executable}\n"
+            "import os\n"
+            "from pathlib import Path\n"
+            f"rows = {serialized}\n"
+            "home = Path(os.environ['HOME'])\n"
+            "for target, source in rows:\n"
+            "    print(f'{home / target}:{source}')\n",
+            encoding="utf-8",
+        )
+        self.fake_lsrc.chmod(0o755)
+
+    def _cutover_command(
+        self,
+        command: str,
+        public_manifest: Path,
+        private_manifest: Path,
+        *arguments: str,
+        private_dir: Path | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        return self._command(
+            command,
+            "--public-targets",
+            str(public_manifest),
+            "--private-targets",
+            str(private_manifest),
+            *arguments,
+            private_dir=private_dir,
+        )
+
+    def _cutover_backup(
+        self,
+        public_manifest: Path,
+        private_manifest: Path,
+        output: Path,
+    ) -> subprocess.CompletedProcess[str]:
+        return self._cutover_command(
+            "cutover-backup",
+            public_manifest,
+            private_manifest,
+            "--output",
+            str(output),
+        )
+
     @staticmethod
     def _plan_digest(payload: dict[str, object]) -> str:
         digest_payload = {key: value for key, value in payload.items() if key != "approval_sha256"}
@@ -190,6 +274,317 @@ class RcmLinksInventoryTest(unittest.TestCase):
             sort_keys=True,
         ).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
+
+    def test_cutover_backup_is_complete_private_and_exclusive(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        backup = self.root / "cutover-backup.json"
+
+        completed = self._cutover_backup(public_manifest, private_manifest, backup)
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(backup.read_text(encoding="utf-8"))
+        self.assertEqual(payload["schema"], 1)
+        self.assertEqual(payload["approval_sha256"], self._plan_digest(payload))
+        self.assertEqual(
+            [link["target"] for link in payload["links"]],
+            [".missing", ".zshrc", ".zshrc.local"],
+        )
+        self.assertEqual(payload["private"], str(self.private))
+        self.assertEqual(backup.stat().st_mode & 0o777, 0o600)
+        original = backup.read_bytes()
+
+        verified = self._cutover_command(
+            "cutover-backup-verify",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+        )
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+        self.assertIn("cutover backup verified\ttargets=3", verified.stdout)
+
+        repeated = self._cutover_backup(public_manifest, private_manifest, backup)
+        self.assertEqual(repeated.returncode, 2)
+        self.assertIn("cutover backup already exists", repeated.stderr)
+        self.assertEqual(backup.read_bytes(), original)
+
+        symlink_target = self.root / "symlink-target.json"
+        symlink_target.write_bytes(original)
+        symlink_target.chmod(0o600)
+        backup.unlink()
+        backup.symlink_to(symlink_target)
+        refused_symlink = self._cutover_command(
+            "cutover-backup-verify",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+        )
+        self.assertEqual(refused_symlink.returncode, 2)
+        self.assertIn("cannot inspect cutover backup", refused_symlink.stderr)
+
+    def test_cutover_backup_rejects_portable_target_aliases(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        with public_manifest.open("a", encoding="utf-8") as manifest:
+            manifest.write("other\t.ZSHRC\tshadow\tdot_ZSHRC\tfile\n")
+
+        completed = self._cutover_backup(
+            public_manifest,
+            private_manifest,
+            self.root / "aliased-targets.json",
+        )
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("portable cutover target alias .ZSHRC", completed.stderr)
+
+    def test_cutover_backup_rechecks_the_complete_snapshot(self) -> None:
+        first_link = RCM_LINKS.CutoverLink(
+            "public",
+            PurePosixPath("zshrc"),
+            PurePosixPath(".zshrc"),
+            "/fixture/public/zshrc",
+        )
+        second_link = RCM_LINKS.CutoverLink(
+            "public",
+            PurePosixPath("zshrc"),
+            PurePosixPath(".zshrc"),
+            "/other/public/zshrc",
+        )
+        initial_map = {PurePosixPath(".zshrc"): Path("/fixture/public/zshrc")}
+
+        with self.assertRaisesRegex(
+            RCM_LINKS.InventoryError,
+            "HOME links changed while the cutover backup was captured",
+        ):
+            RCM_LINKS.require_stable_cutover_snapshot(
+                initial_map,
+                dict(initial_map),
+                (first_link,),
+                (second_link,),
+            )
+
+        with self.assertRaisesRegex(
+            RCM_LINKS.InventoryError,
+            "live rcm map changed while the cutover backup was captured",
+        ):
+            RCM_LINKS.require_stable_cutover_snapshot(
+                initial_map,
+                {PurePosixPath(".other"): Path("/fixture/public/other")},
+                (first_link,),
+                (first_link,),
+            )
+
+    def test_cutover_backup_survives_directory_sync_failure(self) -> None:
+        destination = self.root / "sync-failure.json"
+        payload = {"schema": 1, "fixture": "durable publication boundary"}
+
+        with mock.patch.object(
+            RCM_LINKS.os,
+            "fsync",
+            side_effect=(None, OSError("fixture directory sync failure")),
+        ):
+            with self.assertRaisesRegex(
+                RCM_LINKS.InventoryError,
+                "cutover backup was published at",
+            ):
+                RCM_LINKS.write_exclusive_cutover_backup(destination, payload)
+
+        self.assertEqual(destination.stat().st_mode & 0o777, 0o600)
+        self.assertEqual(
+            json.loads(destination.read_text(encoding="utf-8")),
+            payload,
+        )
+        self.assertEqual(list(self.root.glob(".sync-failure.json.staged-*")), [])
+
+    def test_cutover_backup_supports_an_absent_private_checkout(self) -> None:
+        zshrc = self._write(self.public, "zshrc", "public zshrc\n")
+        self._commit(self.public, "add public-only cutover fixture")
+        public_manifest = self.root / "public-only-targets.tsv"
+        public_manifest.write_text(
+            "rcm_source\ttarget\tdisposition\tchezmoi_source\tmode\n"
+            "zshrc\t.zshrc\tshadow\tdot_zshrc\tfile\n",
+            encoding="utf-8",
+        )
+        absent_private = self.root / "private-absent"
+        self._write_fake_lsrc(((".zshrc", zshrc),))
+        self._link(".zshrc", zshrc)
+        backup = self.root / "public-only.json"
+
+        completed = self._cutover_command(
+            "cutover-backup",
+            public_manifest,
+            absent_private / "docs/chezmoi-private-targets.tsv",
+            "--output",
+            str(backup),
+            private_dir=absent_private,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(backup.read_text(encoding="utf-8"))
+        self.assertIsNone(payload["private"])
+        self.assertEqual([link["target"] for link in payload["links"]], [".zshrc"])
+
+    def test_cutover_backup_rejects_manifest_and_live_map_drift(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        extra = self._write(self.public, "extra", "unmanifested\n")
+        self._write_fake_lsrc(
+            (
+                (".extra", extra),
+                (".missing", self.public / "missing"),
+                (".zshrc", self.public / "zshrc"),
+                (".zshrc.local", self.private / "zshrc.local"),
+            )
+        )
+
+        completed = self._cutover_backup(
+            public_manifest,
+            private_manifest,
+            self.root / "drifted.json",
+        )
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("unmanifested targets: .extra", completed.stderr)
+        self.assertFalse((self.root / "drifted.json").exists())
+
+    def test_cutover_backup_rejects_non_exact_live_link(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        (self.home / ".zshrc").unlink()
+        (self.home / ".zshrc").symlink_to("../public/zshrc")
+
+        completed = self._cutover_backup(
+            public_manifest,
+            private_manifest,
+            self.root / "relative.json",
+        )
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("not the exact absolute rcm link: .zshrc", completed.stderr)
+
+    def test_cutover_restore_uses_rcm_and_verifies_every_link(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        backup = self.root / "cutover-backup.json"
+        created = self._cutover_backup(public_manifest, private_manifest, backup)
+        self.assertEqual(created.returncode, 0, created.stderr)
+        payload = json.loads(backup.read_text(encoding="utf-8"))
+        for target in (".missing", ".zshrc", ".zshrc.local"):
+            path = self.home / target
+            path.unlink()
+            path.write_text(f"rendered {target}\n", encoding="utf-8")
+        rcup = shutil.which("rcup")
+        self.assertIsNotNone(rcup, "rcup must be installed for the cutover restore fixture")
+
+        restored = self._cutover_command(
+            "cutover-restore",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+            "--confirm",
+            payload["approval_sha256"],
+            "--rcup",
+            str(rcup),
+        )
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        self.assertIn("cutover restore complete\ttargets=3", restored.stdout)
+        for link in payload["links"]:
+            self.assertTrue((self.home / link["target"]).is_symlink())
+            self.assertEqual(os.readlink(self.home / link["target"]), link["link_target"])
+
+    def test_cutover_restore_rejects_tampering_and_foreign_links_before_rcm(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        backup = self.root / "cutover-backup.json"
+        created = self._cutover_backup(public_manifest, private_manifest, backup)
+        self.assertEqual(created.returncode, 0, created.stderr)
+        payload = json.loads(backup.read_text(encoding="utf-8"))
+        digest = payload["approval_sha256"]
+        payload["approval_sha256"] = ("0" if digest[0] != "0" else "1") + digest[1:]
+        backup.write_text(json.dumps(payload), encoding="utf-8")
+        backup.chmod(0o600)
+
+        tampered = self._cutover_command(
+            "cutover-restore",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+            "--confirm",
+            payload["approval_sha256"],
+        )
+        self.assertEqual(tampered.returncode, 2)
+        self.assertIn("content does not match its approval_sha256", tampered.stderr)
+
+        payload["approval_sha256"] = self._plan_digest(payload)
+        backup.write_text(json.dumps(payload), encoding="utf-8")
+        backup.chmod(0o600)
+        foreign = self.home / ".zshrc"
+        foreign.unlink()
+        foreign.symlink_to(self.root / "foreign")
+        refused = self._cutover_command(
+            "cutover-restore",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+            "--confirm",
+            payload["approval_sha256"],
+        )
+        self.assertEqual(refused.returncode, 2)
+        self.assertIn("foreign symlink: .zshrc", refused.stderr)
+        self.assertEqual(os.readlink(foreign), str(self.root / "foreign"))
+
+    def test_cutover_restore_backup_survives_partial_rcup_and_retry(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        backup = self.root / "cutover-backup.json"
+        created = self._cutover_backup(public_manifest, private_manifest, backup)
+        self.assertEqual(created.returncode, 0, created.stderr)
+        payload = json.loads(backup.read_text(encoding="utf-8"))
+        for target in (".missing", ".zshrc", ".zshrc.local"):
+            path = self.home / target
+            path.unlink()
+            path.write_text(f"rendered {target}\n", encoding="utf-8")
+        original_backup = backup.read_bytes()
+        partial_rcup = self.root / "partial-rcup"
+        partial_rcup.write_text(
+            f"#!{sys.executable}\n"
+            "import os\n"
+            "from pathlib import Path\n"
+            "home = Path(os.environ['HOME'])\n"
+            "target = home / '.missing'\n"
+            "target.unlink()\n"
+            "target.symlink_to(Path(os.environ['DOTFILES_DIR']) / 'missing')\n"
+            "raise SystemExit(7)\n",
+            encoding="utf-8",
+        )
+        partial_rcup.chmod(0o755)
+
+        partial = self._cutover_command(
+            "cutover-restore",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+            "--confirm",
+            payload["approval_sha256"],
+            "--rcup",
+            str(partial_rcup),
+        )
+        self.assertEqual(partial.returncode, 2)
+        self.assertIn("command failed (7)", partial.stderr)
+        self.assertEqual(backup.read_bytes(), original_backup)
+        self.assertTrue((self.home / ".missing").is_symlink())
+        self.assertFalse((self.home / ".zshrc").is_symlink())
+
+        rcup = shutil.which("rcup")
+        self.assertIsNotNone(rcup, "rcup must be installed for the cutover retry fixture")
+        retried = self._cutover_command(
+            "cutover-restore",
+            public_manifest,
+            private_manifest,
+            "--backup",
+            str(backup),
+            "--confirm",
+            payload["approval_sha256"],
+            "--rcup",
+            str(rcup),
+        )
+        self.assertEqual(retried.returncode, 0, retried.stderr)
+        self.assertEqual(backup.read_bytes(), original_backup)
 
     def test_inventory_classifies_current_historical_and_dedicated_links(self) -> None:
         zshrc = self._write(self.public, "zshrc")

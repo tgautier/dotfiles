@@ -219,6 +219,7 @@ Detailed guides live in the `docs/` folder:
 
 - [Homebrew](docs/homebrew.md) — update flow, cask-upgrade recovery, and `just update` troubleshooting
 - [Chezmoi migration inventory](docs/chezmoi-inventory.md) — complete rcm target map, explicit dispositions, parity guard, and rollback boundary
+- [Chezmoi cutover backup](docs/chezmoi-cutover-backup.md) — exact live-link backup, isolated restore rehearsal, and approval-bound rcm recovery
 - [Local shipping gate](docs/local-shipping-gate.md) — per-checkout setup, exact-tip operation, recovery, upgrade, and rollback
 - [Rcm link reconciliation](docs/rcm-link-reconciliation.md) — read-only ownership inventory before the chezmoi backup rehearsal
 - [tmux](docs/tmux.md) — configuration overview, cheat sheet, and troubleshooting
@@ -277,7 +278,7 @@ rcm links each script into `~/.bin`, which `zshenv` adds to `PATH` (alongside
 | `kshow`       | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)     |
 | `obsidian`    | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+)   |
 | `op-ssh-sign` | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)   |
-| `rcm-links`   | Inventory and apply or restore explicitly approved HOME link cleanup        |
+| `rcm-links`   | Inventory HOME links and run approved cleanup or cutover recovery           |
 
 ## Shell functions (`zsh/functions/`)
 
@@ -399,7 +400,7 @@ Individual targets:
 | `just lint-just` | Check in-body `just <recipe>` calls resolve |
 | `just lint-rcrc` | Check `rcrc` dirs, excludes, normalisation |
 | `just lint-cleanup-symlinks` | Fixture-test the stale-symlink scanner |
-| `just test-rcm-links` | Fixture-test the HOME link ownership inventory |
+| `just test-rcm-links` | Fixture-test HOME link inventory, cleanup, cutover backup, and rcm restoration |
 | `just test-chezmoi-canary` | Compare exact maps and, when present, private ownership in an isolated HOME |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
 | `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |

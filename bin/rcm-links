@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import hmac
 import json
@@ -13,6 +14,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import unicodedata
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
@@ -20,11 +22,29 @@ from typing import Callable, Iterable, Iterator, Sequence
 
 SCHEMA_VERSION = 1
 CLEANUP_PLAN_SCHEMA_VERSION = 1
+CUTOVER_BACKUP_SCHEMA_VERSION = 1
 SUBPROCESS_TIMEOUT_SECONDS = 30
 MAX_SUBPROCESS_OUTPUT_BYTES = 16 * 1024 * 1024
 MAX_CLEANUP_PLAN_BYTES = 1024 * 1024
+MAX_CUTOVER_BACKUP_BYTES = 1024 * 1024
 OWNER_MANIFEST_HEADER = ("owner", "target", "source_root", "source")
 SOURCE_ROOTS = frozenset({"public", "private"})
+PUBLIC_TARGET_HEADER = (
+    "rcm_source",
+    "target",
+    "disposition",
+    "chezmoi_source",
+    "mode",
+)
+PRIVATE_TARGET_HEADER = (
+    "rcm_source",
+    "target",
+    "current_owner",
+    "disposition",
+    "future_owner",
+    "target_shape",
+    "mode",
+)
 
 
 class InventoryError(Exception):
@@ -69,6 +89,30 @@ class CleanupPlan:
     public: Path
     private: Path
     links: tuple[ApprovedLink, ...]
+    approval_sha256: str
+
+
+@dataclass(frozen=True, order=True)
+class CutoverTarget:
+    repository: str
+    source: PurePosixPath
+    target: PurePosixPath
+
+
+@dataclass(frozen=True, order=True)
+class CutoverLink:
+    repository: str
+    source: PurePosixPath
+    target: PurePosixPath
+    link_target: str
+
+
+@dataclass(frozen=True)
+class CutoverBackup:
+    home: Path
+    public: Path
+    private: Path | None
+    links: tuple[CutoverLink, ...]
     approval_sha256: str
 
 
@@ -118,6 +162,148 @@ def require_relative_path(value: str, *, label: str, wildcard: bool) -> PurePosi
     elif stars:
         raise InventoryError(f"{label} cannot contain a wildcard: {value}")
     return path
+
+
+def load_tsv_rows(
+    path: Path,
+    *,
+    header: tuple[str, ...],
+    label: str,
+) -> list[tuple[str, ...]]:
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            rows = list(csv.reader(handle, delimiter="\t", strict=True))
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise InventoryError(f"cannot read {label} {path}: {exc}") from exc
+    if not rows:
+        raise InventoryError(f"{label} is empty: {path}")
+    if tuple(rows[0]) != header:
+        raise InventoryError(
+            f"{label} header must be exactly {header!r}; got {tuple(rows[0])!r}"
+        )
+    parsed: list[tuple[str, ...]] = []
+    for line_number, fields in enumerate(rows[1:], start=2):
+        if len(fields) != len(header):
+            raise InventoryError(
+                f"{label} line {line_number} has {len(fields)} fields; "
+                f"expected {len(header)}"
+            )
+        parsed.append(tuple(fields))
+    if not parsed:
+        raise InventoryError(f"{label} has no rows: {path}")
+    return parsed
+
+
+def load_cutover_targets(
+    *,
+    public_manifest: Path,
+    private_manifest: Path,
+    private_available: bool,
+) -> tuple[CutoverTarget, ...]:
+    targets: list[CutoverTarget] = []
+    seen_sources: set[tuple[str, PurePosixPath]] = set()
+    seen_targets: dict[PurePosixPath, CutoverTarget] = {}
+    seen_portable_targets: dict[tuple[str, ...], CutoverTarget] = {}
+
+    def add_target(
+        repository: str,
+        source_value: str,
+        target_value: str,
+        *,
+        label: str,
+    ) -> None:
+        source = require_relative_path(source_value, label=f"{label} source", wildcard=False)
+        target = require_relative_path(target_value, label=f"{label} target", wildcard=False)
+        if not target.parts[0].startswith("."):
+            raise InventoryError(f"{label} HOME target must start with a dot: {target}")
+        source_key = (repository, source)
+        if source_key in seen_sources:
+            raise InventoryError(f"duplicate {repository} cutover source: {source}")
+        if target in seen_targets:
+            previous = seen_targets[target]
+            raise InventoryError(
+                f"duplicate cutover target {target}: "
+                f"{previous.repository}/{previous.source} and {repository}/{source}"
+            )
+        cutover_target = CutoverTarget(repository, source, target)
+        portable_target = tuple(
+            unicodedata.normalize("NFC", part).casefold() for part in target.parts
+        )
+        portable_previous = seen_portable_targets.get(portable_target)
+        if portable_previous is not None:
+            raise InventoryError(
+                f"portable cutover target alias {target}: "
+                f"{portable_previous.repository}/{portable_previous.source} and "
+                f"{repository}/{source}"
+            )
+        seen_sources.add(source_key)
+        seen_targets[target] = cutover_target
+        seen_portable_targets[portable_target] = cutover_target
+        targets.append(cutover_target)
+
+    public_rows = load_tsv_rows(
+        public_manifest,
+        header=PUBLIC_TARGET_HEADER,
+        label="public chezmoi target manifest",
+    )
+    for line_number, row in enumerate(public_rows, start=2):
+        rcm_source, target, disposition, chezmoi_source, mode = row
+        if not disposition or not chezmoi_source or mode not in {"file", "executable"}:
+            raise InventoryError(
+                f"public chezmoi target manifest line {line_number} has an invalid disposition, source, or mode"
+            )
+        add_target(
+            "public",
+            rcm_source,
+            target,
+            label=f"public manifest line {line_number}",
+        )
+
+    if private_available:
+        private_rows = load_tsv_rows(
+            private_manifest,
+            header=PRIVATE_TARGET_HEADER,
+            label="private chezmoi target manifest",
+        )
+        for line_number, row in enumerate(private_rows, start=2):
+            (
+                rcm_source,
+                target,
+                current_owner,
+                disposition,
+                future_owner,
+                target_shape,
+                mode,
+            ) = row
+            if not disposition or not future_owner or not target_shape or not mode:
+                raise InventoryError(
+                    f"private chezmoi target manifest line {line_number} has an empty ownership field"
+                )
+            if current_owner == "public-rcm-precedence":
+                relative = require_relative_path(
+                    target,
+                    label=f"private manifest line {line_number} target",
+                    wildcard=False,
+                )
+                if relative not in seen_targets or seen_targets[relative].repository != "public":
+                    raise InventoryError(
+                        f"private precedence target has no public owner: {relative}"
+                    )
+                continue
+            if current_owner != "private-rcm":
+                raise InventoryError(
+                    f"private chezmoi target manifest line {line_number} has an unsupported current owner: {current_owner}"
+                )
+            add_target(
+                "private",
+                rcm_source,
+                target,
+                label=f"private manifest line {line_number}",
+            )
+
+    if not targets:
+        raise InventoryError("cutover target manifests contain no active rcm targets")
+    return tuple(sorted(targets, key=lambda target: target.target.as_posix()))
 
 
 def load_owner_patterns(path: Path) -> list[OwnerPattern]:
@@ -231,6 +417,188 @@ def load_rcm_map(*, lsrc: str, home: Path, public: Path, private: Path) -> dict[
     )
     output = run_bounded(command, cwd=public, env=environment)
     return parse_lsrc_map(output, home=home, repositories=repositories)
+
+
+def cutover_expected_map(
+    targets: Sequence[CutoverTarget],
+    *,
+    public: Path,
+    private: Path | None,
+) -> dict[PurePosixPath, Path]:
+    roots = {"public": public, "private": private}
+    expected: dict[PurePosixPath, Path] = {}
+    for target in targets:
+        root = roots[target.repository]
+        if root is None:
+            raise InventoryError(
+                f"cutover target requires an unavailable repository: {target.repository}/{target.source}"
+            )
+        source = lexical_absolute(root / target.source)
+        if target.target in expected:
+            raise InventoryError(f"duplicate cutover HOME target: {target.target}")
+        expected[target.target] = source
+    return expected
+
+
+def require_exact_rcm_map(
+    actual: dict[PurePosixPath, Path],
+    expected: dict[PurePosixPath, Path],
+) -> None:
+    missing = sorted(set(expected) - set(actual), key=str)
+    extra = sorted(set(actual) - set(expected), key=str)
+    changed = sorted(
+        (
+            target
+            for target in set(actual) & set(expected)
+            if actual[target] != expected[target]
+        ),
+        key=str,
+    )
+    if not missing and not extra and not changed:
+        return
+    details: list[str] = []
+    if missing:
+        details.append("missing targets: " + ", ".join(map(str, missing)))
+    if extra:
+        details.append("unmanifested targets: " + ", ".join(map(str, extra)))
+    if changed:
+        details.append("changed sources: " + ", ".join(map(str, changed)))
+    raise InventoryError("live rcm map differs from the cutover manifests; " + "; ".join(details))
+
+
+def capture_cutover_links(
+    targets: Sequence[CutoverTarget],
+    *,
+    home: Path,
+    public: Path,
+    private: Path | None,
+) -> tuple[CutoverLink, ...]:
+    expected = cutover_expected_map(targets, public=public, private=private)
+    captured: list[CutoverLink] = []
+    for target in targets:
+        expected_source = expected[target.target]
+        with open_home_parent(home, target.target) as (parent_descriptor, name):
+            try:
+                before = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            except FileNotFoundError as exc:
+                raise InventoryError(f"cutover target is missing from HOME: {target.target}") from exc
+            except OSError as exc:
+                raise InventoryError(f"cannot inspect cutover target {target.target}: {exc}") from exc
+            if not stat.S_ISLNK(before.st_mode):
+                raise InventoryError(f"cutover target is not an rcm symlink: {target.target}")
+            try:
+                raw_target = os.readlink(name, dir_fd=parent_descriptor)
+                after = os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+            except OSError as exc:
+                raise InventoryError(f"cannot read cutover target {target.target}: {exc}") from exc
+            if link_identity(before) != link_identity(after):
+                raise InventoryError(f"cutover target changed while it was captured: {target.target}")
+            if raw_target != str(expected_source):
+                raise InventoryError(
+                    f"cutover target is not the exact absolute rcm link: {target.target}"
+                )
+        captured.append(
+            CutoverLink(
+                target.repository,
+                target.source,
+                target.target,
+                raw_target,
+            )
+        )
+    return tuple(captured)
+
+
+def require_stable_cutover_snapshot(
+    initial_map: dict[PurePosixPath, Path],
+    refreshed_map: dict[PurePosixPath, Path],
+    initial_links: Sequence[CutoverLink],
+    refreshed_links: Sequence[CutoverLink],
+) -> None:
+    if initial_map != refreshed_map:
+        raise InventoryError("live rcm map changed while the cutover backup was captured")
+    if tuple(initial_links) != tuple(refreshed_links):
+        raise InventoryError("HOME links changed while the cutover backup was captured")
+
+
+def cutover_backup_payload(
+    *,
+    home: Path,
+    public: Path,
+    private: Path | None,
+    links: Sequence[CutoverLink],
+) -> dict[str, object]:
+    return {
+        "schema": CUTOVER_BACKUP_SCHEMA_VERSION,
+        "home": str(home),
+        "public": str(public),
+        "private": str(private) if private is not None else None,
+        "links": [
+            {
+                "repository": link.repository,
+                "source": link.source.as_posix(),
+                "target": link.target.as_posix(),
+                "link_target": link.link_target,
+            }
+            for link in links
+        ],
+    }
+
+
+def write_exclusive_cutover_backup(path: Path, payload: dict[str, object]) -> Path:
+    try:
+        parent = path.parent.resolve(strict=True)
+    except OSError as exc:
+        raise InventoryError(f"cannot resolve backup directory {path.parent}: {exc}") from exc
+    if not parent.is_dir():
+        raise InventoryError(f"backup parent is not a directory: {parent}")
+    destination = parent / path.name
+    encoded = (
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode("utf-8")
+    descriptor = -1
+    temporary_path: Path | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.staged-",
+            dir=parent,
+        )
+        temporary_path = Path(temporary_name)
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = -1
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        try:
+            os.link(temporary_path, destination, follow_symlinks=False)
+        except FileExistsError as exc:
+            raise InventoryError(f"cutover backup already exists: {destination}") from exc
+        try:
+            directory_descriptor = os.open(parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_descriptor)
+            finally:
+                os.close(directory_descriptor)
+        except OSError as exc:
+            raise InventoryError(
+                f"cutover backup was published at {destination}, but its directory could not be synced: {exc}"
+            ) from exc
+    except OSError as exc:
+        raise InventoryError(f"cannot publish cutover backup {destination}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                pass
+    return destination
 
 
 def tracked_children(repository: Path, source_parent: PurePosixPath) -> set[str]:
@@ -685,9 +1053,222 @@ def unique_json_object(pairs: Sequence[tuple[str, object]]) -> dict[str, object]
     result: dict[str, object] = {}
     for key, value in pairs:
         if key in result:
-            raise InventoryError(f"cleanup plan contains a duplicate JSON key: {key}")
+            raise InventoryError(f"JSON document contains a duplicate key: {key}")
         result[key] = value
     return result
+
+
+def load_cutover_backup(
+    path: Path,
+    *,
+    home: Path,
+    public: Path,
+    private: Path | None,
+    public_manifest: Path,
+    private_manifest: Path,
+    confirmed_digest: str | None = None,
+) -> CutoverBackup:
+    descriptor = -1
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        metadata = os.fstat(descriptor)
+    except OSError as exc:
+        raise InventoryError(f"cannot inspect cutover backup {path}: {exc}") from exc
+    try:
+        if not stat.S_ISREG(metadata.st_mode):
+            raise InventoryError(f"cutover backup is not a regular file: {path}")
+        if metadata.st_uid != os.getuid():
+            raise InventoryError(f"cutover backup is not owned by the current user: {path}")
+        if stat.S_IMODE(metadata.st_mode) != 0o600:
+            raise InventoryError(f"cutover backup mode must be 0600: {path}")
+        with os.fdopen(descriptor, "rb") as backup_file:
+            descriptor = -1
+            raw = backup_file.read(MAX_CUTOVER_BACKUP_BYTES + 1)
+    except OSError as exc:
+        raise InventoryError(f"cannot read cutover backup {path}: {exc}") from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+    if len(raw) > MAX_CUTOVER_BACKUP_BYTES:
+        raise InventoryError(
+            f"cutover backup exceeds {MAX_CUTOVER_BACKUP_BYTES} bytes: {path}"
+        )
+    try:
+        payload = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_json_object)
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise InventoryError(f"cutover backup is not valid UTF-8 JSON: {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise InventoryError("cutover backup root must be a JSON object")
+    expected_keys = {
+        "schema",
+        "home",
+        "public",
+        "private",
+        "links",
+        "approval_sha256",
+    }
+    if set(payload) != expected_keys:
+        raise InventoryError("cutover backup must contain exactly the documented schema keys")
+    if type(payload["schema"]) is not int or payload["schema"] != CUTOVER_BACKUP_SCHEMA_VERSION:
+        raise InventoryError(f"unsupported cutover backup schema: {payload['schema']!r}")
+
+    expected_private = str(private) if private is not None else None
+    for field, expected in (
+        ("home", str(home)),
+        ("public", str(public)),
+        ("private", expected_private),
+    ):
+        if payload[field] != expected:
+            raise InventoryError(f"cutover backup {field} does not match this invocation")
+    if not isinstance(payload["links"], list) or not payload["links"]:
+        raise InventoryError("cutover backup must contain at least one link")
+    if not isinstance(payload["approval_sha256"], str):
+        raise InventoryError("cutover backup approval_sha256 must be a string")
+
+    links: list[CutoverLink] = []
+    seen_targets: set[PurePosixPath] = set()
+    for index, value in enumerate(payload["links"]):
+        if not isinstance(value, dict) or set(value) != {
+            "repository",
+            "source",
+            "target",
+            "link_target",
+        }:
+            raise InventoryError(f"cutover backup link {index} has the wrong schema")
+        repository = value["repository"]
+        source_value = value["source"]
+        target_value = value["target"]
+        link_target = value["link_target"]
+        if (
+            repository not in {"public", "private"}
+            or not isinstance(source_value, str)
+            or not isinstance(target_value, str)
+            or not isinstance(link_target, str)
+        ):
+            raise InventoryError(f"cutover backup link {index} fields are invalid")
+        source = require_relative_path(
+            source_value,
+            label=f"cutover backup source {index}",
+            wildcard=False,
+        )
+        target = require_relative_path(
+            target_value,
+            label=f"cutover backup target {index}",
+            wildcard=False,
+        )
+        if not target.parts[0].startswith("."):
+            raise InventoryError(f"cutover backup HOME target must start with a dot: {target}")
+        if target in seen_targets:
+            raise InventoryError(f"cutover backup contains a duplicate target: {target}")
+        seen_targets.add(target)
+        root = public if repository == "public" else private
+        if root is None:
+            raise InventoryError(f"cutover backup requires the absent private repository: {target}")
+        if link_target != str(lexical_absolute(root / source)):
+            raise InventoryError(f"cutover backup link target is not canonical: {target}")
+        links.append(CutoverLink(repository, source, target, link_target))
+
+    if links != sorted(links, key=lambda link: link.target.as_posix()):
+        raise InventoryError("cutover backup links must be sorted by HOME target")
+    current_targets = load_cutover_targets(
+        public_manifest=public_manifest,
+        private_manifest=private_manifest,
+        private_available=private is not None,
+    )
+    backed_up_targets = tuple(
+        CutoverTarget(link.repository, link.source, link.target) for link in links
+    )
+    if backed_up_targets != current_targets:
+        raise InventoryError("cutover backup targets differ from the current manifests")
+
+    digest_payload = {key: value for key, value in payload.items() if key != "approval_sha256"}
+    actual_digest = cleanup_plan_digest(digest_payload)
+    stored_digest = payload["approval_sha256"]
+    if len(stored_digest) != 64 or any(
+        character not in "0123456789abcdef" for character in stored_digest
+    ):
+        raise InventoryError("cutover backup approval_sha256 must be a lowercase SHA-256 digest")
+    if not hmac.compare_digest(stored_digest, actual_digest):
+        raise InventoryError("cutover backup content does not match its approval_sha256")
+    if confirmed_digest is not None and not hmac.compare_digest(
+        confirmed_digest,
+        stored_digest,
+    ):
+        raise InventoryError("--confirm does not match the cutover backup approval_sha256")
+    return CutoverBackup(home, public, private, tuple(links), stored_digest)
+
+
+def preflight_cutover_restore(home: Path, links: Sequence[CutoverLink]) -> None:
+    for link in links:
+        current = home
+        missing_ancestor = False
+        for part in link.target.parts[:-1]:
+            current /= part
+            try:
+                metadata = current.lstat()
+            except FileNotFoundError:
+                missing_ancestor = True
+                break
+            except OSError as exc:
+                raise InventoryError(f"cannot inspect restore ancestor {current}: {exc}") from exc
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise InventoryError(f"cutover restore ancestor is not a real directory: {current}")
+        if missing_ancestor:
+            continue
+        target_path = home / link.target
+        try:
+            metadata = target_path.lstat()
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect cutover restore target {link.target}: {exc}") from exc
+        if stat.S_ISLNK(metadata.st_mode):
+            try:
+                raw_target = os.readlink(target_path)
+            except OSError as exc:
+                raise InventoryError(f"cannot read cutover restore link {link.target}: {exc}") from exc
+            if raw_target != link.link_target:
+                raise InventoryError(f"cutover restore target is a foreign symlink: {link.target}")
+        elif not (stat.S_ISREG(metadata.st_mode) or stat.S_ISDIR(metadata.st_mode)):
+            raise InventoryError(f"cutover restore target has an unsupported file type: {link.target}")
+
+
+def restore_cutover_backup(
+    backup: CutoverBackup,
+    *,
+    rcup: str,
+) -> tuple[CutoverLink, ...]:
+    preflight_cutover_restore(backup.home, backup.links)
+    sources = sorted({link.source.as_posix() for link in backup.links})
+    environment = command_environment(
+        {
+            "HOME": str(backup.home),
+            "RCRC": str(backup.public / "rcrc"),
+            "DOTFILES_DIR": str(backup.public),
+            "DOTFILES_PRIVATE_DIR": str(
+                backup.private
+                if backup.private is not None
+                else backup.public.parent / "dotfiles-private-absent"
+            ),
+        }
+    )
+    run_bounded(
+        [rcup, "-f", "-K", *sources],
+        cwd=backup.public,
+        env=environment,
+    )
+    targets = tuple(
+        CutoverTarget(link.repository, link.source, link.target) for link in backup.links
+    )
+    restored = capture_cutover_links(
+        targets,
+        home=backup.home,
+        public=backup.public,
+        private=backup.private,
+    )
+    if restored != backup.links:
+        raise InventoryError("rcup completed but the restored links differ from the backup")
+    return restored
 
 
 def load_cleanup_plan(
@@ -1056,6 +1637,24 @@ def add_common_arguments(
     parser.add_argument("--lsrc", default="lsrc")
 
 
+def add_cutover_arguments(
+    parser: argparse.ArgumentParser,
+    *,
+    repository: Path,
+    private_default: Path,
+) -> None:
+    parser.add_argument(
+        "--public-targets",
+        type=Path,
+        default=repository / "docs/chezmoi-targets.tsv",
+    )
+    parser.add_argument(
+        "--private-targets",
+        type=Path,
+        default=private_default / "docs/chezmoi-private-targets.tsv",
+    )
+
+
 def load_current_records(
     *,
     home: Path,
@@ -1124,6 +1723,56 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     )
     restore_parser.add_argument("--plan", type=Path, required=True)
     restore_parser.add_argument("--confirm", required=True)
+    backup_parser = subparsers.add_parser(
+        "cutover-backup",
+        help="capture an exact digest-bound backup of every manifested rcm link",
+    )
+    add_common_arguments(
+        backup_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    add_cutover_arguments(
+        backup_parser,
+        repository=repository,
+        private_default=private_default,
+    )
+    backup_parser.add_argument("--output", type=Path, required=True)
+    verify_backup_parser = subparsers.add_parser(
+        "cutover-backup-verify",
+        help="verify a cutover backup against the manifests and current HOME links",
+    )
+    add_common_arguments(
+        verify_backup_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    add_cutover_arguments(
+        verify_backup_parser,
+        repository=repository,
+        private_default=private_default,
+    )
+    verify_backup_parser.add_argument("--backup", type=Path, required=True)
+    cutover_restore_parser = subparsers.add_parser(
+        "cutover-restore",
+        help="restore every backed-up link with rcm and verify the exact result",
+    )
+    add_common_arguments(
+        cutover_restore_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    add_cutover_arguments(
+        cutover_restore_parser,
+        repository=repository,
+        private_default=private_default,
+    )
+    cutover_restore_parser.add_argument("--backup", type=Path, required=True)
+    cutover_restore_parser.add_argument("--confirm", required=True)
+    cutover_restore_parser.add_argument("--rcup", default="rcup")
     return parser.parse_args(argv)
 
 
@@ -1137,6 +1786,111 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise InventoryError(f"HOME inventory root is not a directory: {home}")
         if not public.is_dir() or not (public / "rcrc").is_file():
             raise InventoryError(f"public dotfiles repository is incomplete: {public}")
+        private_available = private if private.is_dir() else None
+        if args.command in {
+            "cutover-backup",
+            "cutover-backup-verify",
+            "cutover-restore",
+        }:
+            public_manifest = lexical_absolute(args.public_targets)
+            private_manifest = lexical_absolute(args.private_targets)
+            targets = load_cutover_targets(
+                public_manifest=public_manifest,
+                private_manifest=private_manifest,
+                private_available=private_available is not None,
+            )
+            expected_map = cutover_expected_map(
+                targets,
+                public=public,
+                private=private_available,
+            )
+            current_map = load_rcm_map(
+                lsrc=args.lsrc,
+                home=home,
+                public=public,
+                private=private,
+            )
+            require_exact_rcm_map(current_map, expected_map)
+            if args.command == "cutover-backup":
+                links = capture_cutover_links(
+                    targets,
+                    home=home,
+                    public=public,
+                    private=private_available,
+                )
+                refreshed_map = load_rcm_map(
+                    lsrc=args.lsrc,
+                    home=home,
+                    public=public,
+                    private=private,
+                )
+                require_exact_rcm_map(refreshed_map, expected_map)
+                refreshed_links = capture_cutover_links(
+                    targets,
+                    home=home,
+                    public=public,
+                    private=private_available,
+                )
+                require_stable_cutover_snapshot(
+                    current_map,
+                    refreshed_map,
+                    links,
+                    refreshed_links,
+                )
+                payload = cutover_backup_payload(
+                    home=home,
+                    public=public,
+                    private=private_available,
+                    links=links,
+                )
+                payload["approval_sha256"] = cleanup_plan_digest(payload)
+                destination = write_exclusive_cutover_backup(
+                    lexical_absolute(args.output),
+                    payload,
+                )
+                print(
+                    f"cutover backup complete\ttargets={len(links)}\t"
+                    f"approval_sha256={payload['approval_sha256']}\tpath={destination}"
+                )
+            else:
+                backup = load_cutover_backup(
+                    lexical_absolute(args.backup),
+                    home=home,
+                    public=public,
+                    private=private_available,
+                    public_manifest=public_manifest,
+                    private_manifest=private_manifest,
+                    confirmed_digest=args.confirm if args.command == "cutover-restore" else None,
+                )
+                if args.command == "cutover-backup-verify":
+                    links = capture_cutover_links(
+                        targets,
+                        home=home,
+                        public=public,
+                        private=private_available,
+                    )
+                    if links != backup.links:
+                        raise InventoryError(
+                            "current HOME links differ from the cutover backup"
+                        )
+                    print(
+                        f"cutover backup verified\ttargets={len(links)}\t"
+                        f"approval_sha256={backup.approval_sha256}"
+                    )
+                else:
+                    restored = restore_cutover_backup(backup, rcup=args.rcup)
+                    verified_map = load_rcm_map(
+                        lsrc=args.lsrc,
+                        home=home,
+                        public=public,
+                        private=private,
+                    )
+                    require_exact_rcm_map(verified_map, expected_map)
+                    print(
+                        f"cutover restore complete\ttargets={len(restored)}\t"
+                        f"approval_sha256={backup.approval_sha256}"
+                    )
+            return 0
         owners = lexical_absolute(args.owners)
 
         def refresh_records() -> list[LinkRecord]:

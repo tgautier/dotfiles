@@ -321,6 +321,7 @@ Run `just git-hooks` once in each checkout or worktree. The full machine bootstr
 | `pre-commit` | Checks the effective Git identity and runs the complete `mise x -- just ci` gate |
 | `pre-push` | Rejects direct protected-branch pushes, ancestry without signature headers, dirty or wrong checkout state, and missing or stale exact-tip evidence |
 | `ci-attest` | Runs the complete gate and atomically records the unchanged clean `HEAD` under the checkout's Git directory |
+| `ci-publish` | Verifies the exact pushed SSH branch tip and current `main` ancestry, then publishes and reads back the required GitHub commit status |
 | `lib/git-integrity.sh` | Shares identity, signature, mise, and attestation validation across the executables |
 
 ## Configuration files
@@ -403,6 +404,7 @@ Individual targets:
 | `just test-rcm-links` | Fixture-test the HOME link ownership inventory |
 | `just test-chezmoi-canary` | Compare exact maps in an isolated HOME |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
+| `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |
 
 Wire the hooks after cloning, adding a worktree, or pulling hook changes:
 
@@ -415,9 +417,10 @@ Before each push, attest the final clean commit:
 ```sh
 just ci-attest
 git push
+just ci-publish
 ```
 
-See [Local shipping gate](docs/local-shipping-gate.md) for normal operation, recovery, upgrade, rollback, and evidence limits.
+GitHub Actions remains disabled. The required external status and strict up-to-date rule block squash merge when the exact branch tip has not completed this flow. See [Local shipping gate](docs/local-shipping-gate.md) for normal operation, recovery, upgrade, rollback, and evidence limits.
 
 ## Troubleshooting
 

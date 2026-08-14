@@ -42,6 +42,9 @@ just ci
 # Attest the final clean commit before push
 just ci-attest
 
+# After the SSH push, publish exact-tip evidence for branch protection
+just ci-publish
+
 # Wire the tracked hooks in this checkout or worktree
 just git-hooks
 
@@ -92,10 +95,11 @@ The `Justfile` defines the authoritative local shipping gate:
 
 - `just ci` runs every repository check. The individual targets are listed in `README.md`'s CI / Linting table.
 - `just ci-attest` reruns that complete gate and records the exact unchanged clean `HEAD` for pre-push.
+- `just ci-publish` verifies the pushed SHA and current `main` ancestry, then publishes and reads back the required `local/exact-tip` commit status.
 - `just git-hooks` wires the tracked pre-commit and pre-push hooks in the current checkout.
 - `just setup` runs the full machine bootstrap and includes `just git-hooks`.
 
-GitHub Actions is disabled. Do not push or merge without fresh exact-tip local evidence.
+GitHub Actions is disabled. Push through SSH, then publish fresh exact-tip local evidence. Strict branch protection requires that status and an up-to-date branch before squash merge.
 
 ### tmux
 

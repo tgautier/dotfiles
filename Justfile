@@ -9,6 +9,10 @@ ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-
 ci-attest:
     @bash .githooks/ci-attest
 
+[doc("Publish the pushed exact-tip attestation for GitHub branch protection")]
+ci-publish:
+    @bash .githooks/ci-publish
+
 [doc("Fixture-test identity, pushed signature headers, and exact-tip local CI evidence")]
 test-local-gate:
     ./tests/test-local-gate
@@ -447,7 +451,7 @@ _ensure-profile:
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
     shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary tests/test-local-gate
-    shellcheck --severity=warning .githooks/pre-commit .githooks/pre-push .githooks/ci-attest .githooks/lib/*.sh
+    shellcheck --severity=warning .githooks/pre-commit .githooks/pre-push .githooks/ci-attest .githooks/ci-publish .githooks/lib/*.sh
     shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 

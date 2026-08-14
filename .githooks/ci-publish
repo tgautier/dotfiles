@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# Publish exact-tip local CI evidence for GitHub branch protection.
+
+set -euo pipefail
+
+readonly LOCAL_CI_REPO_SLUG="tgautier/dotfiles"
+readonly LOCAL_CI_ORIGIN_URL="git@github.com:tgautier/dotfiles.git"
+readonly LOCAL_CI_STATUS_CONTEXT="local/exact-tip"
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  printf '%s\n' "local-ci: not inside a Git checkout" >&2
+  exit 1
+}
+cd "$root"
+
+# shellcheck source=lib/git-integrity.sh
+source "$root/.githooks/lib/git-integrity.sh"
+
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null) || {
+  printf '%s\n' "local-ci: detached HEAD cannot publish merge evidence" >&2
+  exit 1
+}
+case "$branch" in
+  main | master)
+    printf 'local-ci: refusing to publish feature-branch evidence from %s\n' "$branch" >&2
+    exit 1
+    ;;
+esac
+
+head_sha=$(git rev-parse HEAD 2>/dev/null) || {
+  printf '%s\n' "local-ci: could not resolve HEAD" >&2
+  exit 1
+}
+state=$(git status --porcelain=v1 --untracked-files=normal 2>&1) || {
+  printf 'local-ci: could not inspect checkout state: %s\n' "$state" >&2
+  exit 1
+}
+if [[ -n "$state" ]]; then
+  printf '%s\n' "local-ci: checkout is dirty; commit or remove all tracked and untracked changes" >&2
+  exit 1
+fi
+git_integrity_check_local_ci_attestation "$head_sha" || exit 1
+
+fetch_urls=$(git remote get-url --all origin 2>&1) || {
+  printf 'local-ci: could not resolve the origin fetch URL: %s\n' "$fetch_urls" >&2
+  exit 1
+}
+push_urls=$(git remote get-url --push --all origin 2>&1) || {
+  printf 'local-ci: could not resolve the origin push URL: %s\n' "$push_urls" >&2
+  exit 1
+}
+if [[ "$fetch_urls" != "$LOCAL_CI_ORIGIN_URL" ]]; then
+  printf "local-ci: origin fetch URL must be exactly '%s', got '%s'\n" "$LOCAL_CI_ORIGIN_URL" "$fetch_urls" >&2
+  exit 1
+fi
+if [[ "$push_urls" != "$LOCAL_CI_ORIGIN_URL" ]]; then
+  printf "local-ci: origin push URL must be exactly '%s', got '%s'\n" "$LOCAL_CI_ORIGIN_URL" "$push_urls" >&2
+  exit 1
+fi
+
+for command_name in gh jq; do
+  if ! command -v "$command_name" >/dev/null 2>&1; then
+    printf "local-ci: %s not found on PATH\n" "$command_name" >&2
+    exit 1
+  fi
+done
+
+if ! git fetch --quiet --no-tags origin +refs/heads/main:refs/remotes/origin/main; then
+  printf '%s\n' "local-ci: could not refresh origin/main" >&2
+  exit 1
+fi
+if ! git merge-base --is-ancestor origin/main "$head_sha"; then
+  printf '%s\n' "local-ci: branch is not up to date with origin/main; merge or rebase main, then re-attest and push" >&2
+  exit 1
+fi
+
+remote_ref="refs/heads/$branch"
+remote_line=$(git ls-remote --exit-code --heads origin "$remote_ref" 2>&1) || {
+  printf 'local-ci: could not resolve pushed branch %s: %s\n' "$remote_ref" "$remote_line" >&2
+  exit 1
+}
+if [[ "$remote_line" != "$head_sha"$'\t'"$remote_ref" ]]; then
+  printf 'local-ci: pushed branch %s does not equal local HEAD %s\n' "$remote_ref" "$head_sha" >&2
+  exit 1
+fi
+
+current_sha=$(git rev-parse HEAD 2>/dev/null) || {
+  printf '%s\n' "local-ci: could not re-resolve HEAD before publication" >&2
+  exit 1
+}
+state=$(git status --porcelain=v1 --untracked-files=normal 2>&1) || {
+  printf 'local-ci: could not re-inspect checkout state: %s\n' "$state" >&2
+  exit 1
+}
+if [[ "$current_sha" != "$head_sha" || -n "$state" ]]; then
+  printf '%s\n' "local-ci: repository state changed during publication checks; refusing stale evidence" >&2
+  exit 1
+fi
+git_integrity_check_local_ci_attestation "$head_sha" || exit 1
+
+if ! gh api --method POST "repos/$LOCAL_CI_REPO_SLUG/statuses/$head_sha" \
+  --field state=success \
+  --field context="$LOCAL_CI_STATUS_CONTEXT" \
+  --field description="Complete local gate passed for the exact branch tip" \
+  >/dev/null; then
+  printf '%s\n' "local-ci: GitHub rejected the exact-tip status" >&2
+  exit 1
+fi
+
+status_json=$(gh api "repos/$LOCAL_CI_REPO_SLUG/commits/$head_sha/status" 2>&1) || {
+  printf 'local-ci: could not read back the GitHub status: %s\n' "$status_json" >&2
+  exit 1
+}
+status_record=$(printf '%s\n' "$status_json" | jq -er --arg context "$LOCAL_CI_STATUS_CONTEXT" '
+  [.statuses[] | select(.context == $context)]
+  | sort_by(.created_at, .updated_at)
+  | last
+  | [.sha, .state, .context]
+  | @tsv
+' 2>/dev/null) || {
+  printf '%s\n' "local-ci: GitHub status read-back was missing or malformed" >&2
+  exit 1
+}
+IFS=$'\t' read -r observed_sha observed_state observed_context extra <<<"$status_record"
+if [[ "$observed_sha" != "$head_sha" || "$observed_state" != success || \
+  "$observed_context" != "$LOCAL_CI_STATUS_CONTEXT" || -n "${extra:-}" ]]; then
+  printf '%s\n' "local-ci: GitHub status read-back did not match the exact successful tip" >&2
+  exit 1
+fi
+
+printf 'local-ci: published %s=success for %s\n' "$LOCAL_CI_STATUS_CONTEXT" "$head_sha" >&2

@@ -29,6 +29,30 @@ check_duplicates() {
     fi
 }
 
+check_private_target_ownership() {
+    local public_manifest=$1
+    local private_repo private_checker
+    private_repo=${DOTFILES_PRIVATE_DIR:-"$HOME/Workspace/tgautier/dotfiles-private"}
+
+    if [[ ! -e "$private_repo" && ! -L "$private_repo" ]]; then
+        printf 'cross-repository target ownership: skipped (private checkout absent: %s)\n' "$private_repo"
+        return 0
+    fi
+    [[ -d "$private_repo" ]] || fail "private checkout path is not a directory: $private_repo"
+    private_checker="$private_repo/shared/chezmoi/check_target_ownership.py"
+    [[ -f "$private_checker" ]] || fail "private checkout is missing the target ownership checker: $private_checker; update that checkout before retrying"
+    require_command python3
+
+    if ! (
+        cd "$private_repo"
+        env -u GIT_DIR -u GIT_WORK_TREE PYTHONDONTWRITEBYTECODE=1 \
+            python3 -m shared.chezmoi.check_target_ownership \
+            --public-targets "$public_manifest"
+    ); then
+        fail "cross-repository target ownership check failed"
+    fi
+}
+
 main() {
     local script_dir repo_root manifest tmp header line_no
     local rcm_source target disposition chezmoi_source mode extra
@@ -42,6 +66,7 @@ main() {
     done
     [[ -f "$repo_root/.chezmoiroot" ]] || fail "missing $repo_root/.chezmoiroot"
     [[ -f "$manifest" ]] || fail "missing target manifest: $manifest"
+    manifest=$(cd "$(dirname "$manifest")" && pwd -P)/$(basename "$manifest")
 
     tmp=$(mktemp -d)
     cleanup_root=$tmp
@@ -154,6 +179,8 @@ main() {
         LC_ALL=C comm -13 "$tmp/expected-map.sorted" "$tmp/actual-map" >&2
         exit 1
     fi
+
+    check_private_target_ownership "$manifest"
 
     run_chezmoi apply
     while IFS=$'\t' read -r rcm_source target disposition chezmoi_source mode extra; do

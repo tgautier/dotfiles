@@ -304,6 +304,31 @@ class RcmLinksInventoryTest(unittest.TestCase):
         self.assertIn("dedicated-owner repository is unavailable", completed.stderr)
         self.assertEqual(completed.stdout, "")
 
+    def test_inventory_refuses_shallow_history(self) -> None:
+        self._write(self.public, "zshrc")
+        self._write(self.public, "missing")
+        self._commit(self.public, "add public sources")
+        self._write(self.public, "second-commit")
+        self._commit(self.public, "add second public commit")
+        self._write(self.private, "codex/hooks.json", "{}\n")
+        self._commit(self.private, "add exact dedicated source")
+        shallow_public = self.root / "shallow-public"
+        self._git(
+            self.root,
+            "clone",
+            "-q",
+            "--depth",
+            "1",
+            f"file://{self.public}",
+            str(shallow_public),
+        )
+        self.public = shallow_public
+
+        completed = self._inventory()
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("repository history is shallow", completed.stderr)
+        self.assertEqual(completed.stdout, "")
+
     def test_malformed_owner_manifest_stops_before_inventory(self) -> None:
         self._write(self.public, "zshrc")
         self._write(self.public, "missing")

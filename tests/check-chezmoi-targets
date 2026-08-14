@@ -43,14 +43,18 @@ check_private_target_ownership() {
     [[ -f "$private_checker" ]] || fail "private checkout is missing the target ownership checker: $private_checker; update that checkout before retrying"
     require_command python3
 
-    if ! (
-        cd "$private_repo"
-        env -u GIT_DIR -u GIT_WORK_TREE PYTHONDONTWRITEBYTECODE=1 \
-            python3 -m shared.chezmoi.check_target_ownership \
-            --public-targets "$public_manifest"
+    if (
+        if ! cd "$private_repo"; then
+            printf 'ERROR: cannot enter private checkout: %s\n' "$private_repo" >&2
+            exit 1
+        fi
+        exec env -u GIT_DIR -u GIT_WORK_TREE \
+            python3 -E -S -B -m shared.chezmoi.check_target_ownership \
+                --public-targets "$public_manifest"
     ); then
-        fail "cross-repository target ownership check failed"
+        return 0
     fi
+    fail "cross-repository target ownership check failed"
 }
 
 main() {

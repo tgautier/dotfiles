@@ -42,9 +42,9 @@ The guard:
 1. Compares the exact chezmoi target/source map with the `shadow` rows
 1. Applies into the isolated destination and verifies bytes plus executable modes
 1. Applies twice and requires an empty diff after each apply
-1. Runs private-checkout available, absent, non-directory, stale, and rejection fixtures plus sabotage fixtures for a misnamed target, omitted shadow and deferred rows, a retired disposition, a duplicate row, a missing source, and an extra source
+1. Runs private-checkout available, conflicting-package, absent, non-directory, stale, and rejection fixtures plus sabotage fixtures for a misnamed target, omitted shadow and deferred rows, a retired disposition, a duplicate row, a missing source, and an extra source
 
-The guard resolves the private companion checkout from `DOTFILES_PRIVATE_DIR`, defaulting to `~/Workspace/tgautier/dotfiles-private`. If that path is absent, it reports an explicit skip and continues the public-only canary. If the checkout exists, the guard requires its target-ownership checker and invokes it before the first isolated `chezmoi apply`. A stale or partial private checkout fails instead of silently dropping the cross-repository gate.
+The guard resolves the private companion checkout from `DOTFILES_PRIVATE_DIR`, defaulting to `~/Workspace/tgautier/dotfiles-private`. If that path is absent, it reports an explicit skip and continues the public-only canary. If the checkout exists, the guard requires its target-ownership checker and invokes it before the first isolated `chezmoi apply`. Python-specific environment overrides and site-package discovery are disabled for that invocation, keeping module resolution inside the selected checkout and the standard library. A stale or partial private checkout fails instead of silently dropping the cross-repository gate.
 
 The guard now maps `zsh/zaliases` and `zsh/zcompletion` to `~/.zsh/zaliases` and `~/.zsh/zcompletion`, matching both rcm and `zshrc`. The previous source names rendered an extra dot in each target while the hand-maintained canary still passed.
 

@@ -213,6 +213,8 @@ def load_cutover_targets(
         label: str,
     ) -> None:
         source = require_relative_path(source_value, label=f"{label} source", wildcard=False)
+        if source.parts[0].startswith("-"):
+            raise InventoryError(f"{label} source must not look like an option: {source}")
         target = require_relative_path(target_value, label=f"{label} target", wildcard=False)
         if not target.parts[0].startswith("."):
             raise InventoryError(f"{label} HOME target must start with a dot: {target}")
@@ -1151,6 +1153,10 @@ def load_cutover_backup(
             label=f"cutover backup source {index}",
             wildcard=False,
         )
+        if source.parts[0].startswith("-"):
+            raise InventoryError(
+                f"cutover backup source {index} must not look like an option: {source}"
+            )
         target = require_relative_path(
             target_value,
             label=f"cutover backup target {index}",
@@ -1237,19 +1243,29 @@ def restore_cutover_backup(
     backup: CutoverBackup,
     *,
     rcup: str,
+    private_dir: Path,
 ) -> tuple[CutoverLink, ...]:
     preflight_cutover_restore(backup.home, backup.links)
+    if backup.private is None:
+        try:
+            private_dir.lstat()
+        except FileNotFoundError:
+            pass
+        except OSError as exc:
+            raise InventoryError(
+                f"cannot verify the absent private repository {private_dir}: {exc}"
+            ) from exc
+        else:
+            raise InventoryError(
+                f"private repository appeared after public-only backup validation: {private_dir}"
+            )
     sources = sorted({link.source.as_posix() for link in backup.links})
     environment = command_environment(
         {
             "HOME": str(backup.home),
             "RCRC": str(backup.public / "rcrc"),
             "DOTFILES_DIR": str(backup.public),
-            "DOTFILES_PRIVATE_DIR": str(
-                backup.private
-                if backup.private is not None
-                else backup.public.parent / "dotfiles-private-absent"
-            ),
+            "DOTFILES_PRIVATE_DIR": str(private_dir),
         }
     )
     run_bounded(
@@ -1878,7 +1894,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                         f"approval_sha256={backup.approval_sha256}"
                     )
                 else:
-                    restored = restore_cutover_backup(backup, rcup=args.rcup)
+                    restored = restore_cutover_backup(
+                        backup,
+                        rcup=args.rcup,
+                        private_dir=private,
+                    )
                     verified_map = load_rcm_map(
                         lsrc=args.lsrc,
                         home=home,

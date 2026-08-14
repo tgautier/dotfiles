@@ -53,7 +53,7 @@ just link-cutover-restore "$backup_file" "$BACKUP_DIGEST"
 just link-inventory
 ```
 
-Restore validates the backup schema, ownership, mode, digest, repository roots, current manifests, and complete rcm map before mutation. Its preflight refuses a foreign symlink, a special file, or a non-directory ancestor. It allows an absent target, an exact saved link, or a regular file or directory that the cutover must replace. The subsequent replacement uses rcm's standard force-relink operation; the preflight does not claim to lock HOME against concurrent changes, so stop other dotfile installers while restoring.
+Restore validates the backup schema, ownership, mode, digest, repository roots, current manifests, and complete rcm map before mutation. Its preflight refuses a foreign symlink, a special file, or a non-directory ancestor. It allows an absent target, an exact saved link, or a regular file or directory that the cutover must replace. A public-only backup preserves the configured absent private path and refuses restore if that path appears before `rcup`. The subsequent replacement uses rcm's standard force-relink operation; the preflight does not claim to lock HOME against concurrent changes, so stop other dotfile installers while restoring.
 
 Rcm processes targets sequentially. If rcm stops after changing some targets, keep the backup and run the same restore command again. The command treats exact restored links as complete and verifies the full set after rcm exits successfully.
 

@@ -336,6 +336,20 @@ class RcmLinksInventoryTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 2)
         self.assertIn("portable cutover target alias .ZSHRC", completed.stderr)
 
+    def test_cutover_backup_rejects_option_like_sources(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        with public_manifest.open("a", encoding="utf-8") as manifest:
+            manifest.write("-option\t.option\tshadow\tdot_option\tfile\n")
+
+        completed = self._cutover_backup(
+            public_manifest,
+            private_manifest,
+            self.root / "option-source.json",
+        )
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("source must not look like an option: -option", completed.stderr)
+
     def test_cutover_backup_rechecks_the_complete_snapshot(self) -> None:
         first_link = RCM_LINKS.CutoverLink(
             "public",
@@ -397,6 +411,10 @@ class RcmLinksInventoryTest(unittest.TestCase):
 
     def test_cutover_backup_supports_an_absent_private_checkout(self) -> None:
         zshrc = self._write(self.public, "zshrc", "public zshrc\n")
+        (self.public / "rcrc").write_text(
+            'DOTFILES_DIRS="${DOTFILES_DIR} ${DOTFILES_PRIVATE_DIR}"\n',
+            encoding="utf-8",
+        )
         self._commit(self.public, "add public-only cutover fixture")
         public_manifest = self.root / "public-only-targets.tsv"
         public_manifest.write_text(
@@ -421,6 +439,69 @@ class RcmLinksInventoryTest(unittest.TestCase):
         payload = json.loads(backup.read_text(encoding="utf-8"))
         self.assertIsNone(payload["private"])
         self.assertEqual([link["target"] for link in payload["links"]], [".zshrc"])
+
+        fallback = self.public.parent / "dotfiles-private-absent"
+        fallback.mkdir()
+        (self.home / ".zshrc").unlink()
+        (self.home / ".zshrc").write_text("rendered zshrc\n", encoding="utf-8")
+        rcup = shutil.which("rcup")
+        self.assertIsNotNone(rcup, "rcup must be installed for public-only restore")
+        asserting_rcup = self.root / "asserting-rcup"
+        asserting_rcup.write_text(
+            f"#!{sys.executable}\n"
+            "import os\n"
+            "import sys\n"
+            f"expected = {str(absent_private)!r}\n"
+            "if os.environ.get('DOTFILES_PRIVATE_DIR') != expected:\n"
+            "    raise SystemExit('wrong private repository path')\n"
+            f"os.execv({str(rcup)!r}, [{str(rcup)!r}, *sys.argv[1:]])\n",
+            encoding="utf-8",
+        )
+        asserting_rcup.chmod(0o755)
+
+        restored = self._cutover_command(
+            "cutover-restore",
+            public_manifest,
+            absent_private / "docs/chezmoi-private-targets.tsv",
+            "--backup",
+            str(backup),
+            "--confirm",
+            payload["approval_sha256"],
+            "--rcup",
+            str(asserting_rcup),
+            private_dir=absent_private,
+        )
+
+        self.assertEqual(restored.returncode, 0, restored.stderr)
+        self.assertEqual(os.readlink(self.home / ".zshrc"), str(zshrc))
+
+    def test_public_only_restore_refuses_a_private_checkout_that_appears(self) -> None:
+        private_dir = self.root / "appeared-private"
+        private_dir.mkdir()
+        backup = RCM_LINKS.CutoverBackup(
+            self.home,
+            self.public,
+            None,
+            (
+                RCM_LINKS.CutoverLink(
+                    "public",
+                    PurePosixPath("zshrc"),
+                    PurePosixPath(".zshrc"),
+                    str(self.public / "zshrc"),
+                ),
+            ),
+            "0" * 64,
+        )
+
+        with self.assertRaisesRegex(
+            RCM_LINKS.InventoryError,
+            "private repository appeared after public-only backup validation",
+        ):
+            RCM_LINKS.restore_cutover_backup(
+                backup,
+                rcup="must-not-run",
+                private_dir=private_dir,
+            )
 
     def test_cutover_backup_rejects_manifest_and_live_map_drift(self) -> None:
         public_manifest, private_manifest = self._configure_cutover_fixture()

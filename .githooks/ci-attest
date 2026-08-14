@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+# Run the complete local gate, then atomically attest the unchanged clean HEAD.
+
+set -euo pipefail
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  printf '%s\n' "local-ci: not inside a Git checkout" >&2
+  exit 1
+}
+cd "$root"
+
+# shellcheck source=lib/git-integrity.sh
+source "$root/.githooks/lib/git-integrity.sh"
+
+checkout_state() {
+  local state
+  if ! state=$(git status --porcelain=v1 --untracked-files=normal 2>&1); then
+    printf 'local-ci: could not inspect checkout state: %s\n' "$state" >&2
+    return 1
+  fi
+  printf '%s' "$state"
+}
+
+head_sha=$(git rev-parse HEAD 2>/dev/null) || {
+  printf '%s\n' "local-ci: could not resolve HEAD" >&2
+  exit 1
+}
+git_dir=$(git rev-parse --absolute-git-dir 2>/dev/null) || {
+  printf '%s\n' "local-ci: could not resolve the attestation path" >&2
+  exit 1
+}
+marker="$git_dir/local-ci-attestation"
+
+if [[ -e "$marker" || -L "$marker" ]]; then
+  if ! rm -f -- "$marker"; then
+    printf 'local-ci: could not invalidate the previous attestation at %s\n' "$marker" >&2
+    exit 1
+  fi
+fi
+
+state=$(checkout_state) || exit 1
+if [[ -n "$state" ]]; then
+  printf '%s\n' "local-ci: checkout is dirty; commit or remove all tracked and untracked changes before attesting HEAD" >&2
+  exit 1
+fi
+
+mise_cmd=$(git_integrity_resolve_mise) || exit 1
+if ! summary=$("$mise_cmd" x -- just --summary 2>&1); then
+  printf 'local-ci: mise could not inspect this Justfile: %s\n' "$summary" >&2
+  exit 1
+fi
+if ! grep -w ci <<<"$summary" >/dev/null; then
+  printf '%s\n' "local-ci: this repository has no complete ci recipe" >&2
+  exit 1
+fi
+
+printf 'local-ci: running complete gate for %s\n' "$head_sha" >&2
+if ! "$mise_cmd" x -- just ci; then
+  printf "%s\n" "local-ci: complete gate failed; reproduce with 'just ci'" >&2
+  exit 1
+fi
+
+after_sha=$(git rev-parse HEAD 2>/dev/null) || {
+  printf '%s\n' "local-ci: could not re-resolve HEAD after validation" >&2
+  exit 1
+}
+state=$(checkout_state) || exit 1
+if [[ "$after_sha" != "$head_sha" || -n "$state" ]]; then
+  printf '%s\n' "local-ci: repository state changed during validation; refusing stale attestation" >&2
+  exit 1
+fi
+
+tmp=$(mktemp "${marker}.XXXXXX") || {
+  printf '%s\n' "local-ci: could not create an attestation temporary file" >&2
+  exit 1
+}
+cleanup() {
+  rm -f -- "$tmp"
+}
+trap cleanup EXIT
+if ! chmod 0600 "$tmp" || ! printf '%s\n' "$head_sha" >"$tmp" || ! mv -f -- "$tmp" "$marker"; then
+  printf 'local-ci: could not publish the attestation at %s\n' "$marker" >&2
+  exit 1
+fi
+trap - EXIT
+
+printf 'local-ci: attested %s\n' "$head_sha" >&2

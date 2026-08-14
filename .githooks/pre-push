@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# Require signed pushed ancestry and exact-tip local CI evidence before transfer.
+
+set -euo pipefail
+
+hook_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+# shellcheck source=lib/git-integrity.sh
+source "$hook_root/.githooks/lib/git-integrity.sh"
+
+readonly PROTECTED_BRANCHES=(main master)
+
+is_protected() {
+  local ref=$1 branch
+  for branch in "${PROTECTED_BRANCHES[@]}"; do
+    [[ "$ref" == "refs/heads/$branch" ]] && return 0
+  done
+  return 1
+}
+
+validate_push_refs() {
+  local local_ref local_sha remote_ref remote_sha branch
+  shipping_sha=""
+
+  while read -r local_ref local_sha remote_ref remote_sha; do
+    [[ -n "$local_ref" ]] || continue
+    if is_protected "$remote_ref"; then
+      branch=${remote_ref#refs/heads/}
+      if git_integrity_is_zero_sha "$local_sha"; then
+        printf 'pre-push: refusing to delete %s\n' "$branch" >&2
+      else
+        printf 'pre-push: direct pushes to %s are forbidden; publish a feature branch and merge a pull request\n' "$branch" >&2
+      fi
+      return 1
+    fi
+
+    git_integrity_check_push_signatures "$local_sha" "$remote_sha" || return 1
+
+    if ! git_integrity_is_zero_sha "$local_sha" && [[ "$remote_ref" == refs/heads/* ]]; then
+      if [[ -n "$shipping_sha" && "$shipping_sha" != "$local_sha" ]]; then
+        printf '%s\n' "pre-push: push one branch tip at a time so local CI can prove the exact commit" >&2
+        return 1
+      fi
+      shipping_sha=$local_sha
+    fi
+  done
+}
+
+checkout_state() {
+  local state
+  if ! state=$(git status --porcelain=v1 --untracked-files=normal 2>&1); then
+    printf 'pre-push: could not inspect checkout state: %s\n' "$state" >&2
+    return 1
+  fi
+  printf '%s' "$state"
+}
+
+run_local_gate() {
+  local expected_sha=$1 repo_root head_sha state
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    printf '%s\n' "pre-push: could not resolve the checkout root" >&2
+    return 1
+  }
+  if [[ "$(cd -- "$repo_root" && pwd -P)" != "$hook_root" ]]; then
+    printf "%s\n" "pre-push: installed hook root does not match this checkout; run 'just git-hooks' here" >&2
+    return 1
+  fi
+  head_sha=$(git rev-parse HEAD 2>/dev/null) || {
+    printf '%s\n' "pre-push: could not resolve HEAD" >&2
+    return 1
+  }
+  if [[ "$expected_sha" != "$head_sha" ]]; then
+    printf 'pre-push: branch tip %s is not checked-out HEAD %s\n' "$expected_sha" "$head_sha" >&2
+    return 1
+  fi
+  state=$(checkout_state) || return 1
+  if [[ -n "$state" ]]; then
+    printf '%s\n' "pre-push: checkout is dirty; commit or remove all tracked and untracked changes" >&2
+    return 1
+  fi
+  git_integrity_check_local_ci_attestation "$expected_sha" || return 1
+  printf 'pre-push: exact-tip local CI attestation accepted for %s\n' "$expected_sha" >&2
+}
+
+main() {
+  local shipping_sha=""
+  validate_push_refs || return 1
+  [[ -n "$shipping_sha" ]] || return 0
+  run_local_gate "$shipping_sha"
+}
+
+if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+  main "$@"
+fi

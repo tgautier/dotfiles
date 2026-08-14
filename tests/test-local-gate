@@ -1,0 +1,290 @@
+#!/usr/bin/env bash
+# End-to-end fixtures for identity, pushed signatures, and exact-tip CI evidence.
+
+set -uo pipefail
+
+readonly LEAKED_GIT_VARS=(
+  GIT_INDEX_FILE
+  GIT_DIR
+  GIT_WORK_TREE
+  GIT_NAMESPACE
+  GIT_PREFIX
+  GIT_OBJECT_DIRECTORY
+  GIT_ALTERNATE_OBJECT_DIRECTORIES
+  GIT_COMMON_DIR
+)
+unset "${LEAKED_GIT_VARS[@]}"
+
+source_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
+fixture_root=$(mktemp -d) || exit 1
+repo="$fixture_root/repo"
+tools="$fixture_root/tools"
+home="$fixture_root/home"
+log="$fixture_root/invoked"
+pass=0
+fail=0
+
+cleanup() {
+  rm -rf -- "$fixture_root"
+}
+trap cleanup EXIT
+
+record_pass() {
+  printf 'ok    - %s\n' "$1"
+  pass=$((pass + 1))
+}
+
+record_fail() {
+  printf 'FAIL  - %s\n' "$1"
+  [[ -z "${2:-}" ]] || printf '        output: %s\n' "$2"
+  fail=$((fail + 1))
+}
+
+mkdir -p "$repo/.githooks/lib" "$tools" "$home"
+cp "$source_root/.githooks/pre-push" "$repo/.githooks/pre-push"
+cp "$source_root/.githooks/ci-attest" "$repo/.githooks/ci-attest"
+cp "$source_root/.githooks/lib/git-integrity.sh" "$repo/.githooks/lib/git-integrity.sh"
+printf '%s\n' 'ci:' >"$repo/Justfile"
+printf '%s\n' clean >"$repo/tracked"
+
+cat >"$tools/mise" <<'STUB'
+#!/bin/sh
+if [ "$1" != x ] || [ "$2" != -- ]; then
+  exit 2
+fi
+shift 2
+exec "$@"
+STUB
+cat >"$tools/just" <<'STUB'
+#!/bin/sh
+if [ "$1" = --summary ]; then
+  printf '%s\n' "${JUST_SUMMARY:-ci}"
+  exit 0
+fi
+printf '%s\n' "$*" >>"$INVOKED_LOG"
+if [ "${JUST_FAIL:-0}" -eq 1 ]; then
+  exit 1
+fi
+if [ -n "${JUST_MUTATE:-}" ]; then
+  printf '%s\n' changed >"$JUST_MUTATE"
+fi
+STUB
+chmod 0755 "$tools/mise" "$tools/just" "$repo/.githooks/pre-push" "$repo/.githooks/ci-attest"
+
+git -C "$repo" init -q
+git -C "$repo" config user.name 'Thomas Gautier'
+git -C "$repo" config user.email 'thomas@gautier.gg'
+git -C "$repo" add Justfile tracked .githooks
+
+write_commit() {
+  local tree=$1 parent=$2 timestamp=$3 signature=$4 message=$5
+  {
+    printf 'tree %s\n' "$tree"
+    [[ -z "$parent" ]] || printf 'parent %s\n' "$parent"
+    printf 'author Thomas Gautier <thomas@gautier.gg> %s +0000\n' "$timestamp"
+    printf 'committer Thomas Gautier <thomas@gautier.gg> %s +0000\n' "$timestamp"
+    [[ "$signature" != signed ]] || printf '%s\n' 'gpgsig fixture-signature'
+    printf '\n%s\n' "$message"
+  } | git -C "$repo" hash-object -t commit -w --stdin
+}
+
+tree=$(git -C "$repo" write-tree) || exit 1
+baseline=$(write_commit "$tree" '' 1 signed baseline) || exit 1
+git -C "$repo" update-ref refs/heads/feature "$baseline"
+git -C "$repo" symbolic-ref HEAD refs/heads/feature
+
+# The production cutoff belongs to the real history. Replace only the copied
+# fixture constant so the same implementation can exercise a tiny local graph.
+awk -v baseline="$baseline" '
+  /^readonly GIT_INTEGRITY_SIGNATURE_BASELINE=/ {
+    printf "readonly GIT_INTEGRITY_SIGNATURE_BASELINE=\"%s\"\n", baseline
+    next
+  }
+  { print }
+' "$repo/.githooks/lib/git-integrity.sh" >"$repo/.githooks/lib/git-integrity.sh.tmp" || exit 1
+mv "$repo/.githooks/lib/git-integrity.sh.tmp" "$repo/.githooks/lib/git-integrity.sh"
+git -C "$repo" add .githooks/lib/git-integrity.sh
+tree=$(git -C "$repo" write-tree) || exit 1
+head_sha=$(write_commit "$tree" "$baseline" 2 signed 'signed tip') || exit 1
+git -C "$repo" update-ref refs/heads/feature "$head_sha"
+
+other_signed=$(write_commit "$tree" "$head_sha" 3 signed 'other signed tip') || exit 1
+other_unsigned=$(write_commit "$tree" "$head_sha" 4 unsigned 'unsigned tip') || exit 1
+zero_sha=$(printf '%040d' 0)
+git_dir=$(git -C "$repo" rev-parse --absolute-git-dir) || exit 1
+marker="$git_dir/local-ci-attestation"
+
+run_attest() {
+  (
+    cd "$repo" || exit 1
+    HOME="$home" PATH="$tools:/usr/bin:/bin" INVOKED_LOG="$log" \
+      JUST_FAIL="${JUST_FAIL:-0}" JUST_MUTATE="${JUST_MUTATE:-}" \
+      JUST_SUMMARY="${JUST_SUMMARY:-ci}" bash .githooks/ci-attest
+  )
+}
+
+run_hook() {
+  local input=${PUSH_INPUT:-"refs/heads/feature ${PUSH_SHA:-$head_sha} refs/heads/feature ${REMOTE_SHA:-$zero_sha}"}
+  (
+    cd "$repo" || exit 1
+    HOME="$home" PATH="$tools:/usr/bin:/bin" bash .githooks/pre-push origin <<<"$input"
+  )
+}
+
+expect_hook_pass() {
+  local name=$1 output
+  if output=$(run_hook 2>&1) && [[ "$output" == *"attestation accepted for $head_sha"* ]]; then
+    record_pass "$name"
+  else
+    record_fail "$name" "$output"
+  fi
+}
+
+expect_hook_block() {
+  local name=$1 expected=$2 output
+  if output=$(run_hook 2>&1); then
+    record_fail "$name was accepted" "$output"
+  elif [[ "$output" == *"$expected"* ]]; then
+    record_pass "$name"
+  else
+    record_fail "$name diagnostic was missing" "$output"
+  fi
+}
+
+run_identity() {
+  (
+    cd "$repo" || exit 1
+    source .githooks/lib/git-integrity.sh
+    git_integrity_check_identity
+  )
+}
+
+if run_identity >/dev/null 2>&1; then
+  record_pass "configured author and committer identity pass"
+else
+  record_fail "configured author and committer identity pass"
+fi
+if output=$(GIT_AUTHOR_EMAIL=unexpected@example.invalid run_identity 2>&1); then
+  record_fail "unexpected author identity was accepted" "$output"
+elif [[ "$output" == *"GIT_AUTHOR_IDENT"* ]]; then
+  record_pass "unexpected author identity is rejected"
+else
+  record_fail "unexpected author identity diagnostic was missing" "$output"
+fi
+
+: >"$log"
+if output=$(run_attest 2>&1) && [[ "$(sed -n '1p' "$marker")" == "$head_sha" ]] && [[ "$(sed -n '1p' "$log")" == ci ]]; then
+  record_pass "complete CI attests the exact clean HEAD"
+else
+  record_fail "complete CI did not attest the exact clean HEAD" "$output"
+fi
+
+expect_hook_pass "new signed branch accepts exact-tip evidence"
+
+rm -f "$marker"
+expect_hook_block "missing evidence blocks push" "run 'just ci-attest'"
+
+printf '%s\n' "$other_signed" >"$marker"
+expect_hook_block "stale evidence cannot cover a new tip" "not ${head_sha:0:12}"
+
+printf '%s\n' malformed >"$marker"
+expect_hook_block "malformed evidence fails closed" "malformed attestation"
+
+printf '%s\n%s\n' "$head_sha" appended >"$marker"
+expect_hook_block "appended evidence fails closed" "malformed attestation"
+
+rm -f "$marker"
+ln -s "$fixture_root/missing" "$marker"
+expect_hook_block "symlinked evidence fails closed" "no trusted attestation"
+rm -f "$marker"
+
+printf '%s\n' "$head_sha" >"$marker"
+PUSH_SHA="$other_unsigned" REMOTE_SHA="$head_sha" \
+  expect_hook_block "unsigned pushed ancestry is rejected" "is unsigned"
+
+printf '%s\n' "$head_sha" >"$marker"
+PUSH_SHA="$other_signed" REMOTE_SHA="$head_sha" \
+  expect_hook_block "another signed tip cannot reuse HEAD evidence" "is not checked-out HEAD"
+
+printf '%s\n' "$head_sha" >"$marker"
+printf '%s\n' dirty >"$repo/untracked"
+expect_hook_block "dirty checkout cannot use clean evidence" "checkout is dirty"
+rm -f "$repo/untracked"
+
+printf '%s\n' "$head_sha" >"$marker"
+PUSH_INPUT="refs/heads/feature $head_sha refs/heads/main $head_sha" \
+  expect_hook_block "direct main push is rejected" "direct pushes to main"
+
+printf '%s\n' "$head_sha" >"$marker"
+PUSH_INPUT="refs/heads/feature $head_sha refs/heads/one $zero_sha
+refs/heads/other $other_signed refs/heads/two $zero_sha" \
+  expect_hook_block "multiple branch tips are rejected" "push one branch tip at a time"
+
+printf '%s\n' "$head_sha" >"$marker"
+if output=$(
+  cd "$repo" || exit 1
+  HOME="$home" PATH="$tools:/usr/bin:/bin" bash "$source_root/.githooks/pre-push" origin \
+    <<<"refs/heads/feature $head_sha refs/heads/feature $head_sha" 2>&1
+); then
+  record_fail "hook from another checkout was accepted" "$output"
+elif [[ "$output" == *"hook root does not match"* ]]; then
+  record_pass "hook wiring mismatch fails closed"
+else
+  record_fail "hook wiring mismatch diagnostic was missing" "$output"
+fi
+
+printf '%s\n' "$head_sha" >"$marker"
+: >"$log"
+if output=$(JUST_SUMMARY=other run_attest 2>&1); then
+  record_fail "missing complete recipe was attested" "$output"
+elif [[ "$output" == *"no complete ci recipe"* && ! -s "$log" && ! -e "$marker" ]]; then
+  record_pass "missing complete recipe invalidates prior evidence"
+else
+  record_fail "missing complete recipe state or diagnostic was wrong" "$output"
+fi
+
+if output=$(
+  cd "$repo" || exit 1
+  HOME="$home" PATH="/usr/bin:/bin" bash .githooks/ci-attest 2>&1
+); then
+  record_fail "missing mise was attested" "$output"
+elif [[ "$output" == *"mise not found"* && ! -e "$marker" ]]; then
+  record_pass "missing mise fails before CI"
+else
+  record_fail "missing mise state or diagnostic was wrong" "$output"
+fi
+
+printf '%s\n' "$head_sha" >"$marker"
+printf '%s\n' dirty >"$repo/untracked"
+: >"$log"
+if output=$(run_attest 2>&1); then
+  record_fail "dirty checkout was attested" "$output"
+elif [[ "$output" == *"checkout is dirty"* && ! -s "$log" && ! -e "$marker" ]]; then
+  record_pass "dirty checkout invalidates prior evidence"
+else
+  record_fail "dirty checkout state or diagnostic was wrong" "$output"
+fi
+rm -f "$repo/untracked"
+
+printf '%s\n' "$head_sha" >"$marker"
+: >"$log"
+if output=$(JUST_FAIL=1 run_attest 2>&1); then
+  record_fail "failing CI was attested" "$output"
+elif [[ "$output" == *"complete gate failed"* && ! -e "$marker" ]]; then
+  record_pass "failing CI invalidates prior evidence"
+else
+  record_fail "failing CI state or diagnostic was wrong" "$output"
+fi
+
+printf '%s\n' "$head_sha" >"$marker"
+: >"$log"
+if output=$(JUST_MUTATE="$repo/tracked" run_attest 2>&1); then
+  record_fail "mutating CI was attested" "$output"
+elif [[ "$output" == *"repository state changed"* && ! -e "$marker" ]]; then
+  record_pass "state changed during CI invalidates evidence"
+else
+  record_fail "mutating CI state or diagnostic was wrong" "$output"
+fi
+
+printf '\nlocal gate tests: %d passed, %d failed\n' "$pass" "$fail"
+[[ "$fail" -eq 0 ]]

@@ -350,6 +350,46 @@ class RcmLinksInventoryTest(unittest.TestCase):
         self.assertEqual(completed.returncode, 2)
         self.assertIn("source must not look like an option: -option", completed.stderr)
 
+    def test_cutover_backup_accepts_trailing_private_metadata(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        lines = private_manifest.read_text(encoding="utf-8").splitlines()
+        private_manifest.write_text(
+            "\n".join(f"{line}\tfixture_metadata" for line in lines) + "\n",
+            encoding="utf-8",
+        )
+
+        completed = self._cutover_backup(
+            public_manifest,
+            private_manifest,
+            self.root / "private-metadata.json",
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_cutover_backup_rejects_reordered_private_ownership_columns(self) -> None:
+        public_manifest, private_manifest = self._configure_cutover_fixture()
+        content = private_manifest.read_text(encoding="utf-8")
+        private_manifest.write_text(
+            content.replace(
+                "target_shape\tmode\tchezmoi_source",
+                "target_shape\tchezmoi_source\tmode",
+                1,
+            ),
+            encoding="utf-8",
+        )
+
+        completed = self._cutover_backup(
+            public_manifest,
+            private_manifest,
+            self.root / "reordered-private.json",
+        )
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn(
+            "private chezmoi target manifest header must start with",
+            completed.stderr,
+        )
+
     def test_cutover_commands_derive_manifests_from_effective_repositories(self) -> None:
         public_override = self.root / "public-override"
         private_override = self.root / "private-override"

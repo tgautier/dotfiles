@@ -36,6 +36,8 @@ Review the target list and keep the printed SHA-256 digest with the file. The di
 
 `just link-cutover-backup` and `just link-cutover-backup-verify` do not change HOME. Keep using `just link` while rcm owns deployment.
 
+Creating and verifying this backup does not authorize a bare chezmoi apply. Continue with [Chezmoi operator cutover](chezmoi-operator-cutover.md), which binds the reviewed status, diff, dry run, source and recovery state, selected executables, canary, and this backup to the guarded apply and automatic recovery path.
+
 ## Rehearse restore in isolation
 
 Run `just test-rcm-links`. Its cutover fixtures replace backed-up links with rendered files inside a temporary HOME. They restore the exact public and private link set through `rcup`, then verify every raw target.
@@ -59,8 +61,8 @@ Rcm processes targets sequentially. If rcm stops after changing some targets, ke
 
 ## Upgrade and rollback boundary
 
-Pull this checkpoint and run `just ci` before creating a live backup. Do not run a real chezmoi apply as part of this checkpoint.
+Pull this checkpoint and run `just ci` before creating a live backup. Before a real apply, complete the review and approval sequence in [Chezmoi operator cutover](chezmoi-operator-cutover.md).
 
 Before any live backup exists, restore the earlier repository revision and run `just ci` to roll back this code change. No HOME action is required.
 
-After a future cutover changes HOME, run `just link-cutover-restore` before reverting repository code. Keep the backup until rcm ownership, dedicated private installers, shell startup, and the complete local gate pass.
+After chezmoi changes HOME, run `just chezmoi-recover` before reverting repository code. Keep the backup until rcm ownership, dedicated private installers, shell startup, and the complete local gate pass.

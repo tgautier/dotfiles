@@ -29,7 +29,7 @@ test-rcm-links:
 test-private-chezmoi-bridge:
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_private_chezmoi_bridge.py' -v
 
-[doc("Fixture-test explicit public/private chezmoi operator invocations")]
+[doc("Fixture-test guarded public/private chezmoi operation and recovery")]
 test-chezmoi-operator:
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_chezmoi_cutover.py' -v
 
@@ -72,6 +72,18 @@ chezmoi-diff:
 [doc("Preview the public and private apply without changing managed targets")]
 chezmoi-apply-dry-run:
     python3 bin/chezmoi-cutover dry-run --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
+
+[doc("Review and bind the exact public/private apply to a verified rcm backup")]
+chezmoi-apply-plan backup backup_confirm:
+    python3 bin/chezmoi-cutover plan --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}} --backup-confirm {{quote(backup_confirm)}}
+
+[doc("Apply the approved public/private plan twice with automatic rcm recovery")]
+chezmoi-apply backup backup_confirm apply_confirm:
+    python3 bin/chezmoi-cutover apply --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}} --backup-confirm {{quote(backup_confirm)}} --apply-confirm {{quote(apply_confirm)}}
+
+[doc("Restore the complete retained rcm link set after a chezmoi trial")]
+chezmoi-recover backup backup_confirm:
+    just link-cutover-restore {{quote(backup)}} {{quote(backup_confirm)}}
 
 # Assert `rcrc` resolves the way README documents, on both halves of the
 # override contract: DOTFILES_DIRS, which reaches the operator's real $HOME

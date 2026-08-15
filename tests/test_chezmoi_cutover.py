@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.machinery
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -9,7 +11,18 @@ import sys
 import tempfile
 import textwrap
 import unittest
+from unittest import mock
 
+
+BACKUP_DIGEST = "a" * 64
+SCRIPT_PATH = Path(__file__).resolve().parents[1] / "bin/chezmoi-cutover"
+LOADER = importlib.machinery.SourceFileLoader("chezmoi_cutover_tests", str(SCRIPT_PATH))
+SPEC = importlib.util.spec_from_loader(LOADER.name, LOADER)
+if SPEC is None:
+    raise RuntimeError("could not load chezmoi operator module")
+CUTOVER = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = CUTOVER
+LOADER.exec_module(CUTOVER)
 
 class ChezmoiCutoverTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -22,7 +35,11 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.cache = self.root / "cache"
         self.state = self.root / "state"
         self.log = self.root / "invocations.jsonl"
-        self.script = Path(__file__).resolve().parents[1] / "bin/chezmoi-cutover"
+        self.rcm_log = self.root / "rcm-invocations.jsonl"
+        self.applied = self.root / "applied"
+        self.backup = self.root / "rcm-links.json"
+        self.canary_log = self.root / "canary.log"
+        self.script = SCRIPT_PATH
         self.fake_chezmoi = self.root / "fake-chezmoi"
         self.home.mkdir()
         self._make_repository(self.public, private=False)
@@ -46,9 +63,13 @@ class ChezmoiCutoverTests(unittest.TestCase):
                         name: os.environ.get(name)
                         for name in (
                             "CHEZMOI_CONFIG_FILE",
+                            "DOTFILES_DIR",
                             "GIT_DIR",
                             "HOME",
                             "NO_COLOR",
+                            "PYTHONPATH",
+                            "RCM_LIB",
+                            "RCRC",
                             "TERM",
                         )
                     },
@@ -58,9 +79,25 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     "a", encoding="utf-8"
                 ) as handle:
                     handle.write(json.dumps(record, sort_keys=True) + "\\n")
-                print(f"fixture {Path.cwd().name} {operation}")
-                if operation == "apply" and "--dry-run" not in arguments:
+                source = Path.cwd().name
+                applied = Path(os.environ["FAKE_CHEZMOI_APPLIED"])
+                marker = applied / source
+                mutating_apply = operation == "apply" and "--dry-run" not in arguments
+                if mutating_apply and os.environ.get(
+                    "FAKE_CHEZMOI_FAIL_APPLY_CWD"
+                ) == source:
+                    raise SystemExit(29)
+                if mutating_apply:
+                    applied.mkdir(exist_ok=True)
+                    marker.touch()
                     (Path(os.environ["HOME"]) / "unexpected-mutation").touch()
+                elif not marker.exists():
+                    print(f"fixture {source} {operation}")
+                elif (
+                    operation == "diff"
+                    and os.environ.get("FAKE_CHEZMOI_POST_APPLY_DRIFT") == "1"
+                ):
+                    print(f"fixture {source} post-apply drift")
                 if os.environ.get("FAKE_CHEZMOI_FAIL_CWD") == Path.cwd().name:
                     raise SystemExit(23)
                 """
@@ -83,6 +120,79 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 "umask = 18\n",
                 encoding="utf-8",
             )
+            (root / "rcrc").write_text("EXCLUDES=\"\"\n", encoding="utf-8")
+            helper = root / "bin/rcm-links"
+            helper.parent.mkdir()
+            helper.write_text(
+                textwrap.dedent(
+                    """\
+                    import json
+                    import os
+                    from pathlib import Path
+                    import sys
+
+                    command = sys.argv[1]
+                    with Path(os.environ["FAKE_RCM_LOG"]).open(
+                        "a", encoding="utf-8"
+                    ) as handle:
+                        handle.write(json.dumps(sys.argv[1:]) + "\\n")
+                    if command == "cutover-backup-verify":
+                        print(
+                            os.environ.get(
+                                "FAKE_RCM_SUMMARY",
+                                "cutover backup verified\\ttargets=1\\t"
+                                f"approval_sha256={os.environ['FAKE_BACKUP_DIGEST']}",
+                            )
+                        )
+                    elif command == "cutover-restore":
+                        if os.environ.get("FAKE_RCM_RESTORE_FAIL") == "1":
+                            raise SystemExit(31)
+                        print("cutover restore complete")
+                    else:
+                        raise SystemExit(32)
+                    """
+                ),
+                encoding="utf-8",
+            )
+            canary = root / "tests/test-chezmoi-canary"
+            canary.parent.mkdir()
+            canary.write_text(
+                textwrap.dedent(
+                    """\
+                    #!/usr/bin/env python3
+                    import os
+                    from pathlib import Path
+
+                    with Path(os.environ["FAKE_CANARY_LOG"]).open(
+                        "a", encoding="utf-8"
+                    ) as handle:
+                        handle.write("passed\\n")
+                    if os.environ.get("FAKE_CANARY_FAIL") == "1":
+                        raise SystemExit(37)
+                    """
+                ),
+                encoding="utf-8",
+            )
+            canary.chmod(0o700)
+            bridge = root / "tests/private_chezmoi_bridge.py"
+            bridge.write_text("# fixture bridge\n", encoding="utf-8")
+            manifest = root / "docs/chezmoi-targets.tsv"
+            manifest.parent.mkdir()
+            manifest.write_text("fixture\n", encoding="utf-8")
+            checker = root / "tests/check-chezmoi-targets"
+            checker.write_text("# fixture checker\n", encoding="utf-8")
+        if private:
+            docs = root / "docs"
+            docs.mkdir()
+            (docs / "chezmoi-private-targets.tsv").write_text(
+                "fixture\n", encoding="utf-8"
+            )
+            (docs / "chezmoi-dedicated-targets.tsv").write_text(
+                "fixture\n", encoding="utf-8"
+            )
+            package = root / "shared/chezmoi"
+            package.mkdir(parents=True)
+            (package / "__init__.py").write_text("", encoding="utf-8")
 
     def _run(
         self,
@@ -98,8 +208,16 @@ class ChezmoiCutoverTests(unittest.TestCase):
         environment.update(
             {
                 "FAKE_CHEZMOI_LOG": str(self.log),
+                "FAKE_CHEZMOI_APPLIED": str(self.applied),
+                "FAKE_RCM_LOG": str(self.rcm_log),
+                "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
+                "FAKE_CANARY_LOG": str(self.canary_log),
                 "CHEZMOI_CONFIG_FILE": str(self.root / "foreign-config"),
+                "DOTFILES_DIR": str(self.root / "foreign-public"),
                 "GIT_DIR": str(self.root / "foreign-git-dir"),
+                "PYTHONPATH": str(self.root / "foreign-python"),
+                "RCM_LIB": str(self.root / "foreign-rcm"),
+                "RCRC": str(self.root / "foreign-rcrc"),
             }
         )
         if extra_environment:
@@ -134,6 +252,34 @@ class ChezmoiCutoverTests(unittest.TestCase):
             timeout=10,
         )
 
+    def _approval(self, *, private: bool = True) -> str:
+        completed = self._run(
+            "plan",
+            private=private,
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+            ],
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        marker = "approval_sha256="
+        self.assertIn(marker, completed.stdout)
+        self.assertIn("fixture public status", completed.stdout)
+        if private:
+            self.assertIn("fixture private diff", completed.stdout)
+        self.assertEqual(self.canary_log.read_text(encoding="utf-8"), "passed\n")
+        return completed.stdout.rsplit(marker, maxsplit=1)[1].strip()
+
+    def _rcm_records(self) -> list[list[str]]:
+        if not self.rcm_log.exists():
+            return []
+        return [
+            json.loads(line)
+            for line in self.rcm_log.read_text(encoding="utf-8").splitlines()
+        ]
+
     def _records(self) -> list[dict[str, object]]:
         if not self.log.exists():
             return []
@@ -160,7 +306,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn(str(self.home.resolve()), arguments)
         self.assertIn(str(self.cache / "public"), arguments)
         self.assertIn(str(self.state / "public.boltdb"), arguments)
-        self.assertEqual(arguments[-2:], ["status", "--path-style=relative"])
+        self.assertEqual(
+            arguments[-4:],
+            ["status", "--include", "files", "--path-style=relative"],
+        )
         self.assertIn("==> public chezmoi status", completed.stderr)
         self.assertIn("fixture public status", completed.stdout)
         self.assertFalse((self.home / "unexpected-mutation").exists())
@@ -188,7 +337,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
             private_arguments[config_index + 1],
             str((self.private / "chezmoi-private.toml").resolve()),
         )
-        self.assertEqual(private_arguments[-2:], ["diff", "--recursive"])
+        self.assertEqual(
+            private_arguments[-4:],
+            ["diff", "--include", "files", "--recursive"],
+        )
         self.assertIn("==> private chezmoi diff", completed.stderr)
 
     def test_dry_run_never_invokes_mutating_apply(self) -> None:
@@ -199,7 +351,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertEqual(len(records), 2)
         for record in records:
             arguments = record["arguments"]
-            self.assertEqual(arguments[-3:], ["apply", "--dry-run", "--verbose"])
+            self.assertEqual(
+                arguments[-5:],
+                ["apply", "--include", "files", "--dry-run", "--verbose"],
+            )
         self.assertFalse((self.home / "unexpected-mutation").exists())
 
     def test_environment_cannot_replace_config_home_or_git_context(self) -> None:
@@ -208,7 +363,11 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         environment = self._records()[0]["environment"]
         self.assertIsNone(environment["CHEZMOI_CONFIG_FILE"])
+        self.assertIsNone(environment["DOTFILES_DIR"])
         self.assertIsNone(environment["GIT_DIR"])
+        self.assertIsNone(environment["PYTHONPATH"])
+        self.assertIsNone(environment["RCM_LIB"])
+        self.assertIsNone(environment["RCRC"])
         self.assertEqual(environment["HOME"], str(self.home.resolve()))
         self.assertEqual(environment["NO_COLOR"], "1")
         self.assertEqual(environment["TERM"], "dumb")
@@ -223,6 +382,17 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertEqual(len(self._records()), 2)
         self.assertIn("private chezmoi status failed with status 23", completed.stderr)
+        self.assertIn("fixture private status", completed.stdout)
+
+    def test_missing_chezmoi_executable_fails_before_invocation(self) -> None:
+        completed = self._run(
+            "status",
+            extra_arguments=["--chezmoi", str(self.root / "missing-chezmoi")],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("chezmoi is not installed or is not executable", completed.stderr)
+        self.assertEqual(self._records(), [])
 
     def test_invalid_existing_private_path_fails_instead_of_skipping(self) -> None:
         self.private.write_text("not a checkout\n", encoding="utf-8")
@@ -272,6 +442,445 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertEqual(self._records(), [])
         self.assertIn("state directory must be an absolute path", completed.stderr)
+
+    def test_empty_home_path_is_rejected_before_it_becomes_the_checkout(self) -> None:
+        completed = self._run("status", extra_arguments=["--home", ""])
+
+        self.assertEqual(completed.returncode, 2)
+        self.assertIn("path must not be empty", completed.stderr)
+        self.assertEqual(self._records(), [])
+
+    def test_plan_reviews_both_sources_and_binds_the_backup(self) -> None:
+        approval = self._approval()
+
+        self.assertEqual(len(approval), 64)
+        self.assertTrue(all(character in "0123456789abcdef" for character in approval))
+        records = self._records()
+        self.assertEqual(len(records), 6)
+        self.assertEqual(
+            [record["operation"] for record in records],
+            ["status", "diff", "apply", "status", "diff", "apply"],
+        )
+        rcm_records = self._rcm_records()
+        self.assertEqual(len(rcm_records), 1)
+        self.assertEqual(rcm_records[0][0], "cutover-backup-verify")
+        self.assertFalse(self.applied.exists())
+
+    def test_approved_apply_runs_twice_and_finishes_settled(self) -> None:
+        approval = self._approval()
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertTrue((self.applied / self.public.name).exists())
+        self.assertTrue((self.applied / self.private.name).exists())
+        self.assertIn("both sources are idempotent", completed.stderr)
+        commands = [record[0] for record in self._rcm_records()]
+        self.assertEqual(commands, [
+            "cutover-backup-verify",
+            "cutover-backup-verify",
+            "cutover-backup-verify",
+        ])
+
+    def test_source_change_invalidates_approval_before_mutation(self) -> None:
+        approval = self._approval()
+        (self.public / "home/dot_fixture").write_text("changed\n", encoding="utf-8")
+
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("apply approval differs", completed.stderr)
+        self.assertFalse(self.applied.exists())
+        self.assertNotIn("cutover-restore", [record[0] for record in self._rcm_records()])
+
+    def test_recovery_contract_change_invalidates_approval_before_mutation(self) -> None:
+        approval = self._approval()
+        with (self.public / "rcrc").open("a", encoding="utf-8") as handle:
+            handle.write("# changed after review\n")
+
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("apply approval differs", completed.stderr)
+        self.assertFalse(self.applied.exists())
+
+    def test_private_apply_failure_restores_the_complete_rcm_set(self) -> None:
+        approval = self._approval()
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_environment={"FAKE_CHEZMOI_FAIL_APPLY_CWD": self.private.name},
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("complete rcm link set was restored", completed.stderr)
+        self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
+
+    def test_post_apply_drift_restores_rcm(self) -> None:
+        approval = self._approval()
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_environment={"FAKE_CHEZMOI_POST_APPLY_DRIFT": "1"},
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("first apply: public chezmoi diff is not empty", completed.stderr)
+        self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
+
+    def test_recovery_failure_has_an_immediate_manual_boundary(self) -> None:
+        approval = self._approval()
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_environment={
+                "FAKE_CHEZMOI_FAIL_APPLY_CWD": self.private.name,
+                "FAKE_RCM_RESTORE_FAIL": "1",
+            },
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("automatic rcm recovery also failed", completed.stderr)
+        self.assertIn("run the documented recovery command immediately", completed.stderr)
+
+    def test_backup_digest_mismatch_stops_before_review(self) -> None:
+        completed = self._run(
+            "plan",
+            private=True,
+            extra_environment={"FAKE_BACKUP_DIGEST": "b" * 64},
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("backup digest differs", completed.stderr)
+        self.assertEqual(self._records(), [])
+
+    def test_canary_failure_stops_before_review_and_apply(self) -> None:
+        completed = self._run(
+            "plan",
+            private=True,
+            extra_environment={"FAKE_CANARY_FAIL": "1"},
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("chezmoi canary failed with status 37", completed.stderr)
+        self.assertEqual(self._records(), [])
+        self.assertFalse(self.applied.exists())
+
+    def test_chezmoi_timeout_is_reported_distinctly(self) -> None:
+        source = CUTOVER.require_source(
+            self.public,
+            label="public",
+            config=Path("chezmoi.toml"),
+        )
+        with (
+            mock.patch.object(
+                CUTOVER.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(["chezmoi"], 120),
+            ),
+            self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 120 seconds"),
+        ):
+            CUTOVER.capture_operation(
+                "status",
+                executable=self.fake_chezmoi,
+                source=source,
+                home=self.home,
+                cache_root=self.cache,
+                state_root=self.state,
+                show_output=False,
+            )
+
+    def test_chezmoi_output_limit_is_enforced_before_reading_it(self) -> None:
+        source = CUTOVER.require_source(
+            self.public,
+            label="public",
+            config=Path("chezmoi.toml"),
+        )
+
+        def oversized_run(*arguments: object, **keywords: object) -> subprocess.CompletedProcess[bytes]:
+            output = keywords["stdout"]
+            output.write(b"x" * (CUTOVER.MAX_COMMAND_OUTPUT_BYTES + 1))
+            return subprocess.CompletedProcess(arguments[0], 0)
+
+        with (
+            mock.patch.object(CUTOVER.subprocess, "run", side_effect=oversized_run),
+            self.assertRaisesRegex(CUTOVER.CutoverError, "output exceeds the safety limit"),
+        ):
+            CUTOVER.capture_operation(
+                "status",
+                executable=self.fake_chezmoi,
+                source=source,
+                home=self.home,
+                cache_root=self.cache,
+                state_root=self.state,
+                show_output=False,
+            )
+
+    def test_rcm_helper_timeout_is_reported_distinctly(self) -> None:
+        with (
+            mock.patch.object(
+                CUTOVER.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(["rcm-links"], 90),
+            ),
+            self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 90 seconds"),
+        ):
+            CUTOVER.run_rcm_helper(
+                "cutover-backup-verify",
+                public=self.public.resolve(),
+                private=self.private,
+                home=self.home,
+                backup=self.backup,
+                backup_confirm=None,
+                lsrc="lsrc",
+                rcup="rcup",
+            )
+
+    def test_rcm_helper_rejects_oversized_output_before_reading_it(self) -> None:
+        def oversized_run(*arguments: object, **keywords: object) -> subprocess.CompletedProcess[bytes]:
+            output = keywords["stdout"]
+            output.write(b"x" * (CUTOVER.MAX_COMMAND_OUTPUT_BYTES + 1))
+            return subprocess.CompletedProcess(arguments[0], 0)
+
+        with (
+            mock.patch.object(CUTOVER.subprocess, "run", side_effect=oversized_run),
+            self.assertRaisesRegex(CUTOVER.CutoverError, "output exceeds the safety limit"),
+        ):
+            CUTOVER.run_rcm_helper(
+                "cutover-backup-verify",
+                public=self.public.resolve(),
+                private=self.private,
+                home=self.home,
+                backup=self.backup,
+                backup_confirm=None,
+                lsrc="lsrc",
+                rcup="rcup",
+            )
+
+    def test_malformed_rcm_summary_stops_before_observation(self) -> None:
+        completed = self._run(
+            "plan",
+            private=True,
+            extra_environment={
+                "FAKE_RCM_SUMMARY": (
+                    "cutover backup verified\\ttargets=1\\t"
+                    f"approval_sha256={BACKUP_DIGEST}\\tignored"
+                )
+            },
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("backup verification returned an invalid summary", completed.stderr)
+        self.assertEqual(self._records(), [])
+
+    def test_canary_timeout_stops_before_observation(self) -> None:
+        self._make_repository(self.private, private=True)
+        sources = CUTOVER.source_states(self.public, self.private)
+        with (
+            mock.patch.object(
+                CUTOVER,
+                "run_rcm_helper",
+                return_value=(
+                    "cutover backup verified\ttargets=1\t"
+                    f"approval_sha256={BACKUP_DIGEST}"
+                ),
+            ),
+            mock.patch.object(
+                CUTOVER.subprocess,
+                "run",
+                side_effect=subprocess.TimeoutExpired(
+                    ["test-chezmoi-canary"], 180
+                ),
+            ),
+            self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 180 seconds"),
+        ):
+            CUTOVER.prepare_approval(
+                executable=self.fake_chezmoi,
+                sources=sources,
+                public=self.public.resolve(),
+                private=self.private.resolve(),
+                home=self.home.resolve(),
+                cache_root=self.cache,
+                state_root=self.state,
+                backup=self.backup,
+                backup_confirm=BACKUP_DIGEST,
+                lsrc="lsrc",
+                rcup="rcup",
+                show_output=False,
+                canary=self.public / "tests/test-chezmoi-canary",
+                run_canary_check=True,
+            )
+
+    def test_interrupted_first_apply_restores_rcm_before_failing(self) -> None:
+        source = CUTOVER.require_source(
+            self.public,
+            label="public",
+            config=Path("chezmoi.toml"),
+        )
+        with (
+            mock.patch.object(CUTOVER, "prepare_approval", return_value=BACKUP_DIGEST),
+            mock.patch.object(CUTOVER, "verify_backup"),
+            mock.patch.object(CUTOVER, "capture_operation", side_effect=KeyboardInterrupt),
+            mock.patch.object(CUTOVER, "restore_rcm") as restore,
+            self.assertRaisesRegex(
+                CUTOVER.CutoverError,
+                "complete rcm link set was restored",
+            ),
+        ):
+            CUTOVER.apply_with_recovery(
+                executable=self.fake_chezmoi,
+                sources=(source,),
+                public=self.public.resolve(),
+                private=self.private,
+                home=self.home,
+                cache_root=self.cache,
+                state_root=self.state,
+                backup=self.backup,
+                backup_confirm=BACKUP_DIGEST,
+                apply_confirm=BACKUP_DIGEST,
+                lsrc="lsrc",
+                rcup="rcup",
+                canary=self.public / "tests/test-chezmoi-canary",
+            )
+        restore.assert_called_once()
+
+    def test_apply_reruns_canary_and_refuses_mutation_when_it_fails(self) -> None:
+        approval = self._approval()
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_environment={"FAKE_CANARY_FAIL": "1"},
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("chezmoi canary failed with status 37", completed.stderr)
+        self.assertFalse(self.applied.exists())
+        self.assertNotIn("cutover-restore", [record[0] for record in self._rcm_records()])
+        self.assertEqual(
+            self.canary_log.read_text(encoding="utf-8").splitlines(),
+            ["passed", "passed"],
+        )
+
+    def test_apply_preflight_withholds_failed_private_inspection_output(self) -> None:
+        approval = self._approval()
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_environment={"FAKE_CHEZMOI_FAIL_CWD": self.private.name},
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("private chezmoi status failed with status 23", completed.stderr)
+        self.assertNotIn("fixture private status", completed.stdout)
+        self.assertNotIn("fixture private status", completed.stderr)
+        self.assertFalse(self.applied.exists())
+
+    def test_public_only_plan_uses_one_source(self) -> None:
+        approval = self._approval(private=False)
+
+        self.assertEqual(len(approval), 64)
+        records = self._records()
+        self.assertEqual(len(records), 3)
+        self.assertEqual({record["cwd"] for record in records}, {str(self.public.resolve())})
+
+    def test_shared_state_lock_rejects_a_concurrent_operator(self) -> None:
+        state = CUTOVER.ensure_private_directory(self.state, label="fixture state")
+        with CUTOVER.operator_lock(state):
+            completed = self._run("status")
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("another chezmoi operator command is already running", completed.stderr)
+        self.assertEqual(self._records(), [])
 
 
 if __name__ == "__main__":

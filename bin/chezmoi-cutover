@@ -1,17 +1,31 @@
 #!/usr/bin/env python3
-"""Inspect the staged chezmoi cutover without changing rcm ownership."""
+"""Inspect and apply the staged chezmoi cutover with verified rcm recovery."""
 
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import dataclass
+import fcntl
+import hashlib
+import hmac
+import json
 import os
 from pathlib import Path
 import shutil
 import stat
 import subprocess
 import sys
-from typing import Sequence
+import tempfile
+from typing import Iterator, Sequence
+
+
+APPROVAL_SCHEMA_VERSION = 1
+MAX_COMMAND_OUTPUT_BYTES = 16 * 1024 * 1024
+MAX_SOURCE_BYTES = 64 * 1024 * 1024
+CHEZMOI_TIMEOUT_SECONDS = 120
+CANARY_TIMEOUT_SECONDS = 180
+RCM_HELPER_TIMEOUT_SECONDS = 90
 
 
 class CutoverError(RuntimeError):
@@ -145,15 +159,45 @@ def ensure_private_directory(path: Path, *, label: str) -> Path:
     return path
 
 
-def resolve_executable(value: str) -> Path:
-    """Resolve the selected chezmoi executable once before any source runs."""
+@contextmanager
+def operator_lock(state_root: Path) -> Iterator[None]:
+    """Serialize every command that shares the persistent chezmoi state."""
+
+    lock_path = state_root / "operator.lock"
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as exc:
+        raise CutoverError(f"cannot open chezmoi operator lock: {exc}") from exc
+    try:
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != os.getuid():
+            raise CutoverError("chezmoi operator lock is not a current-user regular file")
+        if stat.S_IMODE(metadata.st_mode) & 0o077:
+            raise CutoverError("chezmoi operator lock is accessible by another user")
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise CutoverError("another chezmoi operator command is already running") from exc
+        except OSError as exc:
+            raise CutoverError(f"cannot lock chezmoi operator state: {exc}") from exc
+        yield
+    finally:
+        os.close(descriptor)
+
+
+def resolve_executable(value: str, *, label: str) -> Path:
+    """Resolve one selected executable once before any source runs."""
 
     candidate = shutil.which(value)
     if candidate is None:
-        raise CutoverError("chezmoi is not installed or is not executable")
-    path = Path(candidate).resolve(strict=True)
+        raise CutoverError(f"{label} is not installed or is not executable")
+    try:
+        path = Path(candidate).resolve(strict=True)
+    except OSError as exc:
+        raise CutoverError(f"cannot resolve {label} executable: {exc}") from exc
     if not path.is_file() or not os.access(path, os.X_OK):
-        raise CutoverError("chezmoi is not a regular executable file")
+        raise CutoverError(f"{label} is not a regular executable file")
     return path
 
 
@@ -186,11 +230,13 @@ def command_arguments(
     ]
     arguments.extend(("--config", str(source.config)))
     if operation == "status":
-        arguments.extend(("status", "--path-style=relative"))
+        arguments.extend(("status", "--include", "files", "--path-style=relative"))
     elif operation == "diff":
-        arguments.extend(("diff", "--recursive"))
+        arguments.extend(("diff", "--include", "files", "--recursive"))
     elif operation == "dry-run":
-        arguments.extend(("apply", "--dry-run", "--verbose"))
+        arguments.extend(("apply", "--include", "files", "--dry-run", "--verbose"))
+    elif operation == "apply":
+        arguments.extend(("apply", "--include", "files", "--force"))
     else:
         raise CutoverError(f"unsupported operator command: {operation}")
     return arguments
@@ -199,15 +245,91 @@ def command_arguments(
 def command_environment(home: Path) -> dict[str, str]:
     """Remove repository and chezmoi overrides while preserving user context."""
 
+    removed_names = {
+        "DOTFILES_DIR",
+        "DOTFILES_PRIVATE_DIR",
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "PYTHONSTARTUP",
+        "PYTHONWARNINGS",
+        "RCRC",
+        "VIRTUAL_ENV",
+        "__PYVENV_LAUNCHER__",
+    }
     environment = {
         name: value
         for name, value in os.environ.items()
-        if not name.startswith("GIT_") and not name.startswith("CHEZMOI_")
+        if (
+            name not in removed_names
+            and not name.startswith("GIT_")
+            and not name.startswith("CHEZMOI_")
+            and not name.startswith("RCM_")
+        )
     }
     environment["HOME"] = str(home)
     environment["NO_COLOR"] = "1"
     environment["TERM"] = "dumb"
     return environment
+
+
+def capture_operation(
+    operation: str,
+    *,
+    executable: Path,
+    source: SourceState,
+    home: Path,
+    cache_root: Path,
+    state_root: Path,
+    show_output: bool,
+) -> bytes:
+    """Run one bounded command while keeping its output in an unnamed file."""
+
+    environment = command_environment(home)
+    print(f"==> {source.label} chezmoi {operation}", file=sys.stderr)
+    try:
+        with tempfile.TemporaryFile() as output:
+            completed = subprocess.run(
+                command_arguments(
+                    executable,
+                    source,
+                    home=home,
+                    cache_root=cache_root,
+                    state_root=state_root,
+                    operation=operation,
+                ),
+                cwd=source.root,
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                check=False,
+                timeout=CHEZMOI_TIMEOUT_SECONDS,
+            )
+            size = output.tell()
+            if size > MAX_COMMAND_OUTPUT_BYTES:
+                raise CutoverError(
+                    f"{source.label} chezmoi {operation} output exceeds the safety limit"
+                )
+            output.seek(0)
+            captured = output.read()
+            if show_output and captured:
+                sys.stdout.buffer.write(captured)
+                sys.stdout.buffer.flush()
+            if completed.returncode != 0:
+                raise CutoverError(
+                    f"{source.label} chezmoi {operation} failed with status "
+                    f"{completed.returncode}"
+                )
+    except subprocess.TimeoutExpired as exc:
+        raise CutoverError(
+            f"{source.label} chezmoi {operation} exceeded "
+            f"{CHEZMOI_TIMEOUT_SECONDS} seconds"
+        ) from exc
+    except OSError as exc:
+        raise CutoverError(
+            f"cannot run {source.label} chezmoi {operation}: {exc}"
+        ) from exc
+    return captured
 
 
 def run_operation(
@@ -221,33 +343,574 @@ def run_operation(
 ) -> None:
     """Run the same inspection against each source in deterministic order."""
 
-    environment = command_environment(home)
     for source in sources:
-        print(f"==> {source.label} chezmoi {operation}", file=sys.stderr)
+        capture_operation(
+            operation,
+            executable=executable,
+            source=source,
+            home=home,
+            cache_root=cache_root,
+            state_root=state_root,
+            show_output=True,
+        )
+
+
+def require_digest(value: str, *, label: str) -> str:
+    """Require a lowercase SHA-256 digest."""
+
+    if len(value) != 64 or any(character not in "0123456789abcdef" for character in value):
+        raise CutoverError(f"{label} must be a lowercase SHA-256 digest")
+    return value
+
+
+def path_argument(value: str) -> Path:
+    """Reject an empty CLI path before it can resolve to the current directory."""
+
+    if not value:
+        raise argparse.ArgumentTypeError("path must not be empty")
+    return Path(value)
+
+
+def hash_regular_file(path: Path, *, label: str, limit: int) -> str:
+    """Hash one stable non-symlink file with a total-size bound."""
+
+    require_regular_file(path, label=label)
+    digest = hashlib.sha256()
+    total = 0
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as handle:
+            before = os.fstat(handle.fileno())
+            while chunk := handle.read(1024 * 1024):
+                total += len(chunk)
+                if total > limit:
+                    raise CutoverError(f"{label} exceeds the safety limit")
+                digest.update(chunk)
+            after = os.fstat(handle.fileno())
+    except OSError as exc:
+        raise CutoverError(f"cannot hash {label}: {exc}") from exc
+    if (
+        before.st_dev != after.st_dev
+        or before.st_ino != after.st_ino
+        or before.st_size != after.st_size
+        or before.st_mtime_ns != after.st_mtime_ns
+    ):
+        raise CutoverError(f"{label} changed while it was hashed")
+    return digest.hexdigest()
+
+
+def source_digest(source: SourceState) -> str:
+    """Hash every source-state entry, its type, mode, name, and bytes."""
+
+    digest = hashlib.sha256()
+    total = 0
+    if source.label == "public":
+        contract_paths = (
+            source.root / "bin/rcm-links",
+            source.root / "docs/chezmoi-targets.tsv",
+            source.root / "rcrc",
+            source.root / "tests/check-chezmoi-targets",
+            source.root / "tests/private_chezmoi_bridge.py",
+        )
+    else:
+        contract_paths = (
+            source.root / "docs/chezmoi-private-targets.tsv",
+            source.root / "docs/chezmoi-dedicated-targets.tsv",
+            source.root / "shared/chezmoi",
+        )
+    roots = (
+        source.root / ".chezmoiroot",
+        source.config,
+        source.root / "home",
+        *contract_paths,
+    )
+    pending = list(roots)
+    entries: list[Path] = []
+
+    def metadata_for(candidate: Path) -> os.stat_result:
         try:
-            completed = subprocess.run(
-                command_arguments(
-                    executable,
-                    source,
-                    home=home,
-                    cache_root=cache_root,
-                    state_root=state_root,
-                    operation=operation,
-                ),
-                cwd=source.root,
-                env=environment,
-                stdin=subprocess.DEVNULL,
-                check=False,
-            )
+            return candidate.lstat()
         except OSError as exc:
             raise CutoverError(
-                f"cannot run {source.label} chezmoi {operation}: {exc}"
+                f"cannot inspect {source.label} source state: {exc}"
             ) from exc
+
+    while pending:
+        candidate = pending.pop()
+        entries.append(candidate)
+        metadata = metadata_for(candidate)
+        if stat.S_ISDIR(metadata.st_mode):
+            try:
+                pending.extend(candidate.iterdir())
+            except OSError as exc:
+                raise CutoverError(
+                    f"cannot enumerate {source.label} source state: {exc}"
+                ) from exc
+    for candidate in sorted(entries, key=lambda path: path.relative_to(source.root).as_posix()):
+        relative = candidate.relative_to(source.root).as_posix().encode("utf-8")
+        metadata = metadata_for(candidate)
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(stat.S_IFMT(metadata.st_mode).to_bytes(8, "big"))
+        digest.update(stat.S_IMODE(metadata.st_mode).to_bytes(8, "big"))
+        if stat.S_ISLNK(metadata.st_mode):
+            try:
+                target = os.fsencode(os.readlink(candidate))
+            except OSError as exc:
+                raise CutoverError(
+                    f"cannot read {source.label} source symlink: {exc}"
+                ) from exc
+            digest.update(len(target).to_bytes(8, "big"))
+            digest.update(target)
+        elif stat.S_ISREG(metadata.st_mode):
+            total += metadata.st_size
+            if total > MAX_SOURCE_BYTES:
+                raise CutoverError(f"{source.label} source state exceeds the safety limit")
+            digest.update(
+                bytes.fromhex(
+                    hash_regular_file(
+                        candidate,
+                        label=f"{source.label} source file",
+                        limit=MAX_SOURCE_BYTES,
+                    )
+                )
+            )
+        elif not stat.S_ISDIR(metadata.st_mode):
+            raise CutoverError(f"{source.label} source state contains an unsupported entry")
+    return digest.hexdigest()
+
+
+def run_rcm_helper(
+    command: str,
+    *,
+    public: Path,
+    private: Path,
+    home: Path,
+    backup: Path,
+    backup_confirm: str | None,
+    lsrc: str,
+    rcup: str,
+) -> str:
+    """Invoke the tested rcm backup boundary and return its bounded summary."""
+
+    helper = require_regular_file(public / "bin/rcm-links", label="rcm recovery helper")
+    arguments = [
+        sys.executable,
+        str(helper),
+        command,
+        "--home",
+        str(home),
+        "--public-dir",
+        str(public),
+        "--private-dir",
+        str(private),
+        "--backup",
+        str(backup),
+        "--lsrc",
+        lsrc,
+    ]
+    if backup_confirm is not None:
+        arguments.extend(("--confirm", backup_confirm, "--rcup", rcup))
+    try:
+        with tempfile.TemporaryFile() as output:
+            completed = subprocess.run(
+                arguments,
+                cwd=public,
+                env=command_environment(home),
+                stdin=subprocess.DEVNULL,
+                stdout=output,
+                stderr=None,
+                check=False,
+                timeout=RCM_HELPER_TIMEOUT_SECONDS,
+            )
+            size = output.tell()
+            if size > MAX_COMMAND_OUTPUT_BYTES:
+                raise CutoverError(f"rcm {command} output exceeds the safety limit")
+            output.seek(0)
+            captured = output.read()
+    except subprocess.TimeoutExpired as exc:
+        raise CutoverError(
+            f"rcm {command} exceeded {RCM_HELPER_TIMEOUT_SECONDS} seconds"
+        ) from exc
+    except OSError as exc:
+        raise CutoverError(f"cannot run rcm {command}: {exc}") from exc
+    if completed.returncode != 0:
+        raise CutoverError(f"rcm {command} failed with status {completed.returncode}")
+    try:
+        return captured.decode("utf-8").strip()
+    except UnicodeError as exc:
+        raise CutoverError(f"rcm {command} returned invalid output") from exc
+
+
+def verify_backup(
+    *,
+    public: Path,
+    private: Path,
+    home: Path,
+    backup: Path,
+    backup_confirm: str,
+    lsrc: str,
+    rcup: str,
+) -> None:
+    """Require current links and the retained backup to match the reviewed digest."""
+
+    summary = run_rcm_helper(
+        "cutover-backup-verify",
+        public=public,
+        private=private,
+        home=home,
+        backup=backup,
+        backup_confirm=None,
+        lsrc=lsrc,
+        rcup=rcup,
+    )
+    parts = summary.split("\t")
+    if len(parts) != 3 or parts[0] != "cutover backup verified":
+        raise CutoverError("rcm backup verification returned an invalid summary")
+    fields: dict[str, str] = {}
+    for field in parts[1:]:
+        if field.count("=") != 1:
+            raise CutoverError("rcm backup verification returned an invalid summary")
+        name, value = field.split("=", maxsplit=1)
+        if name in fields:
+            raise CutoverError("rcm backup verification returned an invalid summary")
+        fields[name] = value
+    targets = fields.get("targets", "")
+    if (
+        set(fields) != {"targets", "approval_sha256"}
+        or not targets.isascii()
+        or not targets.isdecimal()
+        or int(targets) < 1
+    ):
+        raise CutoverError("rcm backup verification returned an invalid summary")
+    observed = fields.get("approval_sha256", "")
+    if not hmac.compare_digest(observed, backup_confirm):
+        raise CutoverError("cutover backup digest differs from the reviewed confirmation")
+
+
+def observation_digests(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    home: Path,
+    cache_root: Path,
+    state_root: Path,
+    show_output: bool,
+) -> dict[str, dict[str, str]]:
+    """Hash the exact status, diff, and dry-run output for each source."""
+
+    observations: dict[str, dict[str, str]] = {}
+    for source in sources:
+        source_observations: dict[str, str] = {}
+        for operation in ("status", "diff", "dry-run"):
+            output = capture_operation(
+                operation,
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                show_output=show_output,
+            )
+            source_observations[operation] = hashlib.sha256(output).hexdigest()
+        observations[source.label] = source_observations
+    return observations
+
+
+def approval_digest(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    home: Path,
+    backup: Path,
+    backup_confirm: str,
+    observations: dict[str, dict[str, str]],
+    canary: Path,
+    lsrc: Path,
+    rcup: Path,
+) -> str:
+    """Bind reviewed output to source bytes, paths, backup, and executable."""
+
+    material = {
+        "schema": APPROVAL_SCHEMA_VERSION,
+        "home": str(home),
+        "backup": str(backup),
+        "backup_sha256": backup_confirm,
+        "chezmoi_sha256": hash_regular_file(
+            executable,
+            label="chezmoi executable",
+            limit=MAX_SOURCE_BYTES,
+        ),
+        "canary_sha256": hash_regular_file(
+            canary,
+            label="chezmoi canary",
+            limit=MAX_SOURCE_BYTES,
+        ),
+        "rcm": {
+            "lsrc": str(lsrc),
+            "lsrc_sha256": hash_regular_file(
+                lsrc,
+                label="lsrc executable",
+                limit=MAX_SOURCE_BYTES,
+            ),
+            "rcup": str(rcup),
+            "rcup_sha256": hash_regular_file(
+                rcup,
+                label="rcup executable",
+                limit=MAX_SOURCE_BYTES,
+            ),
+        },
+        "sources": [
+            {
+                "label": source.label,
+                "root": str(source.root),
+                "source_sha256": source_digest(source),
+            }
+            for source in sources
+        ],
+        "observations": observations,
+    }
+    encoded = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def prepare_approval(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    public: Path,
+    private: Path,
+    home: Path,
+    cache_root: Path,
+    state_root: Path,
+    backup: Path,
+    backup_confirm: str,
+    lsrc: str,
+    rcup: str,
+    show_output: bool,
+    canary: Path,
+    run_canary_check: bool,
+) -> str:
+    """Verify recovery evidence and compute one exact apply approval."""
+
+    verify_backup(
+        public=public,
+        private=private,
+        home=home,
+        backup=backup,
+        backup_confirm=backup_confirm,
+        lsrc=lsrc,
+        rcup=rcup,
+    )
+    canary = require_regular_file(canary, label="chezmoi canary")
+    if run_canary_check:
+        environment = command_environment(home)
+        environment["DOTFILES_DIR"] = str(public)
+        environment["DOTFILES_PRIVATE_DIR"] = str(private)
+        environment["PATH"] = f"{executable.parent}{os.pathsep}{environment.get('PATH', '')}"
+        print("==> isolated public/private chezmoi canary", file=sys.stderr)
+        try:
+            completed = subprocess.run(
+                [str(canary)],
+                cwd=public,
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=None if show_output else subprocess.DEVNULL,
+                check=False,
+                timeout=CANARY_TIMEOUT_SECONDS,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise CutoverError(
+                f"chezmoi canary exceeded {CANARY_TIMEOUT_SECONDS} seconds"
+            ) from exc
+        except OSError as exc:
+            raise CutoverError(f"cannot run chezmoi canary: {exc}") from exc
         if completed.returncode != 0:
             raise CutoverError(
-                f"{source.label} chezmoi {operation} failed with status "
-                f"{completed.returncode}"
+                f"chezmoi canary failed with status {completed.returncode}"
             )
+    observations = observation_digests(
+        executable=executable,
+        sources=sources,
+        home=home,
+        cache_root=cache_root,
+        state_root=state_root,
+        show_output=show_output,
+    )
+    return approval_digest(
+        executable=executable,
+        sources=sources,
+        home=home,
+        backup=backup,
+        backup_confirm=backup_confirm,
+        observations=observations,
+        canary=canary,
+        lsrc=Path(lsrc),
+        rcup=Path(rcup),
+    )
+
+
+def require_settled_state(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    home: Path,
+    cache_root: Path,
+    state_root: Path,
+    label: str,
+) -> None:
+    """Require status, diff, and dry-run to agree that no change remains."""
+
+    for source in sources:
+        for operation in ("status", "diff", "dry-run"):
+            output = capture_operation(
+                operation,
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                show_output=False,
+            )
+            if output:
+                raise CutoverError(
+                    f"{label}: {source.label} chezmoi {operation} is not empty"
+                )
+
+
+def restore_rcm(
+    *,
+    public: Path,
+    private: Path,
+    home: Path,
+    backup: Path,
+    backup_confirm: str,
+    lsrc: str,
+    rcup: str,
+) -> None:
+    """Restore the complete retained rcm link set after a failed apply."""
+
+    print("==> restoring rcm ownership", file=sys.stderr)
+    run_rcm_helper(
+        "cutover-restore",
+        public=public,
+        private=private,
+        home=home,
+        backup=backup,
+        backup_confirm=backup_confirm,
+        lsrc=lsrc,
+        rcup=rcup,
+    )
+
+
+def apply_with_recovery(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    public: Path,
+    private: Path,
+    home: Path,
+    cache_root: Path,
+    state_root: Path,
+    backup: Path,
+    backup_confirm: str,
+    apply_confirm: str,
+    lsrc: str,
+    rcup: str,
+    canary: Path,
+) -> None:
+    """Apply both sources twice and restore rcm after any mutation failure."""
+
+    observed_approval = prepare_approval(
+        executable=executable,
+        sources=sources,
+        public=public,
+        private=private,
+        home=home,
+        cache_root=cache_root,
+        state_root=state_root,
+        backup=backup,
+        backup_confirm=backup_confirm,
+        lsrc=lsrc,
+        rcup=rcup,
+        show_output=False,
+        canary=canary,
+        run_canary_check=True,
+    )
+    if not hmac.compare_digest(observed_approval, apply_confirm):
+        raise CutoverError("apply approval differs from the reviewed status, diff, or dry run")
+    verify_backup(
+        public=public,
+        private=private,
+        home=home,
+        backup=backup,
+        backup_confirm=backup_confirm,
+        lsrc=lsrc,
+        rcup=rcup,
+    )
+
+    mutation_started = False
+    try:
+        for source in sources:
+            mutation_started = True
+            capture_operation(
+                "apply",
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                show_output=False,
+            )
+        require_settled_state(
+            executable=executable,
+            sources=sources,
+            home=home,
+            cache_root=cache_root,
+            state_root=state_root,
+            label="first apply",
+        )
+        for source in sources:
+            capture_operation(
+                "apply",
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                show_output=False,
+            )
+        require_settled_state(
+            executable=executable,
+            sources=sources,
+            home=home,
+            cache_root=cache_root,
+            state_root=state_root,
+            label="second apply",
+        )
+    except (CutoverError, KeyboardInterrupt) as exc:
+        if not mutation_started:
+            raise
+        try:
+            restore_rcm(
+                public=public,
+                private=private,
+                home=home,
+                backup=backup,
+                backup_confirm=backup_confirm,
+                lsrc=lsrc,
+                rcup=rcup,
+            )
+        except (CutoverError, KeyboardInterrupt) as recovery_exc:
+            raise CutoverError(
+                "chezmoi apply failed and automatic rcm recovery also failed; "
+                "run the documented recovery command immediately"
+            ) from recovery_exc
+        raise CutoverError(
+            f"chezmoi apply failed ({exc}); the complete rcm link set was restored"
+        ) from exc
+    print("chezmoi apply complete: both sources are idempotent", file=sys.stderr)
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -256,23 +919,20 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     repository = Path(__file__).resolve().parent.parent
     home_default = Path.home()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "operation",
-        choices=("status", "diff", "dry-run"),
-    )
+    parser.add_argument("operation", choices=("status", "diff", "dry-run", "plan", "apply"))
     parser.add_argument(
         "--home",
-        type=Path,
+        type=path_argument,
         default=home_default,
     )
     parser.add_argument(
         "--public-dir",
-        type=Path,
+        type=path_argument,
         default=Path(os.environ.get("DOTFILES_DIR", repository)),
     )
     parser.add_argument(
         "--private-dir",
-        type=Path,
+        type=path_argument,
         default=Path(
             os.environ.get(
                 "DOTFILES_PRIVATE_DIR",
@@ -280,9 +940,15 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             )
         ),
     )
-    parser.add_argument("--cache-dir", type=Path)
-    parser.add_argument("--state-dir", type=Path)
+    parser.add_argument("--cache-dir", type=path_argument)
+    parser.add_argument("--state-dir", type=path_argument)
     parser.add_argument("--chezmoi", default="chezmoi")
+    parser.add_argument("--backup", type=path_argument)
+    parser.add_argument("--backup-confirm")
+    parser.add_argument("--apply-confirm")
+    parser.add_argument("--lsrc", default="lsrc")
+    parser.add_argument("--rcup", default="rcup")
+    parser.add_argument("--canary", type=path_argument)
     return parser.parse_args(argv)
 
 
@@ -314,22 +980,79 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             label="chezmoi operator cache directory",
         )
-        for source in sources:
-            ensure_private_directory(
-                cache_root / source.label,
-                label=f"{source.label} chezmoi cache directory",
-            )
-        run_operation(
-            args.operation,
-            executable=resolve_executable(args.chezmoi),
-            sources=sources,
-            home=home,
-            cache_root=cache_root,
-            state_root=state_root,
-        )
+        with operator_lock(state_root):
+            for source in sources:
+                ensure_private_directory(
+                    cache_root / source.label,
+                    label=f"{source.label} chezmoi cache directory",
+                )
+            executable = resolve_executable(args.chezmoi, label="chezmoi")
+            if args.operation in {"status", "diff", "dry-run"}:
+                run_operation(
+                    args.operation,
+                    executable=executable,
+                    sources=sources,
+                    home=home,
+                    cache_root=cache_root,
+                    state_root=state_root,
+                )
+            else:
+                if args.backup is None or args.backup_confirm is None:
+                    raise CutoverError("plan and apply require --backup and --backup-confirm")
+                backup = lexical_absolute(args.backup)
+                backup_confirm = require_digest(args.backup_confirm, label="backup confirmation")
+                lsrc = resolve_executable(args.lsrc, label="lsrc")
+                rcup = resolve_executable(args.rcup, label="rcup")
+                public = sources[0].root
+                private = lexical_absolute(args.private_dir)
+                canary = lexical_absolute(
+                    args.canary if args.canary is not None else public / "tests/test-chezmoi-canary"
+                )
+                if args.operation == "plan":
+                    approval = prepare_approval(
+                        executable=executable,
+                        sources=sources,
+                        public=public,
+                        private=private,
+                        home=home,
+                        cache_root=cache_root,
+                        state_root=state_root,
+                        backup=backup,
+                        backup_confirm=backup_confirm,
+                        lsrc=str(lsrc),
+                        rcup=str(rcup),
+                        show_output=True,
+                        canary=canary,
+                        run_canary_check=True,
+                    )
+                    print(f"chezmoi apply plan approved\tapproval_sha256={approval}")
+                else:
+                    if args.apply_confirm is None:
+                        raise CutoverError("apply requires --apply-confirm")
+                    apply_with_recovery(
+                        executable=executable,
+                        sources=sources,
+                        public=public,
+                        private=private,
+                        home=home,
+                        cache_root=cache_root,
+                        state_root=state_root,
+                        backup=backup,
+                        backup_confirm=backup_confirm,
+                        apply_confirm=require_digest(
+                            args.apply_confirm,
+                            label="apply confirmation",
+                        ),
+                        lsrc=str(lsrc),
+                        rcup=str(rcup),
+                        canary=canary,
+                    )
     except CutoverError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("ERROR: chezmoi operator command interrupted before completion", file=sys.stderr)
+        return 130
     return 0
 
 

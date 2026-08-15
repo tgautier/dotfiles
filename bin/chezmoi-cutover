@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect and apply the staged chezmoi cutover with verified rcm recovery."""
+"""Inspect, deploy, and recover the public and optional private dotfile sources."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ MAX_SOURCE_BYTES = 64 * 1024 * 1024
 CHEZMOI_TIMEOUT_SECONDS = 120
 CANARY_TIMEOUT_SECONDS = 180
 RCM_HELPER_TIMEOUT_SECONDS = 90
+DEDICATED_OWNER_TIMEOUT_SECONDS = 180
 PROCESS_GROUP_CLEANUP_SECONDS = 2
 PROCESS_GROUP_TERM_GRACE_SECONDS = 0.1
 
@@ -106,7 +107,7 @@ def recoverable_termination_signals(
                 ) from exc
 
 
-def mark_apply_committed(state: TerminationState) -> None:
+def mark_operation_committed(state: TerminationState) -> None:
     """Atomically commit success before termination handlers are removed."""
 
     try:
@@ -117,7 +118,7 @@ def mark_apply_committed(state: TerminationState) -> None:
         state.committed = True
         signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
     except (AttributeError, OSError) as exc:
-        raise CutoverError(f"cannot commit the apply signal handoff: {exc}") from exc
+        raise CutoverError(f"cannot commit the completion signal handoff: {exc}") from exc
 
 
 def lexical_absolute(path: Path) -> Path:
@@ -316,6 +317,8 @@ def command_arguments(
         arguments.extend(("apply", "--include", "files", "--dry-run", "--verbose"))
     elif operation == "apply":
         arguments.extend(("apply", "--include", "files", "--force"))
+    elif operation == "safe-apply":
+        arguments.extend(("apply", "--include", "files", "--error-on-conflict"))
     else:
         raise CutoverError(f"unsupported operator command: {operation}")
     return arguments
@@ -797,6 +800,198 @@ def verify_backup(
         raise CutoverError("cutover backup digest differs from the reviewed confirmation")
 
 
+def run_retained_link_helper(
+    *,
+    public: Path,
+    private: Path,
+    home: Path,
+    rcup: Path,
+) -> None:
+    """Delegate the remaining rcm links to the manifest-scoped helper."""
+
+    helper = require_regular_file(public / "bin/rcm-links", label="rcm link helper")
+    returncode, captured = capture_bounded_process(
+        [
+            sys.executable,
+            str(helper),
+            "link-retained",
+            "--home",
+            str(home),
+            "--public-dir",
+            str(public),
+            "--private-dir",
+            str(private),
+            "--rcup",
+            str(rcup),
+        ],
+        cwd=public,
+        environment=command_environment(home),
+        stderr=subprocess.DEVNULL,
+        timeout=RCM_HELPER_TIMEOUT_SECONDS,
+        label="retained rcm link helper",
+    )
+    if returncode != 0:
+        raise CutoverError(f"retained rcm link helper failed with status {returncode}")
+    try:
+        summary = captured.decode("utf-8").strip()
+    except UnicodeError as exc:
+        raise CutoverError("retained rcm link helper returned invalid output") from exc
+    prefix = "retained rcm links complete\ttargets="
+    count = summary.removeprefix(prefix)
+    if not summary.startswith(prefix) or not count.isascii() or not count.isdecimal():
+        raise CutoverError("retained rcm link helper returned an invalid summary")
+    if int(count) < 1:
+        raise CutoverError("retained rcm link helper reported no targets")
+    print(f"==> retained rcm links verified ({count})", file=sys.stderr)
+
+
+def run_dedicated_private_owners(
+    *,
+    private: Path,
+    public: Path,
+    home: Path,
+    just: Path,
+) -> None:
+    """Run the private aggregate without exposing companion command output."""
+
+    justfile = require_regular_file(private / "Justfile", label="private Justfile")
+    environment = command_environment(home)
+    environment["DOTFILES_DIR"] = str(public)
+    environment["DOTFILES_PRIVATE_DIR"] = str(private)
+    returncode = run_bounded_process(
+        [
+            str(just),
+            "--no-dotenv",
+            "--justfile",
+            str(justfile),
+            "--working-directory",
+            str(private),
+            "dedicated-targets-install",
+        ],
+        cwd=private,
+        environment=environment,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=DEDICATED_OWNER_TIMEOUT_SECONDS,
+        label="private dedicated target installers",
+    )
+    if returncode != 0:
+        raise CutoverError(
+            f"private dedicated target installers failed with status {returncode}; output withheld"
+        )
+    print("==> private dedicated targets verified", file=sys.stderr)
+
+
+def run_parity_check(
+    *,
+    checker: Path,
+    executable: Path,
+    lsrc: Path,
+    public: Path,
+    private: Path,
+    home: Path,
+) -> None:
+    """Validate the current public and optional private ownership contracts."""
+
+    checker = require_regular_file(checker, label="chezmoi parity checker")
+    environment = command_environment(home)
+    environment["DOTFILES_DIR"] = str(public)
+    environment["DOTFILES_PRIVATE_DIR"] = str(private)
+    print("==> isolated public/private chezmoi parity check", file=sys.stderr)
+    try:
+        with tempfile.TemporaryDirectory(prefix="chezmoi-link-tools-") as temporary:
+            tool_directory = Path(temporary)
+            (tool_directory / "chezmoi").symlink_to(executable)
+            lsrc_wrapper = tool_directory / "lsrc"
+            lsrc_wrapper.write_text(
+                f"#!/bin/sh\nexec {shlex.quote(str(lsrc))} \"$@\"\n",
+                encoding="utf-8",
+            )
+            lsrc_wrapper.chmod(0o700)
+            environment["PATH"] = (
+                f"{tool_directory}{os.pathsep}{environment.get('PATH', '')}"
+            )
+            returncode = run_bounded_process(
+                [str(checker), str(public), str(public / "docs/chezmoi-targets.tsv")],
+                cwd=public,
+                environment=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=CANARY_TIMEOUT_SECONDS,
+                label="chezmoi parity check",
+            )
+    except OSError as exc:
+        raise CutoverError(f"cannot prepare exact parity-check executables: {exc}") from exc
+    if returncode != 0:
+        raise CutoverError(
+            f"chezmoi parity check failed with status {returncode}; output withheld"
+        )
+
+
+def link_current_state(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    public: Path,
+    private: Path,
+    home: Path,
+    cache_root: Path,
+    state_root: Path,
+    lsrc: Path,
+    rcup: Path,
+    just: Path,
+    parity_check: Path,
+    termination: TerminationState,
+) -> None:
+    """Refresh each target through its current owner and prove idempotence."""
+
+    run_parity_check(
+        checker=parity_check,
+        executable=executable,
+        lsrc=lsrc,
+        public=public,
+        private=private,
+        home=home,
+    )
+    run_retained_link_helper(
+        public=public,
+        private=private,
+        home=home,
+        rcup=rcup,
+    )
+    if len(sources) == 2:
+        run_dedicated_private_owners(
+            private=private,
+            public=public,
+            home=home,
+            just=just,
+        )
+    for pass_number in (1, 2):
+        for source in sources:
+            capture_operation(
+                "safe-apply",
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                show_output=False,
+            )
+        require_settled_state(
+            executable=executable,
+            sources=sources,
+            home=home,
+            cache_root=cache_root,
+            state_root=state_root,
+            label=f"link pass {pass_number}",
+            before_operation=lambda: None,
+        )
+    mark_operation_committed(termination)
+    print("dotfile ownership refresh complete: all owners are idempotent", file=sys.stderr)
+
+
 def observation_digests(
     *,
     executable: Path,
@@ -1194,7 +1389,7 @@ def apply_with_recovery(
             label="second apply",
             before_operation=require_approved_execution,
         )
-        mark_apply_committed(termination)
+        mark_operation_committed(termination)
         print("chezmoi apply complete: both sources are idempotent", file=sys.stderr)
         return
     except (CutoverError, KeyboardInterrupt, TerminationRequested) as exc:
@@ -1229,7 +1424,10 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     repository = Path(__file__).resolve().parent.parent
     home_default = Path.home()
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("operation", choices=("status", "diff", "dry-run", "plan", "apply"))
+    parser.add_argument(
+        "operation",
+        choices=("status", "diff", "dry-run", "link", "plan", "apply"),
+    )
     parser.add_argument(
         "--home",
         type=path_argument,
@@ -1258,7 +1456,9 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--apply-confirm")
     parser.add_argument("--lsrc", default="lsrc")
     parser.add_argument("--rcup", default="rcup")
+    parser.add_argument("--just", default="just")
     parser.add_argument("--canary", type=path_argument)
+    parser.add_argument("--parity-check", type=path_argument)
     return parser.parse_args(argv)
 
 
@@ -1299,7 +1499,32 @@ def main(argv: Sequence[str] | None = None) -> int:
                     label=f"{source.label} chezmoi cache directory",
                 )
             executable = resolve_executable(args.chezmoi, label="chezmoi")
-            if args.operation in {"status", "diff", "dry-run"}:
+            if args.operation == "link":
+                lsrc = resolve_executable(args.lsrc, label="lsrc")
+                rcup = resolve_executable(args.rcup, label="rcup")
+                just = resolve_executable(args.just, label="just")
+                public = sources[0].root
+                private = lexical_absolute(args.private_dir)
+                parity_check = lexical_absolute(
+                    args.parity_check
+                    if args.parity_check is not None
+                    else public / "tests/check-chezmoi-targets"
+                )
+                link_current_state(
+                    executable=executable,
+                    sources=sources,
+                    public=public,
+                    private=private,
+                    home=home,
+                    cache_root=cache_root,
+                    state_root=state_root,
+                    lsrc=lsrc,
+                    rcup=rcup,
+                    just=just,
+                    parity_check=parity_check,
+                    termination=termination,
+                )
+            elif args.operation in {"status", "diff", "dry-run"}:
                 run_operation(
                     args.operation,
                     executable=executable,

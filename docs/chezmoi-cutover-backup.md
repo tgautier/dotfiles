@@ -34,7 +34,7 @@ The backup command creates one regular file with mode `0600`. It refuses an exis
 
 Review the target list and keep the printed SHA-256 digest with the file. The digest confirms the reviewed artifact during restore. It does not replace local review of the target list.
 
-`just link-cutover-backup` and `just link-cutover-backup-verify` do not change HOME. Keep using `just link` while rcm owns deployment.
+`just link-cutover-backup` and `just link-cutover-backup-verify` do not change HOME. After the first live cutover, `just link` preserves the mixed ownership split while this artifact retains the complete rcm rollback state.
 
 Creating and verifying this backup does not authorize a bare chezmoi apply. Continue with [Chezmoi operator cutover](chezmoi-operator-cutover.md), which binds the reviewed status, diff, dry run, source and recovery state, selected executables, canary, and this backup to the guarded apply and automatic recovery path.
 
@@ -65,4 +65,4 @@ Pull this checkpoint and run `just ci` before creating a live backup. Before a r
 
 Before any live backup exists, restore the earlier repository revision and run `just ci` to roll back this code change. No HOME action is required.
 
-After chezmoi changes HOME, run `just chezmoi-recover` before reverting repository code. Keep the backup until rcm ownership, dedicated private installers, shell startup, and the complete local gate pass.
+After chezmoi changes HOME, run `just chezmoi-recover` before reverting repository code. Keep the backup through the routine-owner switch, fresh-machine and supported-profile acceptance, shell startup checks, and final rcm retirement.

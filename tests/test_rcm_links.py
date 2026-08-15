@@ -264,6 +264,136 @@ class RcmLinksInventoryTest(unittest.TestCase):
             str(output),
         )
 
+    def _retained_command(
+        self,
+        public_manifest: Path,
+        rcup: Path,
+    ) -> subprocess.CompletedProcess[str]:
+        return self._command(
+            "link-retained",
+            "--public-targets",
+            str(public_manifest),
+            "--rcup",
+            str(rcup),
+        )
+
+    def _retained_fixture(self) -> tuple[Path, Path]:
+        self._write(self.public, "Brewfile", "brew fixture\n")
+        self._write(self.public, "config/mise/config.toml", "[tools]\n")
+        self._write(self.public, "zshrc", "zsh fixture\n")
+        manifest = self.root / "retained-targets.tsv"
+        manifest.write_text(
+            "rcm_source\ttarget\tdisposition\tchezmoi_source\tmode\n"
+            "Brewfile\t.Brewfile\tdefer-homebrew-link\t-\tfile\n"
+            "config/mise/config.toml\t.config/mise/config.toml\t"
+            "defer-machine-overrides\t-\tfile\n"
+            "zshrc\t.zshrc\tshadow\tdot_zshrc\tfile\n",
+            encoding="utf-8",
+        )
+        rcup = self.root / "fake-rcup"
+        rcup.write_text(
+            f"#!{sys.executable}\n"
+            "import json\n"
+            "import os\n"
+            "from pathlib import Path\n"
+            "import sys\n"
+            "arguments = sys.argv[1:]\n"
+            "Path(os.environ['FAKE_RCUP_LOG']).write_text(\n"
+            "    json.dumps({'arguments': arguments, 'environment': {\n"
+            "        name: os.environ.get(name)\n"
+            "        for name in ('DOTFILES_DIR', 'DOTFILES_PRIVATE_DIR', 'HOME', 'RCRC')\n"
+            "    }}),\n"
+            "    encoding='utf-8',\n"
+            ")\n"
+            "directory = Path(arguments[arguments.index('-d') + 1])\n"
+            "home = Path(os.environ['HOME'])\n"
+            "for source in arguments[arguments.index('-d') + 2:]:\n"
+            "    target = home / ('.' + source)\n"
+            "    target.parent.mkdir(parents=True, exist_ok=True)\n"
+            "    if target.is_symlink():\n"
+            "        target.unlink()\n"
+            "    target.symlink_to(directory / source)\n",
+            encoding="utf-8",
+        )
+        rcup.chmod(0o755)
+        return manifest, rcup
+
+    def test_link_retained_targets_scopes_rcm_to_manifest_deferred_public_sources(self) -> None:
+        manifest, rcup = self._retained_fixture()
+        rcup_log = self.root / "rcup.json"
+        with mock.patch.dict(os.environ, {"FAKE_RCUP_LOG": str(rcup_log)}):
+            completed = self._retained_command(manifest, rcup)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(completed.stdout, "retained rcm links complete\ttargets=2\n")
+        record = json.loads(rcup_log.read_text(encoding="utf-8"))
+        self.assertEqual(
+            record["arguments"],
+            [
+                "-K",
+                "-d",
+                str(self.public),
+                "Brewfile",
+                "config/mise/config.toml",
+            ],
+        )
+        self.assertEqual(
+            record["environment"],
+            {
+                "DOTFILES_DIR": str(self.public),
+                "DOTFILES_PRIVATE_DIR": str(self.private),
+                "HOME": str(self.home),
+                "RCRC": str(self.public / "rcrc"),
+            },
+        )
+        self.assertEqual(os.readlink(self.home / ".Brewfile"), str(self.public / "Brewfile"))
+        self.assertEqual(
+            os.readlink(self.home / ".config/mise/config.toml"),
+            str(self.public / "config/mise/config.toml"),
+        )
+        self.assertFalse((self.home / ".zshrc").exists())
+
+    def test_link_retained_targets_refuses_regular_and_foreign_targets_before_rcm(self) -> None:
+        manifest, rcup = self._retained_fixture()
+        rcup_log = self.root / "rcup.json"
+        target = self.home / ".Brewfile"
+        target.write_text("local override\n", encoding="utf-8")
+        with mock.patch.dict(os.environ, {"FAKE_RCUP_LOG": str(rcup_log)}):
+            regular = self._retained_command(manifest, rcup)
+        self.assertEqual(regular.returncode, 2)
+        self.assertIn("retained rcm target is not an owned symlink: .Brewfile", regular.stderr)
+        self.assertFalse(rcup_log.exists())
+
+        target.unlink()
+        target.symlink_to(self.root / "foreign")
+        with mock.patch.dict(os.environ, {"FAKE_RCUP_LOG": str(rcup_log)}):
+            foreign = self._retained_command(manifest, rcup)
+        self.assertEqual(foreign.returncode, 2)
+        self.assertIn("retained rcm target is a foreign symlink: .Brewfile", foreign.stderr)
+        self.assertFalse(rcup_log.exists())
+
+    def test_link_retained_targets_uses_only_the_public_rcm_directory(self) -> None:
+        manifest, _fake_rcup = self._retained_fixture()
+        self._write(self.private, "Brewfile", "private fixture\n")
+        rcup = shutil.which("rcup")
+        self.assertIsNotNone(rcup, "rcup must be installed for the retained-link fixture")
+
+        completed = self._command(
+            "link-retained",
+            "--public-targets",
+            str(manifest),
+            "--rcup",
+            str(rcup),
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(os.readlink(self.home / ".Brewfile"), str(self.public / "Brewfile"))
+        self.assertEqual(
+            os.readlink(self.home / ".config/mise/config.toml"),
+            str(self.public / "config/mise/config.toml"),
+        )
+        self.assertFalse((self.home / ".zshrc").exists())
+
     @staticmethod
     def _plan_digest(payload: dict[str, object]) -> str:
         digest_payload = {key: value for key, value in payload.items() if key != "approval_sha256"}

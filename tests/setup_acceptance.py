@@ -314,7 +314,7 @@ def verify_private_targets(private: Path, home: Path, environment: dict[str, str
         "agent-hooks-live-check",
     ):
         run(
-            ["just", "-f", str(private / "Justfile"), recipe],
+            ["just", recipe],
             cwd=private,
             env=environment,
             label=f"private {recipe}",

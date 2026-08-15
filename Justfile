@@ -967,3 +967,11 @@ cleanup-symlinks:
         link="${entry%% ->*}"
         rm "$link" && echo "Removed: $link"
     done
+
+[doc("Run setup acceptance in a Linux container (public-only)")]
+test-setup-acceptance-linux:
+    bash tests/run-linux-acceptance.sh
+
+[doc("Run setup acceptance in a Linux container with private companion")]
+test-setup-acceptance-linux-private:
+    bash tests/run-linux-acceptance.sh {{quote(private_dir)}}

@@ -28,6 +28,24 @@ expect_failure() {
     esac
 }
 
+expect_failure_withheld() {
+    local label=$1
+    local expected=$2
+    local forbidden=$3
+    shift 3
+    local output
+    if output=$("$@" 2>&1); then
+        fail "$label fixture passed unexpectedly"
+    fi
+    case "$output" in
+        *"$expected"*) ;;
+        *) printf '%s\n' "$output" >&2; fail "$label fixture failed for the wrong reason" ;;
+    esac
+    case "$output" in
+        *"$forbidden"*) printf '%s\n' "$output" >&2; fail "$label fixture exposed companion output" ;;
+    esac
+}
+
 make_fixture() {
     local destination=$1
     local rcm_source
@@ -62,12 +80,12 @@ main() {
         fail "absent private checkout did not preserve the public-only canary"
     fi
     case "$output" in
-        *'cross-repository target ownership: skipped'*) ;;
+        *'companion chezmoi ownership: skipped'*'companion chezmoi source: skipped'*) ;;
         *) printf '%s\n' "$output" >&2; fail "absent private checkout did not report the public-only skip" ;;
     esac
 
     : > "$tmp/non-directory-private"
-    expect_failure 'non-directory private path' 'private checkout path is not a directory' \
+    expect_failure 'non-directory private path' 'companion checkout path is not a directory' \
         env DOTFILES_PRIVATE_DIR="$tmp/non-directory-private" "$checker" "$repo_root" "$manifest"
 
     mkdir -p "$tmp/accepting-private/shared/chezmoi"
@@ -80,6 +98,9 @@ if len(sys.argv) != 3 or sys.argv[1] != "--public-targets" or not Path(sys.argv[
     print("fixture checker received the wrong public manifest contract", file=sys.stderr)
     raise SystemExit(24)
 print("fixture ownership accepted")
+PY
+    cat > "$tmp/accepting-private/shared/chezmoi/check_private_source.py" <<'PY'
+print("fixture private source accepted")
 PY
     mkdir -p "$tmp/conflicting-pythonpath/shared/chezmoi"
     : > "$tmp/conflicting-pythonpath/shared/__init__.py"
@@ -125,17 +146,19 @@ PY
         fail "accepting private checker did not preserve the canary"
     fi
     case "$output" in
-        *'fixture ownership accepted'*'chezmoi parity OK'*) ;;
+        *'companion chezmoi ownership: passed'*'companion chezmoi source: passed'*'chezmoi parity OK'*) ;;
         *) printf '%s\n' "$output" >&2; fail "accepting private checker did not run through the canary" ;;
     esac
     case "$output" in
+        *'fixture ownership accepted'*) printf '%s\n' "$output" >&2; fail "ownership checker output was exposed" ;;
+        *'fixture private source accepted'*) printf '%s\n' "$output" >&2; fail "source checker output was exposed" ;;
         *'conflicting shared package ran'*) printf '%s\n' "$output" >&2; fail "Python path shadowed the selected private checker" ;;
         *'conflicting site package ran'*) printf '%s\n' "$output" >&2; fail "Python site-packages shadowed the selected private checker" ;;
     esac
     [[ ! -e "$tmp/accepting-private/shared/chezmoi/__pycache__" ]] || fail "accepting private checker wrote bytecode into the selected checkout"
 
     mkdir -p "$tmp/stale-private"
-    expect_failure 'stale private checkout' 'private checkout is missing the target ownership checker' \
+    expect_failure 'stale private checkout' 'companion checkout is incompatible' \
         env DOTFILES_PRIVATE_DIR="$tmp/stale-private" "$checker" "$repo_root" "$manifest"
 
     mkdir -p "$tmp/rejecting-private/shared/chezmoi"
@@ -151,9 +174,22 @@ print("fixture overlap detected", file=sys.stderr)
 raise SystemExit(23)
 PY
     pushd "$repo_root" >/dev/null
-    expect_failure 'rejected ownership' 'fixture overlap detected' \
+    expect_failure_withheld 'rejected ownership' 'companion check failed with status 23; output withheld' 'fixture overlap detected' \
         env DOTFILES_PRIVATE_DIR="$tmp/rejecting-private" "$checker" "$repo_root" docs/chezmoi-targets.tsv
     popd >/dev/null
+
+    mkdir -p "$tmp/rejecting-source/shared/chezmoi"
+    : > "$tmp/rejecting-source/shared/chezmoi/__init__.py"
+    cp "$tmp/accepting-private/shared/chezmoi/check_target_ownership.py" \
+        "$tmp/rejecting-source/shared/chezmoi/check_target_ownership.py"
+    cat > "$tmp/rejecting-source/shared/chezmoi/check_private_source.py" <<'PY'
+import sys
+
+print("fixture private source rejected", file=sys.stderr)
+raise SystemExit(29)
+PY
+    expect_failure_withheld 'rejected private source' 'companion check failed with status 29; output withheld' 'fixture private source rejected' \
+        env DOTFILES_PRIVATE_DIR="$tmp/rejecting-source" "$checker" "$repo_root" "$manifest"
 
     awk 'BEGIN { FS=OFS="\t" } $2 == ".zsh/zaliases" { $2=".zsh/.zaliases" } { print }' "$manifest" > "$tmp/misnamed.tsv"
     expect_failure misnamed 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/misnamed.tsv"
@@ -178,7 +214,7 @@ PY
     printf 'unexpected fixture\n' > "$tmp/extra/home/dot_unexpected"
     expect_failure extra 'target map mismatch' "$checker" "$tmp/extra" "$tmp/extra/docs/chezmoi-targets.tsv"
 
-    printf 'chezmoi canary fixtures OK (private available/conflicting-package/absent/non-directory/stale/rejected, misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra)\n'
+    printf 'chezmoi canary fixtures OK (companion available/conflicting-package/absent/non-directory/stale/ownership-rejected/source-rejected, misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra)\n'
 }
 
 main "$@"

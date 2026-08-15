@@ -14,16 +14,16 @@ Personal financial workflows, vault-specific content, employer-tied notes, colle
 
 ## Repository Overview
 
-Cross-platform personal dotfiles for macOS and Linux/WSL2, managed with **rcm** (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`. A companion private repo (`dotfiles-private`) is merged via `DOTFILES_DIRS` in `rcrc`; it hosts plaintext shell secrets, personal workflow config, and the global Claude Code config.
+Cross-platform personal dotfiles for macOS and Linux/WSL2, deployed primarily with chezmoi. The manifest-deferred public targets remain rcm links, private dedicated installers retain their declared targets, and the unchanged complete rcm graph remains the digest-bound rollback authority. An optional private companion provides a second chezmoi source and dedicated-owner aggregate without exposing its values through the public operator.
 
 ## Key Commands
 
 ```sh
-# Re-apply the rcm symlinks (uses DOTFILES_DIRS from rcrc). Required for an
-# edit to a symlinked dotfile — gitconfig, zshrc, zshenv, tmux.conf — to take
-# effect on this machine. `just update` does NOT re-link. Prefer this over a
-# bare `rcup`, which finds the same config only once ~/.rcrc is itself linked.
-# Run it from this checkout — ~/.justfile points at the private repo's justfile
+# Refresh config through its manifest-declared owner. The command runs an
+# isolated ownership/source preflight, only the deferred public rcm links, the
+# optional private dedicated-owner aggregate, then conflict-refusing chezmoi
+# apply passes. Never use broad rcup for routine deployment: it is rollback.
+# Run this from the public checkout; ~/.justfile points at the private repo.
 just link
 
 # Install packages (auto-selects the platform Brewfile and, on macOS, the

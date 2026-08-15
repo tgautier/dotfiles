@@ -52,7 +52,7 @@ The guard now maps `zsh/zaliases` and `zsh/zcompletion` to `~/.zsh/zaliases` and
 
 ## Upgrade and rollback
 
-Pull the private companion repository first when it is installed, then pull this repository and run `just test-chezmoi-canary`. The command changes no HOME file: the public and private source-state canaries each own separate temporary config, cache, persistent-state, destination, and operator-HOME paths. A machine without the private repository continues to run the complete public-only parity canary without private paths or target identifiers in its output. Keep using `just link` for active rcm deployment, and run `just ci` before publishing changes.
+Pull the private companion repository first when it is installed, then pull this repository and run `just test-chezmoi-canary`. The command changes no HOME file: the public and private source-state canaries each own separate temporary config, cache, persistent-state, destination, and operator-HOME paths. A machine without the private repository continues to run the complete public-only parity canary without private paths or target identifiers in its output. Use `just link` for the current mixed-owner deployment and run `just ci` before publishing changes.
 
 After the canary passes, `just chezmoi-status`, `just chezmoi-diff`, and `just chezmoi-apply-dry-run` inspect the real HOME through explicit public and private source roots. They do not modify managed targets, but they create owner-only operator metadata under `${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/chezmoi` and `${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/chezmoi`. The diff and verbose dry run can display complete private target contents; review them only in the local terminal and never paste their output into this public repository. Do not invoke bare `chezmoi apply`.
 
@@ -62,4 +62,4 @@ The removed empty Git-template marker may leave `~/.git_template/hooks/gitkeep` 
 
 Before any real apply, restore the earlier public revision and run `just ci`; no HOME action is required. After an apply starts, run the retained digest through `just chezmoi-recover` and verify the restored inventory before reverting repository code. A code revert cannot reconstruct targets already converted from links to regular files.
 
-The future cutover remains blocked until the exact guard passes from a fresh checkout, `just link-inventory` reports the approved live baseline, a live backup passes verification, and the cutover PR records the apply and post-apply checks for macOS, Linux, and WSL2.
+The live cutover and routine-owner switch are complete on the current machine. Rcm retirement remains blocked until fresh-machine and supported-profile acceptance pass with and without the private companion, the retained backup is reverified, and the final cleanup proves no supported workflow needs the broad rcm graph.

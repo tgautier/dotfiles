@@ -1,6 +1,6 @@
 # Chezmoi operator cutover
 
-This runbook reviews and applies the staged public and optional private chezmoi sources without changing `just setup` or `just link`. Rcm remains installed and the retained link backup remains the recovery authority throughout this checkpoint.
+This runbook records the approval-bound first live apply of the public and optional private chezmoi sources. Rcm remains installed and the retained link backup remains the recovery authority throughout migration acceptance. Routine deployment now uses the guarded `just link` ownership refresh documented below.
 
 ## Prepare a current recovery point
 
@@ -72,17 +72,20 @@ The dedicated chezmoi cache, state databases, and lock file can remain. A later 
 
 ## Preserve a working state after success
 
-After a successful apply, the migrated targets are regular chezmoi-managed files while deferred targets remain rcm links. Keep rcm and the backup. Do not run `just link` or `just setup`: both still invoke rcm and would deliberately return the migrated targets to symlinks before the later cutover switch lands.
+After a successful first apply, the migrated targets are regular chezmoi-managed files while deferred targets remain rcm links. Keep rcm and the backup. `just link` and `just setup` now preserve that ownership split: the operator runs isolated parity checks, refreshes only manifest-deferred public rcm links, invokes the optional private dedicated-owner aggregate, and applies both chezmoi sources without force. It applies twice and requires empty status, diff, and dry-run state after each pass.
+
+A regular file or foreign link at a retained rcm target fails before `rcup`. A changed or pre-existing chezmoi target fails through `--error-on-conflict` instead of being overwritten. A failure after an earlier owner succeeds does not automatically restore the full rcm graph because that would undo the successful cutover. Resolve the conflict or tool failure and rerun `just link`; use the retained backup and `just chezmoi-recover` only when intentionally rolling the complete migration back.
 
 Run the nonmutating checks:
 
 ```sh
 just chezmoi-status
 just chezmoi-diff
+just link
 just ci
 ```
 
-Status and diff must remain empty for both sources. Perform the separately reviewed shell, dedicated-installer, and supported-profile acceptance checks before treating the live trial as cutover evidence.
+Status and diff must remain empty for both sources before and after the routine refresh. Perform the separately reviewed shell, dedicated-installer, fresh-machine, and supported-profile acceptance checks before retiring rcm or deleting the backup.
 
 To end the trial or roll back this operator checkpoint, restore rcm before reverting repository code:
 

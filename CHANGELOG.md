@@ -177,6 +177,8 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Routine deployment now preserves the live chezmoi ownership split. `just link`, and therefore the linking phase of `just setup`, runs an isolated public/private parity preflight, invokes rcm without force only for the six public `defer-*` manifest rows through explicit `-d` and source operands, runs the optional private dedicated-owner aggregate with output withheld, and applies each chezmoi source twice without force. Retained targets refuse regular files and foreign links before rcm; chezmoi uses conflict errors instead of overwriting modified targets; status, diff, and dry-run must settle after each pass. A routine failure remains safely rerunnable and never silently triggers the broad rollback graph. The unchanged `rcrc` and digest-bound backup continue to provide explicit full rollback until fresh-machine and supported-profile acceptance permit rcm retirement ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+
 - Elixir 1.20.2 → 1.20.3 in `config/mise/config.toml`; OTP-29 suffix unchanged.
 - The stale-symlink sweep is split in two: `_scan-stale-symlinks` finds and
   prints stale links, `cleanup-symlinks` confirms and removes them. The scan

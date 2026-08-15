@@ -331,7 +331,7 @@ lint-just:
     fi
     echo "lint-just empty-match detection OK"
 
-# Bootstrap this machine: profile, packages, symlinks, runtimes, hooks, tools (idempotent)
+# Bootstrap this machine: profile, packages, dotfiles, runtimes, hooks, tools (idempotent)
 setup: _ensure-profile
     #!/usr/bin/env bash
     set -euo pipefail
@@ -355,10 +355,9 @@ setup: _ensure-profile
     #    package upgrading cleanly.
     brew bundle install --no-upgrade --file="{{brewfile}}"
 
-    # 2. Symlink dotfiles. Delegated to `link` so the RCRC-prefixed invocation
-    #    lives in exactly one place. Called here rather than declared as a
-    #    dependency because dependencies run before the recipe body, and rcm
-    #    itself comes from the `brew bundle` in step 1.
+    # 2. Refresh dotfiles through their manifest-declared owners. Called here
+    #    rather than declared as a dependency because dependencies run before
+    #    the recipe body, and chezmoi and rcm come from the bundle in step 1.
     just link
 
     # 3. Language runtimes from the pinned mise config. Install mise first if the
@@ -394,23 +393,20 @@ git-hooks:
     git config --local core.hooksPath .githooks
     @echo "Git hooks wired for this checkout"
 
-# Run this after editing any dotfile rcm links into $HOME (gitconfig, zshrc,
-# zshenv, tmux.conf, …) — the edit lands in this repo, but the running machine
-# only picks it up once the links are re-applied. `just update` does NOT
-# re-link: it upgrades installed software, not local config. RCRC points rcm at
-# this repo's in-tree config, so every DOTFILES_DIRS entry is linked even on a
-# machine that has never been bootstrapped — `~/.rcrc` is itself one of the
-# symlinks rcm creates, so a bare `rcup` only finds the same config after the
-# first run. That makes this the authoritative invocation, and `setup` calls it
-# rather than repeating it. An absent private repo is skipped, not fatal.
+# Run this after editing managed config. The operator validates public/private
+# ownership in isolation, refreshes only the manifest-deferred public rcm links,
+# runs the private dedicated owners when that checkout exists, then applies the
+# public and private chezmoi sources without force. Both apply passes must finish
+# settled. The unchanged broad rcm configuration remains available only to the
+# digest-bound full rollback. An absent private repo is skipped, not fatal.
 #
 # Must be run from this checkout: `~/.justfile` is a symlink to the PRIVATE
 # repo's justfile, so `just link` from $HOME resolves there and fails with an
 # unknown-recipe error. The [doc] attribute carries the summary because `just
 # --list` would otherwise show only the last line of this comment.
-[doc("Re-apply the rcm symlinks (run after editing a symlinked dotfile)")]
+[doc("Refresh dotfiles through their manifest-declared owners")]
 link:
-    RCRC="{{dotfiles_dir}}/rcrc" rcup
+    python3 bin/chezmoi-cutover link --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
 
 # Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for
 # Dart/Flutter (Drift) FFI, which dlopen()s the unversioned 'libsqlite3.so' the

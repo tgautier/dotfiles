@@ -45,6 +45,9 @@ PRIVATE_TARGET_HEADER = (
     "target_shape",
     "mode",
 )
+RETAINED_PUBLIC_DISPOSITIONS = frozenset(
+    {"defer-homebrew-link", "defer-machine-overrides", "defer-private-overlay"}
+)
 
 
 class InventoryError(Exception):
@@ -331,6 +334,153 @@ def load_cutover_targets(
     if not targets:
         raise InventoryError("cutover target manifests contain no active rcm targets")
     return tuple(sorted(targets, key=lambda target: target.target.as_posix()))
+
+
+def load_retained_rcm_targets(
+    *,
+    public_manifest: Path,
+    public: Path,
+) -> tuple[CutoverTarget, ...]:
+    """Load only public targets that deliberately remain rcm-owned."""
+
+    rows = load_tsv_rows(
+        public_manifest,
+        header=PUBLIC_TARGET_HEADER,
+        label="public chezmoi target manifest",
+    )
+    retained: list[CutoverTarget] = []
+    seen_sources: set[PurePosixPath] = set()
+    seen_targets: set[PurePosixPath] = set()
+    for line_number, row in enumerate(rows, start=2):
+        source_value, target_value, disposition, chezmoi_source, mode = row
+        if disposition not in RETAINED_PUBLIC_DISPOSITIONS:
+            continue
+        if chezmoi_source != "-" or mode not in {"file", "executable"}:
+            raise InventoryError(
+                f"public manifest line {line_number} has an invalid retained rcm contract"
+            )
+        source = require_relative_path(
+            source_value,
+            label=f"public manifest line {line_number} source",
+            wildcard=False,
+        )
+        if source.parts[0].startswith("-"):
+            raise InventoryError(
+                f"public manifest line {line_number} source must not look like an option: {source}"
+            )
+        target = require_relative_path(
+            target_value,
+            label=f"public manifest line {line_number} target",
+            wildcard=False,
+        )
+        if not target.parts[0].startswith("."):
+            raise InventoryError(
+                f"public manifest line {line_number} HOME target must start with a dot: {target}"
+            )
+        if source in seen_sources:
+            raise InventoryError(f"duplicate retained rcm source: {source}")
+        if target in seen_targets:
+            raise InventoryError(f"duplicate retained rcm target: {target}")
+        source_path = public / source
+        try:
+            metadata = source_path.lstat()
+        except OSError as exc:
+            raise InventoryError(f"cannot inspect retained rcm source {source}: {exc}") from exc
+        if not stat.S_ISREG(metadata.st_mode):
+            raise InventoryError(f"retained rcm source is not a regular file: {source}")
+        executable = bool(stat.S_IMODE(metadata.st_mode) & 0o111)
+        if executable != (mode == "executable"):
+            raise InventoryError(f"retained rcm source mode differs from its manifest: {source}")
+        seen_sources.add(source)
+        seen_targets.add(target)
+        retained.append(CutoverTarget("public", source, target))
+    if not retained:
+        raise InventoryError("public manifest contains no retained rcm targets")
+    return tuple(sorted(retained, key=lambda item: item.target.as_posix()))
+
+
+def preflight_retained_rcm_links(
+    targets: Sequence[CutoverTarget],
+    *,
+    home: Path,
+    public: Path,
+) -> None:
+    """Refuse to replace user files or links owned by another source."""
+
+    for target in targets:
+        current = home
+        for part in target.target.parts[:-1]:
+            current /= part
+            try:
+                metadata = current.lstat()
+            except FileNotFoundError:
+                break
+            except OSError as exc:
+                raise InventoryError(
+                    f"cannot inspect retained rcm ancestor {current}: {exc}"
+                ) from exc
+            if not stat.S_ISDIR(metadata.st_mode):
+                raise InventoryError(
+                    f"retained rcm ancestor is not a real directory: {current}"
+                )
+        else:
+            target_path = home / target.target
+            try:
+                metadata = target_path.lstat()
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise InventoryError(
+                    f"cannot inspect retained rcm target {target.target}: {exc}"
+                ) from exc
+            if not stat.S_ISLNK(metadata.st_mode):
+                raise InventoryError(
+                    f"retained rcm target is not an owned symlink: {target.target}"
+                )
+            expected = str(lexical_absolute(public / target.source))
+            try:
+                actual = os.readlink(target_path)
+            except OSError as exc:
+                raise InventoryError(
+                    f"cannot read retained rcm link {target.target}: {exc}"
+                ) from exc
+            if actual != expected:
+                raise InventoryError(
+                    f"retained rcm target is a foreign symlink: {target.target}"
+                )
+
+
+def link_retained_rcm_targets(
+    targets: Sequence[CutoverTarget],
+    *,
+    home: Path,
+    public: Path,
+    private: Path,
+    rcup: str,
+) -> tuple[CutoverLink, ...]:
+    """Install only manifest-deferred public links and verify exact ownership."""
+
+    preflight_retained_rcm_links(targets, home=home, public=public)
+    environment = command_environment(
+        {
+            "HOME": str(home),
+            "RCRC": str(public / "rcrc"),
+            "DOTFILES_DIR": str(public),
+            "DOTFILES_PRIVATE_DIR": str(private),
+        }
+    )
+    sources = sorted(target.source.as_posix() for target in targets)
+    run_bounded(
+        [rcup, "-K", "-d", str(public), *sources],
+        cwd=public,
+        env=environment,
+    )
+    return capture_cutover_links(
+        targets,
+        home=home,
+        public=public,
+        private=None,
+    )
 
 
 def load_owner_patterns(path: Path) -> list[OwnerPattern]:
@@ -1760,6 +1910,18 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     )
     restore_parser.add_argument("--plan", type=Path, required=True)
     restore_parser.add_argument("--confirm", required=True)
+    retained_parser = subparsers.add_parser(
+        "link-retained",
+        help="install only public targets that remain rcm-owned",
+    )
+    add_common_arguments(
+        retained_parser,
+        repository=repository,
+        public_default=public_default,
+        private_default=private_default,
+    )
+    retained_parser.add_argument("--public-targets", type=Path, default=None)
+    retained_parser.add_argument("--rcup", default="rcup")
     backup_parser = subparsers.add_parser(
         "cutover-backup",
         help="capture an exact digest-bound backup of every manifested rcm link",
@@ -1800,13 +1962,14 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     cutover_restore_parser.add_argument("--rcup", default="rcup")
     args = parser.parse_args(argv)
     if args.command in {
+        "link-retained",
         "cutover-backup",
         "cutover-backup-verify",
         "cutover-restore",
     }:
         if args.public_targets is None:
             args.public_targets = args.public_dir / "docs/chezmoi-targets.tsv"
-        if args.private_targets is None:
+        if args.command != "link-retained" and args.private_targets is None:
             args.private_targets = args.private_dir / "docs/chezmoi-private-targets.tsv"
     return args
 
@@ -1825,6 +1988,20 @@ def main(argv: Sequence[str] | None = None) -> int:
             private,
             label="private dotfiles repository",
         )
+        if args.command == "link-retained":
+            targets = load_retained_rcm_targets(
+                public_manifest=lexical_absolute(args.public_targets),
+                public=public,
+            )
+            linked = link_retained_rcm_targets(
+                targets,
+                home=home,
+                public=public,
+                private=private,
+                rcup=args.rcup,
+            )
+            print(f"retained rcm links complete\ttargets={len(linked)}")
+            return 0
         if args.command in {
             "cutover-backup",
             "cutover-backup-verify",

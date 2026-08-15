@@ -41,11 +41,15 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.applied = self.root / "applied"
         self.backup = self.root / "rcm-links.json"
         self.canary_log = self.root / "canary.log"
+        self.parity_log = self.root / "parity.json"
+        self.just_log = self.root / "just.json"
         self.ready = self.root / "apply-ready"
         self.restore_ready = self.root / "restore-ready"
         self.descendant_pid = self.root / "descendant.pid"
         self.output_pid = self.root / "output.pid"
         self.fake_chezmoi = self.root / "fake-chezmoi"
+        self.fake_parity = self.root / "fake-parity"
+        self.fake_just = self.root / "fake-just"
         self.home.mkdir()
         self._make_repository(self.public, private=False)
         self.script = self.public / "bin/chezmoi-cutover"
@@ -133,6 +137,67 @@ class ChezmoiCutoverTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.fake_chezmoi.chmod(0o700)
+        self.fake_parity.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                from pathlib import Path
+                import shutil
+                import sys
+
+                Path(os.environ["FAKE_PARITY_LOG"]).write_text(
+                    json.dumps(
+                        {
+                            "arguments": sys.argv[1:],
+                            "chezmoi": str(Path(shutil.which("chezmoi")).resolve()),
+                            "lsrc": str(Path(shutil.which("lsrc")).resolve()),
+                            "private": os.environ.get("DOTFILES_PRIVATE_DIR"),
+                            "public": os.environ.get("DOTFILES_DIR"),
+                        },
+                        sort_keys=True,
+                    ),
+                    encoding="utf-8",
+                )
+                if os.environ.get("FAKE_PARITY_FAIL") == "1":
+                    print("private fixture detail", file=sys.stderr)
+                    raise SystemExit(41)
+                """
+            ),
+            encoding="utf-8",
+        )
+        self.fake_parity.chmod(0o700)
+        self.fake_just.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env python3
+                import json
+                import os
+                from pathlib import Path
+                import sys
+
+                Path(os.environ["FAKE_JUST_LOG"]).write_text(
+                    json.dumps(
+                        {
+                            "arguments": sys.argv[1:],
+                            "cwd": str(Path.cwd()),
+                            "home": os.environ.get("HOME"),
+                            "private": os.environ.get("DOTFILES_PRIVATE_DIR"),
+                            "public": os.environ.get("DOTFILES_DIR"),
+                        },
+                        sort_keys=True,
+                    ),
+                    encoding="utf-8",
+                )
+                if os.environ.get("FAKE_JUST_FAIL") == "1":
+                    print("private fixture detail", file=sys.stderr)
+                    raise SystemExit(43)
+                """
+            ),
+            encoding="utf-8",
+        )
+        self.fake_just.chmod(0o700)
 
     def _make_repository(self, root: Path, *, private: bool) -> None:
         (root / "home").mkdir(parents=True)
@@ -174,6 +239,15 @@ class ChezmoiCutoverTests(unittest.TestCase):
                                 "FAKE_RCM_SUMMARY",
                                 "cutover backup verified\\ttargets=1\\t"
                                 f"approval_sha256={os.environ['FAKE_BACKUP_DIGEST']}",
+                            )
+                        )
+                    elif command == "link-retained":
+                        if os.environ.get("FAKE_RCM_LINK_FAIL") == "1":
+                            raise SystemExit(35)
+                        print(
+                            os.environ.get(
+                                "FAKE_RCM_LINK_SUMMARY",
+                                "retained rcm links complete\\ttargets=6",
                             )
                         )
                     elif command == "cutover-restore":
@@ -269,6 +343,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
             checker = root / "tests/check-chezmoi-targets"
             checker.write_text("# fixture checker\n", encoding="utf-8")
         if private:
+            (root / "Justfile").write_text(
+                "dedicated-targets-install:\n    @true\n",
+                encoding="utf-8",
+            )
             docs = root / "docs"
             docs.mkdir()
             (docs / "chezmoi-private-targets.tsv").write_text(
@@ -300,6 +378,8 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 "FAKE_RCM_RESTORE_READY": str(self.restore_ready),
                 "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
                 "FAKE_CANARY_LOG": str(self.canary_log),
+                "FAKE_PARITY_LOG": str(self.parity_log),
+                "FAKE_JUST_LOG": str(self.just_log),
                 "FAKE_CHEZMOI_READY": str(self.ready),
                 "FAKE_DESCENDANT_PID": str(self.descendant_pid),
                 "CHEZMOI_CONFIG_FILE": str(self.root / "foreign-config"),
@@ -328,6 +408,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
             str(self.state),
             "--chezmoi",
             str(self.fake_chezmoi),
+            "--just",
+            str(self.fake_just),
+            "--parity-check",
+            str(self.fake_parity),
         ]
         if extra_arguments:
             arguments.extend(extra_arguments)
@@ -377,6 +461,122 @@ class ChezmoiCutoverTests(unittest.TestCase):
             json.loads(line)
             for line in self.log.read_text(encoding="utf-8").splitlines()
         ]
+
+    def test_link_public_only_scopes_rcm_and_applies_without_force(self) -> None:
+        completed = self._run("link")
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("retained rcm links verified (6)", completed.stderr)
+        self.assertIn("all owners are idempotent", completed.stderr)
+        self.assertFalse(self.just_log.exists())
+        self.assertEqual([record[0] for record in self._rcm_records()], ["link-retained"])
+        parity = json.loads(self.parity_log.read_text(encoding="utf-8"))
+        self.assertEqual(
+            parity["arguments"],
+            [
+                str(self.public.resolve()),
+                str(self.public.resolve() / "docs/chezmoi-targets.tsv"),
+            ],
+        )
+        self.assertEqual(parity["chezmoi"], str(self.fake_chezmoi.resolve()))
+        self.assertEqual(parity["private"], str(CUTOVER.lexical_absolute(self.private)))
+        self.assertEqual(parity["public"], str(self.public.resolve()))
+        applies = [
+            record for record in self._records()
+            if record["operation"] == "apply" and "--dry-run" not in record["arguments"]
+        ]
+        self.assertEqual(len(applies), 2)
+        for record in applies:
+            self.assertIn("--error-on-conflict", record["arguments"])
+            self.assertNotIn("--force", record["arguments"])
+
+    def test_link_with_private_runs_dedicated_owner_before_two_source_apply(self) -> None:
+        completed = self._run("link", private=True)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        invocation = json.loads(self.just_log.read_text(encoding="utf-8"))
+        self.assertEqual(invocation["cwd"], str(self.private.resolve()))
+        self.assertEqual(invocation["home"], str(self.home.resolve()))
+        self.assertEqual(invocation["private"], str(CUTOVER.lexical_absolute(self.private)))
+        self.assertEqual(invocation["public"], str(self.public.resolve()))
+        self.assertEqual(
+            invocation["arguments"],
+            [
+                "--no-dotenv",
+                "--justfile",
+                str(CUTOVER.lexical_absolute(self.private) / "Justfile"),
+                "--working-directory",
+                str(CUTOVER.lexical_absolute(self.private)),
+                "dedicated-targets-install",
+            ],
+        )
+        applies = [
+            record for record in self._records()
+            if record["operation"] == "apply" and "--dry-run" not in record["arguments"]
+        ]
+        self.assertEqual(
+            [record["cwd"] for record in applies],
+            [
+                str(self.public.resolve()),
+                str(self.private.resolve()),
+                str(self.public.resolve()),
+                str(self.private.resolve()),
+            ],
+        )
+
+    def test_link_preflight_failure_starts_no_owner_mutation(self) -> None:
+        completed = self._run(
+            "link",
+            private=True,
+            extra_environment={"FAKE_PARITY_FAIL": "1"},
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("parity check failed with status 41; output withheld", completed.stderr)
+        self.assertNotIn("private fixture detail", completed.stderr)
+        self.assertEqual(self._rcm_records(), [])
+        self.assertFalse(self.just_log.exists())
+        self.assertEqual(self._records(), [])
+
+    def test_link_retained_rcm_failure_stops_before_later_owners(self) -> None:
+        completed = self._run(
+            "link",
+            private=True,
+            extra_environment={"FAKE_RCM_LINK_FAIL": "1"},
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("retained rcm link helper failed with status 35", completed.stderr)
+        self.assertFalse(self.just_log.exists())
+        self.assertEqual(self._records(), [])
+
+    def test_link_private_owner_failure_withholds_output_and_stops_before_chezmoi(self) -> None:
+        completed = self._run(
+            "link",
+            private=True,
+            extra_environment={"FAKE_JUST_FAIL": "1"},
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn(
+            "private dedicated target installers failed with status 43; output withheld",
+            completed.stderr,
+        )
+        self.assertNotIn("private fixture detail", completed.stderr)
+        self.assertEqual([record[0] for record in self._rcm_records()], ["link-retained"])
+        self.assertEqual(self._records(), [])
+
+    def test_link_apply_failure_does_not_replace_current_state_with_full_rcm_restore(self) -> None:
+        completed = self._run(
+            "link",
+            private=True,
+            extra_environment={"FAKE_CHEZMOI_FAIL_APPLY_CWD": self.private.name},
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("private chezmoi safe-apply failed with status 29", completed.stderr)
+        self.assertEqual([record[0] for record in self._rcm_records()], ["link-retained"])
+        self.assertTrue(self.just_log.exists())
 
     def _descendant_launcher(self, *, wait: bool) -> Path:
         launcher = self.root / f"descendant-launcher-{wait}"
@@ -1225,7 +1425,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
 
     def test_committed_signal_is_recorded_without_ambiguous_failure(self) -> None:
         with CUTOVER.recoverable_termination_signals() as termination:
-            CUTOVER.mark_apply_committed(termination)
+            CUTOVER.mark_operation_committed(termination)
             os.kill(os.getpid(), signal.SIGTERM)
             self.assertEqual(termination.signum, signal.SIGTERM)
             self.assertTrue(termination.committed)
@@ -1240,7 +1440,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
             with CUTOVER.recoverable_termination_signals(
                 retain_committed_handlers=True
             ) as termination:
-                CUTOVER.mark_apply_committed(termination)
+                CUTOVER.mark_operation_committed(termination)
 
             os.kill(os.getpid(), signal.SIGTERM)
             self.assertEqual(termination.signum, signal.SIGTERM)

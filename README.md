@@ -1,7 +1,6 @@
 # Dotfiles
 
-Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
-[rcm](https://github.com/thoughtbot/rcm).
+Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, deployed primarily with [chezmoi](https://www.chezmoi.io/). A small manifest-declared set remains linked through [rcm](https://github.com/thoughtbot/rcm), which is also retained as the full rollback authority during migration acceptance.
 
 ## Features
 
@@ -9,6 +8,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
 - Platform detection (`$PLATFORM`) with automatic path configuration
 - Homebrew integration with platform-specific Brewfiles
 - Runtime version management via [mise](https://mise.jdx.dev/)
+- Conflict-refusing public/private chezmoi deployment through `just link`
 - Optimized shell startup with intelligent caching
 - [tmux](docs/tmux.md) with vi-style bindings and platform-aware clipboard
 - Exact-tip local shipping gate with [just](https://just.systems/), commit signature-header checks, and no hosted CI minutes
@@ -29,8 +29,8 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    ```sh
    mkdir -p ~/Workspace/tgautier
    git clone https://github.com/tgautier/dotfiles.git ~/Workspace/tgautier/dotfiles
-   # Optional: clone the private companion repo alongside it (merged via
-   # DOTFILES_DIRS). If absent, setup links the public repo only.
+   # Optional: clone the private companion repo alongside it. If absent,
+   # setup deploys the public source only.
    ```
 
 3. **Sign in to the App Store** (the Brewfile's `mas` entries fail without
@@ -46,7 +46,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    ```
 
    `just setup` prompts for the machine profile (work/personal) on first run,
-   then installs all packages for that profile, links every dotfiles repo,
+   then installs all packages for that profile, deploys the selected sources,
    installs mise and the pinned runtimes, and enables git hooks and tools.
    It is idempotent — re-run it anytime.
 
@@ -120,8 +120,8 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    ```sh
    mkdir -p ~/Workspace/tgautier
    git clone https://github.com/tgautier/dotfiles.git ~/Workspace/tgautier/dotfiles
-   # Optional: clone the private companion repo alongside it (merged via
-   # DOTFILES_DIRS). If absent, setup links the public repo only.
+   # Optional: clone the private companion repo alongside it. If absent,
+   # setup deploys the public source only.
    ```
 
 6. **Bootstrap and run setup** (uses `Brewfile.linux` automatically):
@@ -132,7 +132,7 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, managed with
    just setup
    ```
 
-   `just setup` installs all packages, links every dotfiles repo, installs
+   `just setup` installs all packages, deploys the selected sources, installs
    mise and the pinned runtimes, and enables git hooks and tools (the
    work/personal machine profile is macOS-only — Linux has no overlay).
    It is idempotent — re-run it anytime.
@@ -177,9 +177,7 @@ Or run individual update steps:
 
 ### Applying config changes
 
-`just update` upgrades installed software — it does **not** re-apply symlinks.
-After editing a dotfile that rcm links into `$HOME` (`gitconfig`, `zshrc`,
-`zshenv`, `tmux.conf`, …), re-link so the running machine picks the change up:
+`just update` upgrades installed software; it does not deploy local config changes. After editing managed config, refresh the running machine through the declared owners:
 
 ```sh
 cd ~/Workspace/tgautier/dotfiles
@@ -189,13 +187,11 @@ just link
 The `cd` matters: `~/.justfile` is a symlink to the private repo's justfile, so
 `just link` from `$HOME` resolves there and fails with an unknown-recipe error.
 
-`just setup` also re-links, but it is the whole bootstrap — `just link` is the
-one step.
+`just setup` also runs the same refresh, but it is the whole bootstrap. Use `just link` for config deployment alone.
 
-Prefer it over a bare `rcup`. This repo's `rcrc` lives in-tree, and the recipe
-passes `RCRC=` explicitly, so it works on any machine — including one that has
-never been bootstrapped. A bare `rcup` reads the same config only *after* the
-first bootstrap, because `~/.rcrc` is itself one of the symlinks rcm creates.
+The recipe first runs the public/private ownership and source parity check in isolation. It then uses rcm only for the six public targets whose manifest disposition starts with `defer-`, invokes the private dedicated-owner aggregate when that checkout exists, and applies the public and private chezmoi sources twice. Neither routine owner uses force: rcm runs only after exact-link or absence preflight, and chezmoi enables conflict errors. A modified or pre-existing managed file therefore stops the refresh instead of being overwritten. Empty status, diff, and dry-run state after each pass proves idempotence.
+
+Do not use bare `rcup` for routine deployment. The unchanged broad `rcrc` graph is retained for the digest-bound full rollback and would return migrated targets to symlinks. If `just link` stops after one owner has run, resolve the reported conflict or tool failure and rerun it; each owner is designed to converge independently.
 
 ### Custom checkout locations
 
@@ -203,15 +199,12 @@ Both repos default to `~/Workspace/tgautier/`. Override per machine with two
 environment variables, which are a single shared contract — set one and every
 consumer moves together:
 
-| Variable               | Default                                 | Used by                                                          |
-| ---------------------- | --------------------------------------- | ---------------------------------------------------------------- |
-| `DOTFILES_DIR`         | `~/Workspace/tgautier/dotfiles`         | `DOTFILES_DIRS` in `rcrc`, the stale-symlink scanner             |
-| `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | the above, plus `EXCLUDES` in `rcrc`                             |
+| Variable               | Default                                 | Used by                                                            |
+| ---------------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| `DOTFILES_DIR`         | `~/Workspace/tgautier/dotfiles`         | chezmoi orchestration, retained rcm links, rollback, and inventory |
+| `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | optional private chezmoi source, dedicated owners, and rollback    |
 
-Export them before `just link` / `just setup` so `rcrc` sees them — rcm sources
-`rcrc` as shell, which is what lets it read the environment at all. A trailing
-slash is fine: `rcrc` strips it and the scanner normalises with zsh's `:a`. An
-absent private repo is skipped, not fatal.
+Export them before `just link` or `just setup`. The operator passes the same paths to chezmoi, the retained rcm helper, the optional private dedicated owners, inventory, and rollback. A trailing slash is normalized. An absent private repository is skipped, not fatal.
 
 ## Documentation
 
@@ -252,7 +245,7 @@ Brewfile.work           # macOS work-only casks/apps
 Brewfile.personal       # macOS personal-only casks/apps
 Brewfile.linux          # Linux Homebrew packages
 .chezmoiroot            # Selects home/ as the chezmoi source state
-home/                   # Shadow chezmoi sources; rcm still owns deployment
+home/                   # Active public chezmoi source state
 tests/                  # Isolated parity checker and sabotage fixtures
 Justfile                # Bootstrap, CI and update recipes
 .githooks/              # Local identity, complete-CI, signature, and exact-tip push gate
@@ -270,8 +263,7 @@ which are self-describing.
 
 ## Scripts (`bin/`)
 
-rcm links each script into `~/.bin`, which `zshenv` adds to `PATH` (alongside
-`~/.bin.local` for machine-local scripts that stay out of this repo).
+Chezmoi installs each managed script into `~/.bin`, which `zshenv` adds to `PATH` alongside `~/.bin.local` for machine-local scripts that stay out of this repository.
 
 | Script        | Description                                                                 |
 | ------------- | --------------------------------------------------------------------------- |
@@ -279,7 +271,7 @@ rcm links each script into `~/.bin`, which `zshenv` adds to `PATH` (alongside
 | `kshow`       | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)     |
 | `obsidian`    | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+)   |
 | `op-ssh-sign` | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)   |
-| `rcm-links`   | Inventory HOME links and run approved cleanup or cutover recovery           |
+| `rcm-links`   | Inventory HOME links, refresh retained rcm targets, and perform recovery    |
 
 ## Shell functions (`zsh/functions/`)
 
@@ -407,6 +399,7 @@ Individual targets:
 | `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
 | `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |
+| `just link` | Refresh retained rcm links, private dedicated targets, and public/private chezmoi sources |
 | `just chezmoi-status` | Inspect public/private chezmoi status without changing managed targets |
 | `just chezmoi-diff` | Print the local public/private target-state diff |
 | `just chezmoi-apply-dry-run` | Preview both applies without changing managed targets |

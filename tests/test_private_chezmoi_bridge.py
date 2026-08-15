@@ -263,7 +263,11 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             bridge.subprocess.TimeoutExpired("child", bridge.CLEANUP_TIMEOUT_SECONDS),
         ]
 
-        with mock.patch.object(bridge.os, "killpg") as killpg:
+        with mock.patch.object(
+            bridge.os,
+            "killpg",
+            side_effect=[None, None, ProcessLookupError],
+        ) as killpg:
             bridge._stop_process_group(process)
 
         self.assertEqual(
@@ -278,8 +282,19 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             [
                 mock.call(process.pid, bridge.signal.SIGTERM),
                 mock.call(process.pid, bridge.signal.SIGKILL),
+                mock.call(process.pid, 0),
             ],
         )
+
+    def test_cleanup_fails_if_the_process_group_survives_sigkill(self) -> None:
+        with (
+            mock.patch.object(bridge.os, "killpg") as killpg,
+            mock.patch.object(bridge.time, "monotonic", side_effect=[10, 13]),
+            self.assertRaisesRegex(bridge.BridgeError, "cleanup deadline"),
+        ):
+            bridge._wait_for_process_group_exit(123)
+
+        killpg.assert_called_once_with(123, 0)
 
     def test_non_directory_and_stale_checkout_fail_generically(self) -> None:
         self.checkout.write_text(PRIVATE_SENTINEL, encoding="utf-8")

@@ -10,6 +10,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Sequence
 
 
@@ -24,6 +25,19 @@ PRIVATE_MODULES = {
 
 class BridgeError(RuntimeError):
     """The optional companion checkout cannot satisfy its canary contract."""
+
+
+def _wait_for_process_group_exit(process_group: int) -> None:
+    deadline = time.monotonic() + CLEANUP_TIMEOUT_SECONDS
+    while True:
+        try:
+            os.killpg(process_group, 0)
+        except ProcessLookupError:
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise BridgeError("companion process group exceeded its cleanup deadline")
+        time.sleep(min(0.01, remaining))
 
 
 def _companion_path() -> Path:
@@ -75,6 +89,7 @@ def _stop_process_group(process: subprocess.Popen[bytes]) -> None:
             process.communicate(timeout=CLEANUP_TIMEOUT_SECONDS)
         except subprocess.TimeoutExpired:
             pass
+    _wait_for_process_group_exit(process.pid)
 
 
 def _invoke_private(

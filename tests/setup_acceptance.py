@@ -467,7 +467,20 @@ def run_case(
             if first_state is None:
                 first_state = current_state
             elif current_state != first_state:
-                raise AcceptanceError("the second setup pass mutated managed target state")
+                if private is None:
+                    changed = sorted(
+                        str(target.relative_to(home))
+                        for target in managed_targets
+                        if current_state.get(target) != first_state.get(target)
+                    )
+                    raise AcceptanceError(
+                        "the second setup pass mutated managed target state: "
+                        + ", ".join(changed)
+                    )
+                raise AcceptanceError(
+                    "the second setup pass mutated companion-managed target state; "
+                    "details withheld"
+                )
 
         verify_provisioning_calls(tool_log, public, runs=2)
         hooks_path = run(

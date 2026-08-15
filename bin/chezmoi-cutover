@@ -36,9 +36,8 @@ class CutoverError(RuntimeError):
 class TerminationRequested(BaseException):
     """A recoverable termination signal interrupted the operator command."""
 
-    def __init__(self, signum: int, *, restored: bool = False) -> None:
+    def __init__(self, signum: int) -> None:
         self.signum = signum
-        self.restored = restored
         super().__init__(signal.Signals(signum).name)
 
 

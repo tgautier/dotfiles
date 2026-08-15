@@ -74,7 +74,7 @@ cleanup-retired-iterm:
                 echo "removed retired iTerm2 symlink: $target"
                 ;;
             *)
-                echo "refusing to remove non-rcm symlink: $target -> $link" >&2
+                echo "refusing to remove unrecognized symlink: $target -> $link" >&2
                 exit 1
                 ;;
         esac

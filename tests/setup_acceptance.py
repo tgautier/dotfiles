@@ -176,6 +176,7 @@ def clean_environment(home: Path, fake_bin: Path, log_path: Path) -> dict[str, s
         if not key.startswith("GIT_")
         and key
         not in {
+            "BASH_ENV",
             "CDPATH",
             "CHEZMOI_CONFIG_FILE",
             "DOTFILES_DIR",
@@ -184,6 +185,7 @@ def clean_environment(home: Path, fake_bin: Path, log_path: Path) -> dict[str, s
             "PYTHONHOME",
             "PYTHONPATH",
             "RCRC",
+            "SHELLOPTS",
             "ZDOTDIR",
         }
     }
@@ -202,8 +204,10 @@ def clean_environment(home: Path, fake_bin: Path, log_path: Path) -> dict[str, s
             "XDG_CONFIG_HOME": str(home / ".config"),
             "XDG_DATA_HOME": str(home / ".local/share"),
             "XDG_STATE_HOME": str(home / ".local/state"),
+            "ZDOTDIR": str(home.parent / "zdotdir"),
         }
     )
+    Path(environment["ZDOTDIR"]).mkdir(mode=0o700)
     return environment
 
 

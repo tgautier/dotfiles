@@ -97,7 +97,10 @@ def run(mode: str, public_targets: Path | None = None) -> str:
         return "skipped"
     if not checkout.is_dir():
         raise BridgeError("companion checkout path is not a directory")
-    checkout = checkout.resolve(strict=True)
+    try:
+        checkout = checkout.resolve(strict=True)
+    except RuntimeError as exc:
+        raise BridgeError("companion checkout path cannot be resolved") from exc
 
     module = PRIVATE_MODULES[mode]
     module_path = checkout.joinpath(*module.split(".")).with_suffix(".py")

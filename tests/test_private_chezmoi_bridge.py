@@ -111,6 +111,24 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         )
         self.assertNotIn(str(self.checkout), error.getvalue())
 
+    def test_resolution_error_withholds_private_path(self) -> None:
+        self.checkout.mkdir()
+        error = io.StringIO()
+        resolution_error = RuntimeError(f"Symlink loop from {self.checkout}")
+        with (
+            self._environment(),
+            mock.patch.object(Path, "resolve", side_effect=resolution_error),
+            redirect_stderr(error),
+        ):
+            result = bridge.main(["source"])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "companion chezmoi: companion checkout path cannot be resolved\n",
+        )
+        self.assertNotIn(str(self.checkout), error.getvalue())
+
     def test_timeout_terminates_the_private_process_group(self) -> None:
         child_pid_file = self.root / "child.pid"
         self._module(

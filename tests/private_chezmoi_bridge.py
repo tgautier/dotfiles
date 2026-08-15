@@ -30,6 +30,7 @@ PRIVATE_MODULES = {
 }
 PUBLIC_ONLY_STATE = "public-only"
 COMPANION_STATE_PREFIX = "companion:"
+INCOMPATIBLE_CHECKOUT = "companion checkout is incompatible; update it before retrying"
 
 
 class BridgeError(RuntimeError):
@@ -158,6 +159,7 @@ def _snapshot_paths(checkout: Path, digest: _Digest, deadline: float) -> list[by
 def _hash_checkout_entry(
     checkout: Path,
     relative_bytes: bytes,
+    snapshot_paths: set[bytes],
     digest: _Digest,
     deadline: float,
 ) -> None:
@@ -177,6 +179,18 @@ def _hash_checkout_entry(
     _hash_field(digest, stat.S_IMODE(metadata.st_mode).to_bytes(8, "big"))
     if stat.S_ISLNK(metadata.st_mode):
         _hash_field(digest, os.fsencode(os.readlink(candidate)))
+        try:
+            resolved = candidate.resolve(strict=True)
+            resolved_relative = resolved.relative_to(checkout)
+        except (FileNotFoundError, RuntimeError, ValueError) as exc:
+            raise BridgeError(INCOMPATIBLE_CHECKOUT) from exc
+        resolved_bytes = os.fsencode(resolved_relative)
+        resolved_prefix = resolved_bytes.rstrip(b"/") + b"/"
+        if resolved_bytes not in snapshot_paths and not any(
+            path.startswith(resolved_prefix) for path in snapshot_paths
+        ):
+            raise BridgeError(INCOMPATIBLE_CHECKOUT)
+        _hash_field(digest, resolved_bytes)
         return
     if stat.S_ISDIR(metadata.st_mode):
         return
@@ -211,9 +225,47 @@ def _checkout_identity(checkout: Path) -> str:
         str(metadata.st_ino).encode("ascii"),
     ):
         _hash_field(digest, value)
-    for relative_bytes in _snapshot_paths(checkout, digest, deadline):
-        _hash_checkout_entry(checkout, relative_bytes, digest, deadline)
+    snapshot_paths = _snapshot_paths(checkout, digest, deadline)
+    snapshot_path_set = set(snapshot_paths)
+    for relative_bytes in snapshot_paths:
+        _hash_checkout_entry(
+            checkout,
+            relative_bytes,
+            snapshot_path_set,
+            digest,
+            deadline,
+        )
     return digest.hexdigest()
+
+
+def _require_checker_module(checkout: Path, module: str) -> None:
+    current = checkout
+    parts = module.split(".")
+    for package in parts[:-1]:
+        current /= package
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError as exc:
+            raise BridgeError(INCOMPATIBLE_CHECKOUT) from exc
+        if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
+            raise BridgeError(INCOMPATIBLE_CHECKOUT)
+        package_initializer = current / "__init__.py"
+        try:
+            initializer_metadata = package_initializer.lstat()
+        except FileNotFoundError:
+            continue
+        if stat.S_ISLNK(initializer_metadata.st_mode) or not stat.S_ISREG(
+            initializer_metadata.st_mode
+        ):
+            raise BridgeError(INCOMPATIBLE_CHECKOUT)
+
+    module_path = current / f"{parts[-1]}.py"
+    try:
+        module_metadata = module_path.lstat()
+    except FileNotFoundError as exc:
+        raise BridgeError(INCOMPATIBLE_CHECKOUT) from exc
+    if stat.S_ISLNK(module_metadata.st_mode) or not stat.S_ISREG(module_metadata.st_mode):
+        raise BridgeError(INCOMPATIBLE_CHECKOUT)
 
 
 def _publish_session_state(path: Path, state_value: str) -> None:
@@ -362,9 +414,7 @@ def run(mode: str, session_state: Path, public_targets: Path | None = None) -> s
             raise BridgeError("companion checkout changed during canary")
 
     module = PRIVATE_MODULES[mode]
-    module_path = checkout.joinpath(*module.split(".")).with_suffix(".py")
-    if not module_path.is_file():
-        raise BridgeError("companion checkout is incompatible; update it before retrying")
+    _require_checker_module(checkout, module)
 
     arguments: list[str] = []
     timeout = SOURCE_TIMEOUT_SECONDS

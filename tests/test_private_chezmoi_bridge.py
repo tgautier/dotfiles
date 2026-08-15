@@ -207,6 +207,19 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         ):
             bridge._checkout_identity(self.checkout.resolve())
 
+    def test_checkout_identity_binds_internal_symlink_referents(self) -> None:
+        self.checkout.mkdir()
+        shared = self.checkout / "shared"
+        shared.mkdir()
+        referent = shared / "source"
+        referent.write_text("first\n", encoding="utf-8")
+        (self.checkout / "linked-source").symlink_to("shared/source")
+        first_identity = bridge._checkout_identity(self.checkout.resolve())
+
+        referent.write_text("second\n", encoding="utf-8")
+        second_identity = bridge._checkout_identity(self.checkout.resolve())
+        self.assertNotEqual(first_identity, second_identity)
+
     def test_private_failure_withholds_stdout_and_stderr(self) -> None:
         self._module(
             "check_private_source",
@@ -412,6 +425,35 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
 
         self.checkout.unlink()
         self.checkout.mkdir()
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "incompatible"
+        ):
+            bridge.run("ownership", self.session_state, self.manifest)
+
+    def test_symlinked_checker_module_is_rejected(self) -> None:
+        self._module("check_target_ownership", "")
+        module = self.checkout / "shared/chezmoi/check_target_ownership.py"
+        external_module = self.root / "external-checker.py"
+        external_module.write_text("", encoding="utf-8")
+        module.unlink()
+        module.symlink_to(external_module)
+
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "incompatible"
+        ):
+            bridge.run("ownership", self.session_state, self.manifest)
+
+    def test_symlinked_checker_package_is_rejected(self) -> None:
+        external_package = self.root / "external-shared"
+        module = external_package / "chezmoi/check_target_ownership.py"
+        module.parent.mkdir(parents=True)
+        module.write_text("", encoding="utf-8")
+        self.checkout.mkdir()
+        (self.checkout / "shared").symlink_to(
+            external_package,
+            target_is_directory=True,
+        )
+
         with self._environment(), self.assertRaisesRegex(
             bridge.BridgeError, "incompatible"
         ):

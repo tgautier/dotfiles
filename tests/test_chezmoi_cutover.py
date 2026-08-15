@@ -99,6 +99,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     applied.mkdir(exist_ok=True)
                     marker.touch()
                     (Path(os.environ["HOME"]) / "unexpected-mutation").touch()
+                    if os.environ.get("FAKE_CHEZMOI_MUTATE_SOURCE_AFTER_APPLY") == source:
+                        (Path.cwd() / "home/dot_fixture").write_text(
+                            "changed after approval\\n", encoding="utf-8"
+                        )
                     if os.environ.get("FAKE_CHEZMOI_WAIT_AFTER_APPLY_CWD") == source:
                         descendant = subprocess.Popen(
                             [
@@ -744,6 +748,29 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn("complete rcm link set was restored", completed.stderr)
         self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
 
+    def test_source_drift_after_first_apply_restores_before_next_invocation(self) -> None:
+        approval = self._approval()
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_environment={
+                "FAKE_CHEZMOI_MUTATE_SOURCE_AFTER_APPLY": self.public.name,
+            },
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("approved execution inputs changed", completed.stderr)
+        self.assertIn("complete rcm link set was restored", completed.stderr)
+        self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
+
     def test_post_apply_drift_restores_rcm(self) -> None:
         approval = self._approval()
         completed = self._run(
@@ -1132,6 +1159,11 @@ class ChezmoiCutoverTests(unittest.TestCase):
             config=Path("chezmoi.toml"),
         )
         with (
+            mock.patch.object(
+                CUTOVER,
+                "execution_contract_digest",
+                return_value=BACKUP_DIGEST,
+            ),
             mock.patch.object(CUTOVER, "prepare_approval", return_value=BACKUP_DIGEST),
             mock.patch.object(CUTOVER, "verify_backup"),
             mock.patch.object(CUTOVER, "capture_operation", side_effect=KeyboardInterrupt),
@@ -1159,49 +1191,12 @@ class ChezmoiCutoverTests(unittest.TestCase):
             )
         restore.assert_called_once()
 
-    def test_termination_at_completion_handoff_restores_rcm(self) -> None:
-        source = CUTOVER.require_source(
-            self.public,
-            label="public",
-            config=Path("chezmoi.toml"),
-        )
-        termination = CUTOVER.TerminationState()
-
-        def interrupt_completion(*arguments: object, **_keywords: object) -> None:
-            if arguments and arguments[0] == (
-                "chezmoi apply complete: both sources are idempotent"
-            ):
-                termination.signum = signal.SIGTERM
-                raise CUTOVER.TerminationRequested(signal.SIGTERM)
-
-        with (
-            mock.patch.object(CUTOVER, "prepare_approval", return_value=BACKUP_DIGEST),
-            mock.patch.object(CUTOVER, "verify_backup"),
-            mock.patch.object(CUTOVER, "capture_operation"),
-            mock.patch.object(CUTOVER, "require_settled_state"),
-            mock.patch.object(CUTOVER, "restore_rcm") as restore,
-            mock.patch("builtins.print", side_effect=interrupt_completion),
-            self.assertRaises(CUTOVER.TerminationRequested) as raised,
-        ):
-            CUTOVER.apply_with_recovery(
-                executable=self.fake_chezmoi,
-                sources=(source,),
-                public=self.public.resolve(),
-                private=self.private,
-                home=self.home,
-                cache_root=self.cache,
-                state_root=self.state,
-                backup=self.backup,
-                backup_confirm=BACKUP_DIGEST,
-                apply_confirm=BACKUP_DIGEST,
-                lsrc="lsrc",
-                rcup="rcup",
-                canary=self.public / "tests/test-chezmoi-canary",
-                termination=termination,
-            )
-
-        self.assertTrue(raised.exception.restored)
-        restore.assert_called_once()
+    def test_committed_signal_is_recorded_without_ambiguous_failure(self) -> None:
+        with CUTOVER.recoverable_termination_signals() as termination:
+            CUTOVER.mark_apply_committed(termination)
+            os.kill(os.getpid(), signal.SIGTERM)
+            self.assertEqual(termination.signum, signal.SIGTERM)
+            self.assertTrue(termination.committed)
 
     def test_apply_reruns_canary_and_refuses_mutation_when_it_fails(self) -> None:
         approval = self._approval()

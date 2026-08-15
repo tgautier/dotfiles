@@ -20,10 +20,10 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Iterator, Sequence
+from typing import Callable, Iterator, Sequence
 
 
-APPROVAL_SCHEMA_VERSION = 1
+APPROVAL_SCHEMA_VERSION = 2
 MAX_COMMAND_OUTPUT_BYTES = 16 * 1024 * 1024
 MAX_SOURCE_BYTES = 64 * 1024 * 1024
 CHEZMOI_TIMEOUT_SECONDS = 120
@@ -52,6 +52,7 @@ class TerminationState:
 
     signum: int | None = None
     recovering: bool = False
+    committed: bool = False
 
 
 @dataclass(frozen=True)
@@ -73,7 +74,7 @@ def recoverable_termination_signals() -> Iterator[TerminationState]:
     def request_termination(signum: int, _frame: object) -> None:
         if state.signum is None:
             state.signum = signum
-            if not state.recovering:
+            if not state.recovering and not state.committed:
                 raise TerminationRequested(signum)
 
     handled = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
@@ -85,6 +86,18 @@ def recoverable_termination_signals() -> Iterator[TerminationState]:
     finally:
         for signum, handler in previous.items():
             signal.signal(signum, handler)
+
+
+def mark_apply_committed(state: TerminationState) -> None:
+    """Atomically commit success before termination handlers are removed."""
+
+    handled = {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
+    try:
+        previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, handled)
+        state.committed = True
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+    except (AttributeError, OSError) as exc:
+        raise CutoverError(f"cannot commit the apply signal handoff: {exc}") from exc
 
 
 def lexical_absolute(path: Path) -> Path:
@@ -793,25 +806,17 @@ def observation_digests(
     return observations
 
 
-def approval_digest(
+def execution_contract_material(
     *,
     executable: Path,
     sources: Sequence[SourceState],
-    home: Path,
-    backup: Path,
-    backup_confirm: str,
-    observations: dict[str, dict[str, str]],
     canary: Path,
     lsrc: Path,
     rcup: Path,
-) -> str:
-    """Bind reviewed output to source bytes, paths, backup, and executable."""
+) -> dict[str, object]:
+    """Describe every approved executable and source input."""
 
-    material = {
-        "schema": APPROVAL_SCHEMA_VERSION,
-        "home": str(home),
-        "backup": str(backup),
-        "backup_sha256": backup_confirm,
+    return {
         "chezmoi": str(executable),
         "chezmoi_sha256": hash_regular_file(
             executable,
@@ -824,6 +829,7 @@ def approval_digest(
             label="chezmoi operator",
             limit=MAX_SOURCE_BYTES,
         ),
+        "canary": str(canary),
         "canary_sha256": hash_regular_file(
             canary,
             label="chezmoi canary",
@@ -851,6 +857,56 @@ def approval_digest(
             }
             for source in sources
         ],
+    }
+
+
+def execution_contract_digest(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    canary: Path,
+    lsrc: Path,
+    rcup: Path,
+) -> str:
+    """Hash every path and byte sequence allowed to run after approval."""
+
+    material = execution_contract_material(
+        executable=executable,
+        sources=sources,
+        canary=canary,
+        lsrc=lsrc,
+        rcup=rcup,
+    )
+    encoded = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def approval_digest(
+    *,
+    executable: Path,
+    sources: Sequence[SourceState],
+    home: Path,
+    backup: Path,
+    backup_confirm: str,
+    observations: dict[str, dict[str, str]],
+    canary: Path,
+    lsrc: Path,
+    rcup: Path,
+) -> str:
+    """Bind reviewed output to source bytes, paths, backup, and executable."""
+
+    material = {
+        "schema": APPROVAL_SCHEMA_VERSION,
+        "home": str(home),
+        "backup": str(backup),
+        "backup_sha256": backup_confirm,
+        "execution": execution_contract_material(
+            executable=executable,
+            sources=sources,
+            canary=canary,
+            lsrc=lsrc,
+            rcup=rcup,
+        ),
         "observations": observations,
     }
     encoded = json.dumps(material, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -944,11 +1000,13 @@ def require_settled_state(
     cache_root: Path,
     state_root: Path,
     label: str,
+    before_operation: Callable[[], None],
 ) -> None:
     """Require status, diff, and dry-run to agree that no change remains."""
 
     for source in sources:
         for operation in ("status", "diff", "dry-run"):
+            before_operation()
             output = capture_operation(
                 operation,
                 executable=executable,
@@ -1008,6 +1066,15 @@ def apply_with_recovery(
 ) -> None:
     """Apply both sources twice and restore rcm after any mutation failure."""
 
+    lsrc_path = Path(lsrc)
+    rcup_path = Path(rcup)
+    expected_execution = execution_contract_digest(
+        executable=executable,
+        sources=sources,
+        canary=canary,
+        lsrc=lsrc_path,
+        rcup=rcup_path,
+    )
     observed_approval = prepare_approval(
         executable=executable,
         sources=sources,
@@ -1026,6 +1093,17 @@ def apply_with_recovery(
     )
     if not hmac.compare_digest(observed_approval, apply_confirm):
         raise CutoverError("apply approval differs from the reviewed status, diff, or dry run")
+    if not hmac.compare_digest(
+        execution_contract_digest(
+            executable=executable,
+            sources=sources,
+            canary=canary,
+            lsrc=lsrc_path,
+            rcup=rcup_path,
+        ),
+        expected_execution,
+    ):
+        raise CutoverError("approved execution inputs changed during apply preflight")
     verify_backup(
         public=public,
         private=private,
@@ -1037,8 +1115,21 @@ def apply_with_recovery(
     )
 
     mutation_started = False
+
+    def require_approved_execution() -> None:
+        observed = execution_contract_digest(
+            executable=executable,
+            sources=sources,
+            canary=canary,
+            lsrc=lsrc_path,
+            rcup=rcup_path,
+        )
+        if not hmac.compare_digest(observed, expected_execution):
+            raise CutoverError("approved execution inputs changed before invocation")
+
     try:
         for source in sources:
+            require_approved_execution()
             mutation_started = True
             capture_operation(
                 "apply",
@@ -1056,8 +1147,10 @@ def apply_with_recovery(
             cache_root=cache_root,
             state_root=state_root,
             label="first apply",
+            before_operation=require_approved_execution,
         )
         for source in sources:
+            require_approved_execution()
             capture_operation(
                 "apply",
                 executable=executable,
@@ -1074,7 +1167,9 @@ def apply_with_recovery(
             cache_root=cache_root,
             state_root=state_root,
             label="second apply",
+            before_operation=require_approved_execution,
         )
+        mark_apply_committed(termination)
         print("chezmoi apply complete: both sources are idempotent", file=sys.stderr)
         return
     except (CutoverError, KeyboardInterrupt, TerminationRequested) as exc:

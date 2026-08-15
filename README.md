@@ -401,7 +401,8 @@ Individual targets:
 | `just lint-rcrc` | Check `rcrc` dirs, excludes, normalisation |
 | `just lint-cleanup-symlinks` | Fixture-test the stale-symlink scanner |
 | `just test-rcm-links` | Fixture-test HOME link inventory, cleanup, cutover backup, and rcm restoration |
-| `just test-chezmoi-canary` | Compare exact maps and, when present, private ownership in an isolated HOME |
+| `just test-private-chezmoi-bridge` | Fixture-test bounded companion checks and output withholding |
+| `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
 | `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |
 

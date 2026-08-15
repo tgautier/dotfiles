@@ -310,15 +310,15 @@ def command_arguments(
     ]
     arguments.extend(("--config", str(source.config)))
     if operation == "status":
-        arguments.extend(("status", "--include", "files", "--path-style=relative"))
+        arguments.extend(("status", "--include", "files,dirs", "--path-style=relative"))
     elif operation == "diff":
-        arguments.extend(("diff", "--include", "files", "--recursive"))
+        arguments.extend(("diff", "--include", "files,dirs", "--recursive"))
     elif operation == "dry-run":
-        arguments.extend(("apply", "--include", "files", "--dry-run", "--verbose"))
+        arguments.extend(("apply", "--include", "files,dirs", "--dry-run", "--verbose"))
     elif operation == "apply":
-        arguments.extend(("apply", "--include", "files", "--force"))
+        arguments.extend(("apply", "--include", "files,dirs", "--force"))
     elif operation == "safe-apply":
-        arguments.extend(("apply", "--include", "files", "--error-on-conflict"))
+        arguments.extend(("apply", "--include", "files,dirs", "--error-on-conflict"))
     else:
         raise CutoverError(f"unsupported operator command: {operation}")
     return arguments

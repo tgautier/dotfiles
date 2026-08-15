@@ -45,6 +45,7 @@ def run(
     cwd: Path | None = None,
     env: dict[str, str] | None = None,
     label: str,
+    expose_output: bool = False,
 ) -> subprocess.CompletedProcess[str]:
     """Run one bounded command and withhold output on failure."""
 
@@ -61,8 +62,14 @@ def run(
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise AcceptanceError(f"{label} could not complete: {exc}") from exc
     if completed.returncode != 0:
+        detail = ""
+        if expose_output:
+            output = (completed.stdout + completed.stderr).strip()
+            if output:
+                detail = f"\n{output[-16_384:]}"
         raise AcceptanceError(
-            f"{label} failed with status {completed.returncode}; output withheld"
+            f"{label} failed with status {completed.returncode}"
+            + (detail if detail else "; output withheld")
         )
     return completed
 
@@ -442,6 +449,7 @@ def run_case(
                 cwd=public,
                 env=environment,
                 label=f"setup pass {invocation}",
+                expose_output=private is None,
             )
             managed_targets = verify_public_targets(public, home)
             if private:

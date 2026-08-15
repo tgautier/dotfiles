@@ -343,7 +343,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
             checker = root / "tests/check-chezmoi-targets"
             checker.write_text("# fixture checker\n", encoding="utf-8")
         if private:
-            (root / "Justfile").write_text(
+            (root / "justfile").write_text(
                 "dedicated-targets-install:\n    @true\n",
                 encoding="utf-8",
             )
@@ -487,6 +487,8 @@ class ChezmoiCutoverTests(unittest.TestCase):
         ]
         self.assertEqual(len(applies), 2)
         for record in applies:
+            include_index = record["arguments"].index("--include")
+            self.assertEqual(record["arguments"][include_index + 1], "files,dirs")
             self.assertIn("--error-on-conflict", record["arguments"])
             self.assertNotIn("--force", record["arguments"])
 
@@ -504,7 +506,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
             [
                 "--no-dotenv",
                 "--justfile",
-                str(CUTOVER.lexical_absolute(self.private) / "Justfile"),
+                str(CUTOVER.lexical_absolute(self.private) / "justfile"),
                 "--working-directory",
                 str(CUTOVER.lexical_absolute(self.private)),
                 "dedicated-targets-install",
@@ -666,7 +668,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn(str(self.state / "public.boltdb"), arguments)
         self.assertEqual(
             arguments[-4:],
-            ["status", "--include", "files", "--path-style=relative"],
+            ["status", "--include", "files,dirs", "--path-style=relative"],
         )
         self.assertIn("==> public chezmoi status", completed.stderr)
         self.assertIn("fixture public status", completed.stdout)
@@ -697,7 +699,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         )
         self.assertEqual(
             private_arguments[-4:],
-            ["diff", "--include", "files", "--recursive"],
+            ["diff", "--include", "files,dirs", "--recursive"],
         )
         self.assertIn("==> private chezmoi diff", completed.stderr)
 
@@ -711,7 +713,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
             arguments = record["arguments"]
             self.assertEqual(
                 arguments[-5:],
-                ["apply", "--include", "files", "--dry-run", "--verbose"],
+                ["apply", "--include", "files,dirs", "--dry-run", "--verbose"],
             )
         self.assertFalse((self.home / "unexpected-mutation").exists())
 

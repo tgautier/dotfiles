@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-private-chezmoi-bridge test-chezmoi-operator test-chezmoi-canary test-local-gate
+ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
 
 [doc("Run the complete local gate and attest the exact clean HEAD")]
 ci-attest:
@@ -19,7 +19,7 @@ test-local-gate:
 
 [doc("Compile tracked Python helpers with warnings promoted to errors")]
 lint-python:
-    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "bin/rcm-links", "tests/private_chezmoi_bridge.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_rcm_links.py")]'
+    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "bin/rcm-links", "tests/private_chezmoi_bridge.py", "tests/setup_acceptance.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_rcm_links.py", "tests/test_setup_helpers.py")]'
 
 [doc("Fixture-test rcm link inventory, cleanup, cutover backup, and restore")]
 test-rcm-links:
@@ -32,6 +32,18 @@ test-private-chezmoi-bridge:
 [doc("Fixture-test guarded public/private chezmoi operation and recovery")]
 test-chezmoi-operator:
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_chezmoi_cutover.py' -v
+
+[doc("Run setup twice from a fresh public checkout into an isolated HOME")]
+test-setup-acceptance:
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/setup_acceptance.py
+
+[doc("Run fresh setup acceptance with and without the private companion")]
+test-setup-acceptance-private:
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/setup_acceptance.py --private-source {{quote(private_dir)}}
+
+[doc("Fixture-test setup-owned platform compatibility links")]
+test-setup-helpers:
+    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_setup_helpers.py' -v
 
 [doc("Print the read-only ownership inventory for current and historical rcm HOME targets")]
 link-inventory:
@@ -440,9 +452,23 @@ _link-libsqlite3:
         echo "libsqlite3.so.0 not in ldconfig cache — install it (e.g. apt install libsqlite3-0) for Flutter Drift FFI" >&2
         exit 0
     fi
-    mkdir -p "$HOME/.local/lib/flutter-ffi"
-    ln -sf "$src" "$HOME/.local/lib/flutter-ffi/libsqlite3.so"
-    echo "linked $src -> $HOME/.local/lib/flutter-ffi/libsqlite3.so"
+    target="$HOME/.local/lib/flutter-ffi/libsqlite3.so"
+    mkdir -p "$(dirname "$target")"
+    if [ -L "$target" ]; then
+        current=$(readlink "$target")
+        if [ "$current" = "$src" ]; then
+            echo "link already current: $target -> $src"
+            exit 0
+        fi
+        echo "refusing to replace foreign symlink: $target -> $current" >&2
+        exit 1
+    fi
+    if [ -e "$target" ]; then
+        echo "refusing to replace non-symlink target: $target" >&2
+        exit 1
+    fi
+    ln -s "$src" "$target"
+    echo "linked $src -> $target"
 
 # Ensure a valid Brewfile profile marker exists (macOS only — Brewfile.linux
 # never reads it); prompt on first interactive setup (default: work). A
@@ -941,3 +967,11 @@ cleanup-symlinks:
         link="${entry%% ->*}"
         rm "$link" && echo "Removed: $link"
     done
+
+[doc("Run setup acceptance in a Linux container (public-only)")]
+test-setup-acceptance-linux:
+    bash tests/run-linux-acceptance.sh
+
+[doc("Run setup acceptance in a Linux container with private companion")]
+test-setup-acceptance-linux-private:
+    bash tests/run-linux-acceptance.sh {{quote(private_dir)}}

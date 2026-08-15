@@ -317,6 +317,34 @@ Run `just git-hooks` once in each checkout or worktree. The full machine bootstr
 | `ci-publish` | Verifies the exact pushed SSH branch tip and current `main` ancestry, then publishes and reads back the required GitHub commit status |
 | `lib/git-integrity.sh` | Shares identity, signature, mise, and attestation validation across the executables |
 
+## Fresh-machine acceptance
+
+The acceptance harness proves `just setup` works from a fresh checkout into an empty HOME, then proves a second run is a no-op.
+
+### macOS
+
+```sh
+just test-setup-acceptance                  # public-only
+just test-setup-acceptance-private          # with private companion
+```
+
+The harness clones the committed public tree (and optionally the private companion) into a temporary directory, sets `HOME` to a fresh temporary location, stubs external provisioning commands (`brew`, `mas`, `mise`), and runs `just setup` twice. It verifies target bytes, modes, symlink destinations, Git hooks, companion ownership, and second-run idempotence. Which profile runs (work or personal) depends on the active Homebrew Brewfile overlay on the host.
+
+### Linux container
+
+```sh
+just test-setup-acceptance-linux            # public-only
+just test-setup-acceptance-linux-private    # with private companion
+```
+
+Builds a digest-pinned Ubuntu image with just 1.58.0, chezmoi 2.72.0, rcm, Python 3, and zsh. Source trees enter the container as `git archive` tarballs mounted at runtime; nothing private is baked into an image layer. The container runs on a tmpfs HOME. Docker is the only host dependency.
+
+### Evidence boundaries
+
+- macOS acceptance runs on the host kernel and filesystem. HFS+ is case-insensitive; Linux is not. Both platforms must pass.
+- The Linux container is not WSL2. WSL2 acceptance requires a real Windows host and is deferred until one is available. The container proves the full `just setup` chain on a case-sensitive ext4 filesystem under a real Linux kernel.
+- External provisioning commands are stubbed. The harness does not install real Homebrew packages, mise runtimes, or Mac App Store apps. It proves the setup orchestration, chezmoi rendering, rcm retained links, Git hooks, and companion ownership paths.
+
 ## Configuration files
 
 | File                      | Configures | Highlights                                                        |
@@ -398,6 +426,10 @@ Individual targets:
 | `just test-chezmoi-operator` | Fixture-test guarded public/private operation, approval, idempotence, and recovery |
 | `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
+| `just test-setup-acceptance` | Run `just setup` twice from a fresh public checkout into an isolated HOME |
+| `just test-setup-acceptance-private` | Fresh setup acceptance with and without the private companion |
+| `just test-setup-acceptance-linux` | Run the same harness inside a pinned Linux container (public-only) |
+| `just test-setup-acceptance-linux-private` | Linux container acceptance with the private companion |
 | `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |
 | `just link` | Refresh retained rcm links, private dedicated targets, and public/private chezmoi sources |
 | `just chezmoi-status` | Inspect public/private chezmoi status without changing managed targets |

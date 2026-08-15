@@ -166,17 +166,26 @@ def _snapshot_paths(checkout: Path, digest: _Digest, deadline: float) -> list[by
             for path in serialized_paths.removesuffix(b"\0").split(b"\0")
             if path
         }
-        # Python can import ignored modules from the checkers' namespace package.
-        # Bind that complete package tree even when Git excludes some entries.
-        package_roots = {
-            checkout / module.split(".", maxsplit=1)[0]
-            for module in PRIVATE_MODULES.values()
-        }
-        for package_root in package_roots:
-            if package_root.is_dir() and not package_root.is_symlink():
-                paths.update(_filesystem_paths(package_root, checkout, deadline))
+        # The checkout is on sys.path for `python -m`. Every identifier-named
+        # top-level directory is therefore an importable namespace package,
+        # even without __init__.py and even when Git ignores it. Bind every
+        # such tree, plus importable top-level file modules.
         for root_entry in checkout.iterdir():
-            if root_entry.is_file() and root_entry.suffix == ".py":
+            if time.monotonic() >= deadline:
+                raise BridgeError("companion repository snapshot exceeded its deadline")
+            try:
+                metadata = root_entry.lstat()
+            except OSError as exc:
+                raise BridgeError("companion repository state is unavailable") from exc
+            if root_entry.name.isidentifier() and stat.S_ISDIR(metadata.st_mode):
+                paths.update(_filesystem_paths(root_entry, checkout, deadline))
+            elif root_entry.name.isidentifier() and stat.S_ISLNK(metadata.st_mode):
+                paths.add(os.fsencode(root_entry.relative_to(checkout)))
+            elif (
+                stat.S_ISREG(metadata.st_mode)
+                and root_entry.name.split(".", maxsplit=1)[0].isidentifier()
+                and root_entry.suffix in {".py", ".pyc", ".pyd", ".so"}
+            ):
                 paths.add(os.fsencode(root_entry.relative_to(checkout)))
         return sorted(paths)
     else:

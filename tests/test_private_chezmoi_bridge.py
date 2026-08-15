@@ -519,6 +519,36 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         ):
             bridge.run("source", self.session_state)
 
+    def test_source_rejects_changed_ignored_package_after_ownership(self) -> None:
+        self.checkout.mkdir()
+        self._git("init", "--quiet")
+        self._module(
+            "check_private_source",
+            """
+            from ignored_package import helper
+
+            assert helper.VALUE == "first"
+            """,
+        )
+        ignored_package = self.checkout / "ignored_package"
+        ignored_package.mkdir()
+        (ignored_package / "__init__.py").touch()
+        helper = ignored_package / "helper.py"
+        helper.write_text('VALUE = "first"\n', encoding="utf-8")
+        (self.checkout / ".gitignore").write_text(
+            "ignored_package/\n",
+            encoding="utf-8",
+        )
+        self._git("add", ".")
+        self._git("commit", "--quiet", "-m", "fixture")
+        self._authorize_source()
+
+        helper.write_text('VALUE = "second"\n', encoding="utf-8")
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "changed during canary"
+        ):
+            bridge.run("source", self.session_state)
+
     def test_public_only_session_rejects_a_late_companion(self) -> None:
         with self._environment():
             result = bridge.run("ownership", self.session_state, self.manifest)

@@ -110,6 +110,27 @@ def _git_output(checkout: Path, arguments: Sequence[str], deadline: float) -> by
     return completed.stdout
 
 
+def _filesystem_paths(root: Path, checkout: Path, deadline: float) -> list[bytes]:
+    paths: list[bytes] = []
+    pending = [root]
+    while pending:
+        directory = pending.pop()
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    if time.monotonic() >= deadline:
+                        raise BridgeError(
+                            "companion repository snapshot exceeded its deadline"
+                        )
+                    relative = os.fsencode(Path(entry.path).relative_to(checkout))
+                    paths.append(relative)
+                    if entry.is_dir(follow_symlinks=False):
+                        pending.append(Path(entry.path))
+        except OSError as exc:
+            raise BridgeError("companion repository state is unavailable") from exc
+    return sorted(paths)
+
+
 def _snapshot_paths(checkout: Path, digest: _Digest, deadline: float) -> list[bytes]:
     git_marker = checkout / ".git"
     if git_marker.exists() or git_marker.is_symlink():
@@ -140,20 +161,27 @@ def _snapshot_paths(checkout: Path, digest: _Digest, deadline: float) -> list[by
             ("ls-files", "-z", "--cached", "--others", "--exclude-standard"),
             deadline,
         )
-        return sorted(
+        paths = {
             path
-            for path in set(serialized_paths.removesuffix(b"\0").split(b"\0"))
+            for path in serialized_paths.removesuffix(b"\0").split(b"\0")
             if path
-        )
-
-    paths = []
-    for path in checkout.rglob("*"):
-        if time.monotonic() >= deadline:
-            raise BridgeError("companion repository snapshot exceeded its deadline")
-        if path.name != ".git":
-            paths.append(os.fsencode(path.relative_to(checkout)))
-    _hash_field(digest, b"non-git-companion")
-    return sorted(paths)
+        }
+        # Python can import ignored modules from the checkers' namespace package.
+        # Bind that complete package tree even when Git excludes some entries.
+        package_roots = {
+            checkout / module.split(".", maxsplit=1)[0]
+            for module in PRIVATE_MODULES.values()
+        }
+        for package_root in package_roots:
+            if package_root.is_dir() and not package_root.is_symlink():
+                paths.update(_filesystem_paths(package_root, checkout, deadline))
+        for root_entry in checkout.iterdir():
+            if root_entry.is_file() and root_entry.suffix == ".py":
+                paths.add(os.fsencode(root_entry.relative_to(checkout)))
+        return sorted(paths)
+    else:
+        _hash_field(digest, b"non-git-companion")
+        return _filesystem_paths(checkout, checkout, deadline)
 
 
 def _hash_checkout_entry(

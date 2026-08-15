@@ -492,6 +492,33 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         ):
             bridge.run("source", self.session_state)
 
+    def test_source_rejects_changed_ignored_import_after_ownership(self) -> None:
+        self.checkout.mkdir()
+        self._git("init", "--quiet")
+        self._module(
+            "check_private_source",
+            """
+            from shared.chezmoi import ignored_helper
+
+            assert ignored_helper.VALUE == "first"
+            """,
+        )
+        ignored_helper = self.checkout / "shared/chezmoi/ignored_helper.py"
+        ignored_helper.write_text('VALUE = "first"\n', encoding="utf-8")
+        (self.checkout / ".gitignore").write_text(
+            "shared/chezmoi/ignored_helper.py\n",
+            encoding="utf-8",
+        )
+        self._git("add", ".")
+        self._git("commit", "--quiet", "-m", "fixture")
+        self._authorize_source()
+
+        ignored_helper.write_text('VALUE = "second"\n', encoding="utf-8")
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "changed during canary"
+        ):
+            bridge.run("source", self.session_state)
+
     def test_public_only_session_rejects_a_late_companion(self) -> None:
         with self._environment():
             result = bridge.run("ownership", self.session_state, self.manifest)

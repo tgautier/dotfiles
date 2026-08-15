@@ -42,6 +42,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.backup = self.root / "rcm-links.json"
         self.canary_log = self.root / "canary.log"
         self.ready = self.root / "apply-ready"
+        self.restore_ready = self.root / "restore-ready"
         self.descendant_pid = self.root / "descendant.pid"
         self.fake_chezmoi = self.root / "fake-chezmoi"
         self.home.mkdir()
@@ -155,6 +156,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     import os
                     from pathlib import Path
                     import sys
+                    import time
 
                     command = sys.argv[1]
                     with Path(os.environ["FAKE_RCM_LOG"]).open(
@@ -172,6 +174,9 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     elif command == "cutover-restore":
                         if os.environ.get("FAKE_RCM_RESTORE_FAIL") == "1":
                             raise SystemExit(31)
+                        if os.environ.get("FAKE_RCM_RESTORE_DELAY") == "1":
+                            Path(os.environ["FAKE_RCM_RESTORE_READY"]).touch()
+                            time.sleep(1)
                         descendant_path = Path(os.environ["FAKE_DESCENDANT_PID"])
                         if descendant_path.exists():
                             try:
@@ -262,6 +267,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 "FAKE_CHEZMOI_LOG": str(self.log),
                 "FAKE_CHEZMOI_APPLIED": str(self.applied),
                 "FAKE_RCM_LOG": str(self.rcm_log),
+                "FAKE_RCM_RESTORE_READY": str(self.restore_ready),
                 "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
                 "FAKE_CANARY_LOG": str(self.canary_log),
                 "FAKE_CHEZMOI_READY": str(self.ready),
@@ -1154,6 +1160,71 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
         descendant = int(self.descendant_pid.read_text(encoding="utf-8"))
         self._assert_process_gone(descendant)
+
+    def test_sigterm_during_recovery_is_reported_after_restore(self) -> None:
+        approval = self._approval()
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
+                "FAKE_CANARY_LOG": str(self.canary_log),
+                "FAKE_CHEZMOI_APPLIED": str(self.applied),
+                "FAKE_CHEZMOI_FAIL_APPLY_CWD": self.private.name,
+                "FAKE_CHEZMOI_LOG": str(self.log),
+                "FAKE_CHEZMOI_READY": str(self.ready),
+                "FAKE_DESCENDANT_PID": str(self.descendant_pid),
+                "FAKE_RCM_LOG": str(self.rcm_log),
+                "FAKE_RCM_RESTORE_DELAY": "1",
+                "FAKE_RCM_RESTORE_READY": str(self.restore_ready),
+            }
+        )
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                str(self.script),
+                "apply",
+                "--home",
+                str(self.home),
+                "--public-dir",
+                str(self.public),
+                "--private-dir",
+                str(self.private),
+                "--cache-dir",
+                str(self.cache),
+                "--state-dir",
+                str(self.state),
+                "--chezmoi",
+                str(self.fake_chezmoi),
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.addCleanup(lambda: process.poll() is None and process.kill())
+        for _ in range(200):
+            if self.restore_ready.exists():
+                break
+            if process.poll() is not None:
+                self.fail("apply exited before reaching the recovery signal fixture")
+            time.sleep(0.05)
+        else:
+            self.fail("apply did not reach the recovery signal fixture")
+
+        process.send_signal(signal.SIGTERM)
+        _stdout, stderr = process.communicate(timeout=10)
+
+        self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
+        self.assertIn("received SIGTERM", stderr)
+        self.assertIn("complete rcm link set was restored", stderr)
+        self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
 
     def test_public_only_plan_uses_one_source(self) -> None:
         approval = self._approval(private=False)

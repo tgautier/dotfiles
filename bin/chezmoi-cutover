@@ -1025,8 +1025,8 @@ def apply_with_recovery(
                     "chezmoi apply failed and automatic rcm recovery also failed; "
                     "run the documented recovery command immediately"
                 ) from recovery_exc
-            if isinstance(exc, TerminationRequested):
-                raise TerminationRequested(exc.signum, restored=True) from exc
+            if termination.signum is not None:
+                raise TerminationRequested(termination.signum, restored=True) from exc
             raise CutoverError(
                 f"chezmoi apply failed ({exc}); the complete rcm link set was restored"
             ) from exc

@@ -12,6 +12,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+import selectors
 import shutil
 import signal
 import stat
@@ -402,6 +403,86 @@ def run_bounded_process(
     return process.returncode
 
 
+def capture_bounded_process(
+    arguments: Sequence[str],
+    *,
+    cwd: Path,
+    environment: dict[str, str],
+    stderr: object,
+    timeout: int | float,
+    label: str,
+) -> tuple[int, bytes]:
+    """Capture bounded output while supervising a private process group."""
+
+    try:
+        process = subprocess.Popen(
+            arguments,
+            cwd=cwd,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=stderr,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        raise CutoverError(f"cannot run {label}: {exc}") from exc
+    if process.stdout is None:
+        terminate_process_group(process, label=label)
+        raise CutoverError(f"cannot capture {label} output")
+
+    captured = bytearray()
+    deadline = time.monotonic() + timeout
+    cleaned = False
+    descriptor = process.stdout.fileno()
+    try:
+        with selectors.DefaultSelector() as selector:
+            selector.register(descriptor, selectors.EVENT_READ)
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    terminate_process_group(process, label=label)
+                    cleaned = True
+                    raise CutoverError(f"{label} exceeded {timeout} seconds")
+                for _key, _events in selector.select(min(0.05, remaining)):
+                    chunk = os.read(
+                        descriptor,
+                        min(64 * 1024, MAX_COMMAND_OUTPUT_BYTES + 1 - len(captured)),
+                    )
+                    captured.extend(chunk)
+                    if len(captured) > MAX_COMMAND_OUTPUT_BYTES:
+                        terminate_process_group(process, label=label)
+                        cleaned = True
+                        raise CutoverError(f"{label} output exceeds the safety limit")
+                    if not chunk:
+                        selector.unregister(descriptor)
+                if wait_without_reaping(process, 0):
+                    terminate_process_group(process, label=label)
+                    cleaned = True
+                    os.set_blocking(descriptor, True)
+                    while chunk := os.read(
+                        descriptor,
+                        min(64 * 1024, MAX_COMMAND_OUTPUT_BYTES + 1 - len(captured)),
+                    ):
+                        captured.extend(chunk)
+                        if len(captured) > MAX_COMMAND_OUTPUT_BYTES:
+                            raise CutoverError(f"{label} output exceeds the safety limit")
+                    break
+    except OSError as exc:
+        if not cleaned:
+            terminate_process_group(process, label=label)
+        raise CutoverError(f"cannot monitor {label}: {exc}") from exc
+    except BaseException:
+        if not cleaned:
+            terminate_process_group(process, label=label)
+        raise
+    finally:
+        process.stdout.close()
+
+    if process.returncode is None:
+        raise CutoverError(f"cannot determine {label} status")
+    return process.returncode, bytes(captured)
+
+
 def capture_operation(
     operation: str,
     *,
@@ -416,41 +497,27 @@ def capture_operation(
 
     environment = command_environment(home)
     print(f"==> {source.label} chezmoi {operation}", file=sys.stderr)
-    with tempfile.TemporaryFile() as output:
-        returncode = run_bounded_process(
-            command_arguments(
-                executable,
-                source,
-                home=home,
-                cache_root=cache_root,
-                state_root=state_root,
-                operation=operation,
-            ),
-            cwd=source.root,
-            environment=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=output,
-            stderr=subprocess.STDOUT,
-            timeout=CHEZMOI_TIMEOUT_SECONDS,
-            label=f"{source.label} chezmoi {operation}",
-        )
-        size = output.tell()
-        if size > MAX_COMMAND_OUTPUT_BYTES:
-            raise CutoverError(
-                f"{source.label} chezmoi {operation} output exceeds the safety limit"
-            )
-        output.seek(0)
-        captured = output.read()
-        if show_output and captured:
-            sys.stdout.buffer.write(captured)
-            sys.stdout.buffer.flush()
-        if returncode != 0:
-            raise CutoverError(
-                f"{source.label} chezmoi {operation} failed with status {returncode}"
-            )
-    if not isinstance(captured, bytes):
+    returncode, captured = capture_bounded_process(
+        command_arguments(
+            executable,
+            source,
+            home=home,
+            cache_root=cache_root,
+            state_root=state_root,
+            operation=operation,
+        ),
+        cwd=source.root,
+        environment=environment,
+        stderr=subprocess.STDOUT,
+        timeout=CHEZMOI_TIMEOUT_SECONDS,
+        label=f"{source.label} chezmoi {operation}",
+    )
+    if show_output and captured:
+        sys.stdout.buffer.write(captured)
+        sys.stdout.buffer.flush()
+    if returncode != 0:
         raise CutoverError(
-            f"{source.label} chezmoi {operation} returned unsupported output"
+            f"{source.label} chezmoi {operation} failed with status {returncode}"
         )
     return captured
 
@@ -635,22 +702,14 @@ def run_rcm_helper(
     ]
     if backup_confirm is not None:
         arguments.extend(("--confirm", backup_confirm, "--rcup", rcup))
-    with tempfile.TemporaryFile() as output:
-        returncode = run_bounded_process(
-            arguments,
-            cwd=public,
-            environment=command_environment(home),
-            stdin=subprocess.DEVNULL,
-            stdout=output,
-            stderr=None,
-            timeout=RCM_HELPER_TIMEOUT_SECONDS,
-            label=f"rcm {command}",
-        )
-        size = output.tell()
-        if size > MAX_COMMAND_OUTPUT_BYTES:
-            raise CutoverError(f"rcm {command} output exceeds the safety limit")
-        output.seek(0)
-        captured = output.read()
+    returncode, captured = capture_bounded_process(
+        arguments,
+        cwd=public,
+        environment=command_environment(home),
+        stderr=None,
+        timeout=RCM_HELPER_TIMEOUT_SECONDS,
+        label=f"rcm {command}",
+    )
     if returncode != 0:
         raise CutoverError(f"rcm {command} failed with status {returncode}")
     try:
@@ -753,6 +812,7 @@ def approval_digest(
         "home": str(home),
         "backup": str(backup),
         "backup_sha256": backup_confirm,
+        "chezmoi": str(executable),
         "chezmoi_sha256": hash_regular_file(
             executable,
             label="chezmoi executable",

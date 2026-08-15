@@ -44,6 +44,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.ready = self.root / "apply-ready"
         self.restore_ready = self.root / "restore-ready"
         self.descendant_pid = self.root / "descendant.pid"
+        self.output_pid = self.root / "output.pid"
         self.fake_chezmoi = self.root / "fake-chezmoi"
         self.home.mkdir()
         self._make_repository(self.public, private=False)
@@ -404,6 +405,30 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 self.fail(f"descendant process {process_id} survived group cleanup")
             time.sleep(0.01)
 
+    def _output_launcher(self) -> Path:
+        launcher = self.root / "output-launcher"
+        launcher.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env python3
+                import os
+                from pathlib import Path
+                import sys
+                import time
+
+                Path(os.environ["FAKE_OUTPUT_PID"]).write_text(
+                    str(os.getpid()), encoding="utf-8"
+                )
+                sys.stdout.buffer.write(b"x" * 2048)
+                sys.stdout.buffer.flush()
+                time.sleep(60)
+                """
+            ),
+            encoding="utf-8",
+        )
+        launcher.chmod(0o700)
+        return launcher
+
     def test_public_status_uses_explicit_isolated_state(self) -> None:
         completed = self._run("status")
 
@@ -629,6 +654,31 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn("apply approval differs", completed.stderr)
         self.assertFalse(self.applied.exists())
         self.assertNotIn("cutover-restore", [record[0] for record in self._rcm_records()])
+
+    def test_chezmoi_path_change_invalidates_approval_before_mutation(self) -> None:
+        approval = self._approval()
+        alternate = self.root / "identical-chezmoi"
+        alternate.write_bytes(self.fake_chezmoi.read_bytes())
+        alternate.chmod(0o700)
+
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+                "--chezmoi",
+                str(alternate),
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("apply approval differs", completed.stderr)
+        self.assertFalse(self.applied.exists())
 
     def test_recovery_contract_change_invalidates_approval_before_mutation(self) -> None:
         approval = self._approval()
@@ -868,7 +918,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         with (
             mock.patch.object(
                 CUTOVER,
-                "run_bounded_process",
+                "capture_bounded_process",
                 side_effect=CUTOVER.CutoverError("public chezmoi status exceeded 120 seconds"),
             ),
             self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 120 seconds"),
@@ -925,20 +975,44 @@ class ChezmoiCutoverTests(unittest.TestCase):
         descendant = int(self.descendant_pid.read_text(encoding="utf-8"))
         self._assert_process_gone(descendant)
 
-    def test_chezmoi_output_limit_is_enforced_before_reading_it(self) -> None:
+    def test_output_limit_terminates_process_immediately(self) -> None:
+        launcher = self._output_launcher()
+        environment = os.environ.copy()
+        environment["FAKE_OUTPUT_PID"] = str(self.output_pid)
+        started = time.monotonic()
+
+        with (
+            mock.patch.object(CUTOVER, "MAX_COMMAND_OUTPUT_BYTES", 1024),
+            self.assertRaisesRegex(CUTOVER.CutoverError, "output exceeds the safety limit"),
+        ):
+            CUTOVER.capture_bounded_process(
+                [str(launcher)],
+                cwd=self.root,
+                environment=environment,
+                stderr=subprocess.STDOUT,
+                timeout=10,
+                label="output limit fixture",
+            )
+
+        self.assertLess(time.monotonic() - started, 3)
+        process_id = int(self.output_pid.read_text(encoding="utf-8"))
+        self._assert_process_gone(process_id)
+
+    def test_chezmoi_output_limit_error_is_preserved(self) -> None:
         source = CUTOVER.require_source(
             self.public,
             label="public",
             config=Path("chezmoi.toml"),
         )
 
-        def oversized_run(*arguments: object, **keywords: object) -> int:
-            output = keywords["stdout"]
-            output.write(b"x" * (CUTOVER.MAX_COMMAND_OUTPUT_BYTES + 1))
-            return 0
-
         with (
-            mock.patch.object(CUTOVER, "run_bounded_process", side_effect=oversized_run),
+            mock.patch.object(
+                CUTOVER,
+                "capture_bounded_process",
+                side_effect=CUTOVER.CutoverError(
+                    "public chezmoi status output exceeds the safety limit"
+                ),
+            ),
             self.assertRaisesRegex(CUTOVER.CutoverError, "output exceeds the safety limit"),
         ):
             CUTOVER.capture_operation(
@@ -955,7 +1029,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         with (
             mock.patch.object(
                 CUTOVER,
-                "run_bounded_process",
+                "capture_bounded_process",
                 side_effect=CUTOVER.CutoverError("rcm cutover-backup-verify exceeded 90 seconds"),
             ),
             self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 90 seconds"),
@@ -971,14 +1045,15 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 rcup="rcup",
             )
 
-    def test_rcm_helper_rejects_oversized_output_before_reading_it(self) -> None:
-        def oversized_run(*arguments: object, **keywords: object) -> int:
-            output = keywords["stdout"]
-            output.write(b"x" * (CUTOVER.MAX_COMMAND_OUTPUT_BYTES + 1))
-            return 0
-
+    def test_rcm_helper_preserves_output_limit_error(self) -> None:
         with (
-            mock.patch.object(CUTOVER, "run_bounded_process", side_effect=oversized_run),
+            mock.patch.object(
+                CUTOVER,
+                "capture_bounded_process",
+                side_effect=CUTOVER.CutoverError(
+                    "rcm cutover-backup-verify output exceeds the safety limit"
+                ),
+            ),
             self.assertRaisesRegex(CUTOVER.CutoverError, "output exceeds the safety limit"),
         ):
             CUTOVER.run_rcm_helper(

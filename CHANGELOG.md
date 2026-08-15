@@ -272,6 +272,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- Live cutover backup and restore now accept the private companion's current eight-column target manifest, including its chezmoi source mapping. The public fixtures use that same schema so a future cross-repository header change fails before the operator reaches HOME ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - The Linux validation environment now installs `rcm`, whose `lsrc` command is
   the independent rcm-side oracle for the chezmoi target-map parity guard
   ([#248](https://github.com/tgautier/dotfiles/issues/248)).

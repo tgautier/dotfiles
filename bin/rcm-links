@@ -44,6 +44,7 @@ PRIVATE_TARGET_HEADER = (
     "future_owner",
     "target_shape",
     "mode",
+    "chezmoi_source",
 )
 
 
@@ -292,10 +293,17 @@ def load_cutover_targets(
                 future_owner,
                 target_shape,
                 mode,
+                chezmoi_source,
             ) = row
-            if not disposition or not future_owner or not target_shape or not mode:
+            if (
+                not disposition
+                or not future_owner
+                or not target_shape
+                or not mode
+                or not chezmoi_source
+            ):
                 raise InventoryError(
-                    f"private chezmoi target manifest line {line_number} has an empty ownership field"
+                    f"private chezmoi target manifest line {line_number} has an empty required field"
                 )
             if current_owner == "public-rcm-precedence":
                 relative = require_relative_path(

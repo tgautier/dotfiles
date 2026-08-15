@@ -202,8 +202,8 @@ class RcmLinksInventoryTest(unittest.TestCase):
         )
         private_manifest = self.root / "private-targets.tsv"
         private_manifest.write_text(
-            "rcm_source\ttarget\tcurrent_owner\tdisposition\tfuture_owner\ttarget_shape\tmode\n"
-            "zshrc.local\t.zshrc.local\tprivate-rcm\tmigrate\tprivate-chezmoi\tprivate-file\t0600\n",
+            "rcm_source\ttarget\tcurrent_owner\tdisposition\tfuture_owner\ttarget_shape\tmode\tchezmoi_source\n"
+            "zshrc.local\t.zshrc.local\tprivate-rcm\tmigrate\tprivate-chezmoi\tprivate-file\t0600\tprivate_dot_zshrc.local\n",
             encoding="utf-8",
         )
         self._write_fake_lsrc(

@@ -863,7 +863,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertFalse(self.applied.exists())
 
     def test_canary_uses_the_exact_selected_chezmoi_and_lsrc(self) -> None:
-        selected_root = self.root / "selected-rcm"
+        selected_root = self.root / "selected rcm's layout"
         selected_lsrc = selected_root / "bin/lsrc"
         selected_library = selected_root / "share/rcm/probe.sh"
         selected_lsrc.parent.mkdir(parents=True)

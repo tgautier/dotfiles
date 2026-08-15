@@ -9,6 +9,7 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import tempfile
 from typing import Sequence
 
 
@@ -32,12 +33,24 @@ def _companion_path() -> Path:
     return Path.home() / "Workspace/tgautier/dotfiles-private"
 
 
-def _isolated_environment() -> dict[str, str]:
-    return {
+def _isolated_environment(root: Path) -> dict[str, str]:
+    environment = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith(("GIT_", "PYTHON")) and key != "VIRTUAL_ENV"
+        if not key.startswith(("GIT_", "PYTHON", "XDG_"))
+        and key not in {"HOME", "VIRTUAL_ENV"}
     }
+    isolated_paths = {
+        "HOME": root / "operator-home",
+        "XDG_CACHE_HOME": root / "operator-cache",
+        "XDG_CONFIG_HOME": root / "operator-config",
+        "XDG_DATA_HOME": root / "operator-data",
+        "XDG_STATE_HOME": root / "operator-state",
+    }
+    for path in isolated_paths.values():
+        path.mkdir(mode=0o700)
+    environment.update({key: str(path) for key, path in isolated_paths.items()})
+    return environment
 
 
 def _stop_process_group(process: subprocess.Popen[bytes]) -> None:
@@ -71,24 +84,25 @@ def _invoke_private(
     *,
     timeout: int | float,
 ) -> None:
-    process = subprocess.Popen(
-        [sys.executable, "-E", "-S", "-B", "-m", module, *arguments],
-        cwd=checkout,
-        env=_isolated_environment(),
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-    try:
-        process.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired as exc:
-        _stop_process_group(process)
-        raise BridgeError("companion check exceeded its bounded deadline") from exc
-    if process.returncode != 0:
-        raise BridgeError(
-            f"companion check failed with status {process.returncode}; output withheld"
+    with tempfile.TemporaryDirectory(prefix="public-private-chezmoi-") as temporary:
+        process = subprocess.Popen(
+            [sys.executable, "-E", "-S", "-B", "-m", module, *arguments],
+            cwd=checkout,
+            env=_isolated_environment(Path(temporary)),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
         )
+        try:
+            process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            _stop_process_group(process)
+            raise BridgeError("companion check exceeded its bounded deadline") from exc
+        if process.returncode != 0:
+            raise BridgeError(
+                f"companion check failed with status {process.returncode}; output withheld"
+            )
 
 
 def run(mode: str, public_targets: Path | None = None) -> str:

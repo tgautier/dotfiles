@@ -48,16 +48,33 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         self.assertNotIn(str(self.checkout), output.getvalue())
 
     def test_ownership_success_withholds_output_and_scrubs_python_state(self) -> None:
+        caller_home = self.root / "caller-home"
+        caller_home.mkdir()
         self._module(
             "check_target_ownership",
             f"""
             import os
+            from pathlib import Path
             import sys
 
             assert sys.argv[1:] == ["--public-targets", {str(self.manifest.resolve())!r}]
             assert "PYTHONPATH" not in os.environ
             assert "VIRTUAL_ENV" not in os.environ
             assert "GIT_INDEX_FILE" not in os.environ
+            isolated_paths = [
+                Path(os.environ[name])
+                for name in (
+                    "HOME",
+                    "XDG_CACHE_HOME",
+                    "XDG_CONFIG_HOME",
+                    "XDG_DATA_HOME",
+                    "XDG_STATE_HOME",
+                )
+            ]
+            assert all(path.is_dir() for path in isolated_paths)
+            assert len({{path.parent for path in isolated_paths}}) == 1
+            assert isolated_paths[0] != Path({str(caller_home)!r})
+            (Path.home() / "companion-attempt").write_text("isolated", encoding="utf-8")
             print({PRIVATE_SENTINEL!r})
             """,
         )
@@ -67,6 +84,11 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             "PYTHONPATH": str(self.root / "shadow"),
             "VIRTUAL_ENV": str(self.root / "venv"),
             "GIT_INDEX_FILE": str(self.root / "foreign-index"),
+            "HOME": str(caller_home),
+            "XDG_CACHE_HOME": str(caller_home / "cache"),
+            "XDG_CONFIG_HOME": str(caller_home / "config"),
+            "XDG_DATA_HOME": str(caller_home / "data"),
+            "XDG_STATE_HOME": str(caller_home / "state"),
         }
         with mock.patch.dict(os.environ, environment, clear=False), redirect_stdout(output):
             result = bridge.main(["ownership", "--public-targets", str(self.manifest)])
@@ -74,6 +96,7 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertIn("passed", output.getvalue())
         self.assertNotIn(PRIVATE_SENTINEL, output.getvalue())
+        self.assertFalse((caller_home / "companion-attempt").exists())
 
     def test_private_failure_withholds_stdout_and_stderr(self) -> None:
         self._module(

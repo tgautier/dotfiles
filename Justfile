@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-private-chezmoi-bridge test-chezmoi-canary test-local-gate
+ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-private-chezmoi-bridge test-chezmoi-operator test-chezmoi-canary test-local-gate
 
 [doc("Run the complete local gate and attest the exact clean HEAD")]
 ci-attest:
@@ -19,7 +19,7 @@ test-local-gate:
 
 [doc("Compile tracked Python helpers with warnings promoted to errors")]
 lint-python:
-    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/rcm-links", "tests/private_chezmoi_bridge.py", "tests/test_private_chezmoi_bridge.py", "tests/test_rcm_links.py")]'
+    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "bin/rcm-links", "tests/private_chezmoi_bridge.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_rcm_links.py")]'
 
 [doc("Fixture-test rcm link inventory, cleanup, cutover backup, and restore")]
 test-rcm-links:
@@ -28,6 +28,10 @@ test-rcm-links:
 [doc("Fixture-test bounded, output-withholding private chezmoi orchestration")]
 test-private-chezmoi-bridge:
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_private_chezmoi_bridge.py' -v
+
+[doc("Fixture-test explicit public/private chezmoi operator invocations")]
+test-chezmoi-operator:
+    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_chezmoi_cutover.py' -v
 
 [doc("Print the read-only ownership inventory for current and historical rcm HOME targets")]
 link-inventory:
@@ -56,6 +60,18 @@ link-cutover-backup-verify backup:
 [doc("Restore the exact backed-up link set through rcm after digest confirmation")]
 link-cutover-restore backup confirm:
     python3 bin/rcm-links cutover-restore --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}} --confirm {{quote(confirm)}}
+
+[doc("Show how managed public and private targets differ from their source state")]
+chezmoi-status:
+    python3 bin/chezmoi-cutover status --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
+
+[doc("Print the public and private target-state diff without applying it")]
+chezmoi-diff:
+    python3 bin/chezmoi-cutover diff --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
+
+[doc("Preview the public and private apply without changing managed targets")]
+chezmoi-apply-dry-run:
+    python3 bin/chezmoi-cutover dry-run --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
 
 # Assert `rcrc` resolves the way README documents, on both halves of the
 # override contract: DOTFILES_DIRS, which reaches the operator's real $HOME
@@ -168,6 +184,8 @@ lint-rcrc:
     excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp/nope")
     expect_has   "absent private repo keeps base EXCLUDES" "CHANGELOG.md" "$excludes"
     expect_has   "base EXCLUDES keeps chezmoi metadata private" ".chezmoiroot" "$excludes"
+    expect_has   "base EXCLUDES keeps chezmoi config repository-only" "chezmoi.toml" "$excludes"
+    expect_has   "base EXCLUDES keeps operator helper repository-only" "bin/chezmoi-cutover" "$excludes"
     expect_has   "base EXCLUDES keeps test harnesses private" "tests" "$excludes"
 
     # The strip helper and its temp var must not leak into the sourcing shell.

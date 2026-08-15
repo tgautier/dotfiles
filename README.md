@@ -402,6 +402,7 @@ Individual targets:
 | `just lint-cleanup-symlinks` | Fixture-test the stale-symlink scanner |
 | `just test-rcm-links` | Fixture-test HOME link inventory, cleanup, cutover backup, and rcm restoration |
 | `just test-private-chezmoi-bridge` | Fixture-test bounded companion checks and output withholding |
+| `just test-chezmoi-operator` | Fixture-test explicit public/private status, diff, and dry-run commands |
 | `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
 | `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |

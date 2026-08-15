@@ -44,12 +44,13 @@ unset -f _rcrc_strip_slashes 2>/dev/null || true
 # ${PRIVATE_DIR}/rcm-excludes. Sourced here (rcm reads rcrc as shell) so
 # bare `rcup` and `just setup` both honor them; an absent private repo is a
 # no-op. Keeps project/dir names we don't publish out of this public file.
-# Repository-only directories and files (docs, home, tests, Justfile, and
-# CHANGELOG.md) are excluded. Excluding Justfile also avoids colliding with the
-# private repo's `justfile` -> ~/.justfile on case-insensitive filesystems.
+# Repository-only directories and files (docs, home, tests, Justfile,
+# CHANGELOG.md, and the chezmoi operator files) are excluded. Excluding Justfile
+# also avoids colliding with the private repo's `justfile` -> ~/.justfile on
+# case-insensitive filesystems.
 # NB: Brewfile / Brewfile.linux must stay linked — zshenv exports
 # HOMEBREW_BUNDLE_FILE=~/.Brewfile[.linux], so excluding them breaks bare
 # `brew bundle`.
-EXCLUDES="README.md .githooks docs home tests Justfile CHANGELOG.md .chezmoiroot rcm-excludes $( { grep -hvE '^[[:space:]]*(#|$)' "${PRIVATE_DIR}/rcm-excludes" 2>/dev/null || true; } | tr '\n' ' ')"
+EXCLUDES="README.md .githooks docs home tests Justfile CHANGELOG.md .chezmoiroot chezmoi.toml bin/chezmoi-cutover rcm-excludes $( { grep -hvE '^[[:space:]]*(#|$)' "${PRIVATE_DIR}/rcm-excludes" 2>/dev/null || true; } | tr '\n' ' ')"
 DOTFILES_DIRS="${PUBLIC_DIR} ${PRIVATE_DIR}"
 SYMLINK_DIRS="claude/skills claude/rules claude/hooks"

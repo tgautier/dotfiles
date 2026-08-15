@@ -4,6 +4,8 @@ from contextlib import redirect_stderr, redirect_stdout
 import io
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import textwrap
 import time
@@ -50,6 +52,38 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         with self._environment():
             result = bridge.run("ownership", self.session_state, self.manifest)
         self.assertEqual(result, "passed")
+
+    def _git(self, *arguments: str) -> None:
+        git = shutil.which("git")
+        self.assertIsNotNone(git)
+        environment = {
+            key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+        }
+        git_home = self.root / "git-home"
+        git_home.mkdir(exist_ok=True)
+        environment["HOME"] = str(git_home)
+        completed = subprocess.run(
+            [
+                git or "git",
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "-c",
+                "commit.gpgsign=false",
+                "-c",
+                "core.hooksPath=/dev/null",
+                *arguments,
+            ],
+            cwd=self.checkout,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=5,
+        )
+        self.assertEqual(completed.returncode, 0)
 
     def test_absent_checkout_skips_without_printing_its_path(self) -> None:
         output = io.StringIO()
@@ -144,6 +178,34 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             self.session_state.read_text(encoding="ascii"),
             "preserve me\n",
         )
+
+    def test_checkout_identity_tracks_git_revisions_and_source_contents(self) -> None:
+        self.checkout.mkdir()
+        self._git("init", "--quiet")
+        source = self.checkout / "source"
+        source.write_text("first\n", encoding="utf-8")
+        self._git("add", "source")
+        self._git("commit", "--quiet", "-m", "first")
+        first_identity = bridge._checkout_identity(self.checkout.resolve())
+
+        source.write_text("second\n", encoding="utf-8")
+        self._git("add", "source")
+        self._git("commit", "--quiet", "-m", "second")
+        second_identity = bridge._checkout_identity(self.checkout.resolve())
+        self.assertNotEqual(first_identity, second_identity)
+
+        self._git("checkout", "--quiet", "HEAD^")
+        restored_identity = bridge._checkout_identity(self.checkout.resolve())
+        self.assertEqual(restored_identity, first_identity)
+
+    def test_checkout_snapshot_has_one_bounded_deadline(self) -> None:
+        self.checkout.mkdir()
+        (self.checkout / "source").write_text("fixture\n", encoding="utf-8")
+        with (
+            mock.patch.object(bridge.time, "monotonic", side_effect=[10, 16]),
+            self.assertRaisesRegex(bridge.BridgeError, "snapshot exceeded"),
+        ):
+            bridge._checkout_identity(self.checkout.resolve())
 
     def test_private_failure_withholds_stdout_and_stderr(self) -> None:
         self._module(
@@ -372,6 +434,16 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         moved_checkout = self.root / "original-companion"
         self.checkout.rename(moved_checkout)
         self._module("check_private_source", "")
+
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "changed during canary"
+        ):
+            bridge.run("source", self.session_state)
+
+    def test_source_rejects_checkout_modified_in_place_after_ownership(self) -> None:
+        self._module("check_private_source", "")
+        self._authorize_source()
+        self._module("check_private_source", "CHANGED = True")
 
         with self._environment(), self.assertRaisesRegex(
             bridge.BridgeError, "changed during canary"

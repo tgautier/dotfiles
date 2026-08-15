@@ -9,18 +9,21 @@ import hmac
 import os
 from pathlib import Path
 import signal
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
 import time
-from typing import Sequence
+from typing import Protocol, Sequence
 
 
 OWNERSHIP_TIMEOUT_SECONDS = 15
 SOURCE_TIMEOUT_SECONDS = 60
 CLEANUP_TIMEOUT_SECONDS = 2
 CLEANUP_TERM_GRACE_SECONDS = 0.1
+SNAPSHOT_TIMEOUT_SECONDS = 5
+SNAPSHOT_CHUNK_BYTES = 1024 * 1024
 PRIVATE_MODULES = {
     "ownership": "shared.chezmoi.check_target_ownership",
     "source": "shared.chezmoi.check_private_source",
@@ -31,6 +34,10 @@ COMPANION_STATE_PREFIX = "companion:"
 
 class BridgeError(RuntimeError):
     """The optional companion checkout cannot satisfy its canary contract."""
+
+
+class _Digest(Protocol):
+    def update(self, value: bytes) -> None: ...
 
 
 def _wait_without_reaping(process: subprocess.Popen[bytes], timeout: int | float) -> bool:
@@ -68,16 +75,145 @@ def _resolved_companion() -> Path | None:
         raise BridgeError("companion checkout path cannot be resolved") from exc
 
 
-def _checkout_identity(checkout: Path) -> str:
-    metadata = checkout.stat()
-    identity = b"\0".join(
-        (
-            os.fsencode(checkout),
-            str(metadata.st_dev).encode("ascii"),
-            str(metadata.st_ino).encode("ascii"),
+def _hash_field(digest: _Digest, value: bytes) -> None:
+    digest.update(len(value).to_bytes(8, "big"))
+    digest.update(value)
+
+
+def _git_output(checkout: Path, arguments: Sequence[str], deadline: float) -> bytes:
+    git = shutil.which("git")
+    if git is None:
+        raise BridgeError("companion repository state is unavailable")
+    environment = {
+        key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+    }
+    environment["GIT_OPTIONAL_LOCKS"] = "0"
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise BridgeError("companion repository snapshot exceeded its deadline")
+    try:
+        completed = subprocess.run(
+            [git, "-c", "core.fsmonitor=false", *arguments],
+            cwd=checkout,
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            check=False,
+            timeout=remaining,
         )
-    )
-    return hashlib.sha256(identity).hexdigest()
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise BridgeError("companion repository state is unavailable") from exc
+    if completed.returncode != 0:
+        raise BridgeError("companion repository state is unavailable")
+    return completed.stdout
+
+
+def _snapshot_paths(checkout: Path, digest: _Digest, deadline: float) -> list[bytes]:
+    git_marker = checkout / ".git"
+    if git_marker.exists() or git_marker.is_symlink():
+        _hash_field(
+            digest,
+            _git_output(
+                checkout,
+                ("rev-parse", "--verify", "HEAD^{commit}"),
+                deadline,
+            ),
+        )
+        _hash_field(
+            digest,
+            _git_output(
+                checkout,
+                (
+                    "status",
+                    "--porcelain=v2",
+                    "-z",
+                    "--untracked-files=all",
+                    "--ignore-submodules=none",
+                ),
+                deadline,
+            ),
+        )
+        serialized_paths = _git_output(
+            checkout,
+            ("ls-files", "-z", "--cached", "--others", "--exclude-standard"),
+            deadline,
+        )
+        return sorted(
+            path
+            for path in set(serialized_paths.removesuffix(b"\0").split(b"\0"))
+            if path
+        )
+
+    paths = []
+    for path in checkout.rglob("*"):
+        if time.monotonic() >= deadline:
+            raise BridgeError("companion repository snapshot exceeded its deadline")
+        if path.name != ".git":
+            paths.append(os.fsencode(path.relative_to(checkout)))
+    _hash_field(digest, b"non-git-companion")
+    return sorted(paths)
+
+
+def _hash_checkout_entry(
+    checkout: Path,
+    relative_bytes: bytes,
+    digest: _Digest,
+    deadline: float,
+) -> None:
+    if time.monotonic() >= deadline:
+        raise BridgeError("companion repository snapshot exceeded its deadline")
+    relative = Path(os.fsdecode(relative_bytes))
+    if relative.is_absolute() or ".." in relative.parts:
+        raise BridgeError("companion repository state is invalid")
+    candidate = checkout / relative
+    _hash_field(digest, relative_bytes)
+    try:
+        metadata = candidate.lstat()
+    except FileNotFoundError:
+        _hash_field(digest, b"missing")
+        return
+    _hash_field(digest, stat.S_IFMT(metadata.st_mode).to_bytes(8, "big"))
+    _hash_field(digest, stat.S_IMODE(metadata.st_mode).to_bytes(8, "big"))
+    if stat.S_ISLNK(metadata.st_mode):
+        _hash_field(digest, os.fsencode(os.readlink(candidate)))
+        return
+    if stat.S_ISDIR(metadata.st_mode):
+        return
+    if not stat.S_ISREG(metadata.st_mode):
+        raise BridgeError("companion repository contains an unsupported entry")
+
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    descriptor = os.open(candidate, flags)
+    with os.fdopen(descriptor, "rb") as source:
+        opened = os.fstat(source.fileno())
+        if opened.st_dev != metadata.st_dev or opened.st_ino != metadata.st_ino:
+            raise BridgeError("companion repository changed during snapshot")
+        while chunk := source.read(SNAPSHOT_CHUNK_BYTES):
+            digest.update(chunk)
+            if time.monotonic() >= deadline:
+                raise BridgeError("companion repository snapshot exceeded its deadline")
+        finished = os.fstat(source.fileno())
+    if (
+        finished.st_size != opened.st_size
+        or finished.st_mtime_ns != opened.st_mtime_ns
+    ):
+        raise BridgeError("companion repository changed during snapshot")
+
+
+def _checkout_identity(checkout: Path) -> str:
+    deadline = time.monotonic() + SNAPSHOT_TIMEOUT_SECONDS
+    metadata = checkout.stat()
+    digest = hashlib.sha256()
+    for value in (
+        os.fsencode(checkout),
+        str(metadata.st_dev).encode("ascii"),
+        str(metadata.st_ino).encode("ascii"),
+    ):
+        _hash_field(digest, value)
+    for relative_bytes in _snapshot_paths(checkout, digest, deadline):
+        _hash_checkout_entry(checkout, relative_bytes, digest, deadline)
+    return digest.hexdigest()
 
 
 def _publish_session_state(path: Path, state_value: str) -> None:

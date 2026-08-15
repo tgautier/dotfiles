@@ -185,6 +185,7 @@ def load_tsv_rows(
     *,
     header: tuple[str, ...],
     label: str,
+    allow_trailing_fields: bool = False,
 ) -> list[tuple[str, ...]]:
     try:
         with path.open("r", encoding="utf-8", newline="") as handle:
@@ -193,18 +194,25 @@ def load_tsv_rows(
         raise InventoryError(f"cannot read {label} {path}: {exc}") from exc
     if not rows:
         raise InventoryError(f"{label} is empty: {path}")
-    if tuple(rows[0]) != header:
+    actual_header = tuple(rows[0])
+    header_matches = (
+        actual_header[: len(header)] == header
+        if allow_trailing_fields
+        else actual_header == header
+    )
+    if not header_matches:
+        requirement = "start with" if allow_trailing_fields else "be exactly"
         raise InventoryError(
-            f"{label} header must be exactly {header!r}; got {tuple(rows[0])!r}"
+            f"{label} header must {requirement} {header!r}; got {actual_header!r}"
         )
     parsed: list[tuple[str, ...]] = []
     for line_number, fields in enumerate(rows[1:], start=2):
-        if len(fields) != len(header):
+        if len(fields) != len(actual_header):
             raise InventoryError(
                 f"{label} line {line_number} has {len(fields)} fields; "
-                f"expected {len(header)}"
+                f"expected {len(actual_header)}"
             )
-        parsed.append(tuple(fields))
+        parsed.append(tuple(fields[: len(header)]))
     if not parsed:
         raise InventoryError(f"{label} has no rows: {path}")
     return parsed
@@ -282,6 +290,7 @@ def load_cutover_targets(
             private_manifest,
             header=PRIVATE_TARGET_HEADER,
             label="private chezmoi target manifest",
+            allow_trailing_fields=True,
         )
         for line_number, row in enumerate(private_rows, start=2):
             (

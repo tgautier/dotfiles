@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## ⚠️ This repo is PUBLIC
 
-Every `Write`, `Edit`, and `git add` in this working tree ships to a public GitHub repo. Before any such action, apply the `public-repo-hygiene` rule (auto-loaded from `~/.claude/rules/public-repo-hygiene.md` via rcm symlinks):
+Every `Write`, `Edit`, and `git add` in this working tree ships to a public GitHub repo. Before any such action, apply the `public-repo-hygiene` rule (auto-loaded from `~/.claude/rules/public-repo-hygiene.md`):
 
-1. Read the sensitive-terms list at `~/.claude/sensitive-terms.md` (rcm symlink to `dotfiles-private/claude/sensitive-terms.md` — portable across macOS, Linux, WSL)
+1. Read the sensitive-terms list at `~/.claude/sensitive-terms.md` (symlinked from `dotfiles-private/claude/sensitive-terms.md` — portable across macOS, Linux, WSL)
 2. Scan the new/changed content against that list AND the categorical examples in the rule (PII, employer, financial, colleagues, internal references, session context)
 3. Sensitive content → route to `dotfiles-private` or redact to neutral placeholders. **Never** rely on "I'll catch it at commit time" — scan on every write
 
@@ -14,15 +14,14 @@ Personal financial workflows, vault-specific content, employer-tied notes, colle
 
 ## Repository Overview
 
-Cross-platform personal dotfiles for macOS and Linux/WSL2, deployed primarily with chezmoi. The manifest-deferred public targets remain rcm links, private dedicated installers retain their declared targets, and the unchanged complete rcm graph remains the digest-bound rollback authority. An optional private companion provides a second chezmoi source and dedicated-owner aggregate without exposing its values through the public operator.
+Cross-platform personal dotfiles for macOS and Linux/WSL2, deployed with chezmoi. Private dedicated installers retain their declared targets. An optional private companion provides a second chezmoi source and dedicated-owner aggregate without exposing its values through the public operator.
 
 ## Key Commands
 
 ```sh
 # Refresh config through its manifest-declared owner. The command runs an
-# isolated ownership/source preflight, only the deferred public rcm links, the
-# optional private dedicated-owner aggregate, then conflict-refusing chezmoi
-# apply passes. Never use broad rcup for routine deployment: it is rollback.
+# isolated ownership/source preflight, then conflict-refusing chezmoi apply
+# passes and the optional private dedicated-owner aggregate.
 # Run this from the public checkout; ~/.justfile points at the private repo.
 just link
 
@@ -78,7 +77,7 @@ background for the *next* login. `README.md` → Shell load order has the
 per-file detail; don't duplicate that list here.
 
 Custom functions live in `zsh/functions/`, which `zsh/zcompletion` prepends to
-`fpath` and autoloads. Scripts in `bin/` are linked by rcm into `~/.bin`, which
+`fpath` and autoloads. Scripts in `bin/` are deployed by chezmoi into `~/.bin`, which
 `zshenv` puts on `PATH`.
 
 ### Tool Version Management (mise)
@@ -103,7 +102,7 @@ GitHub Actions is disabled. Push through SSH, then publish fresh exact-tip local
 
 ### tmux
 
-`tmux.conf` (symlinked to `~/.tmux.conf` by rcm). Prefix is `C-a`, vi-style bindings, platform-aware clipboard. See `docs/tmux.md` for the full cheat sheet.
+`tmux.conf` (deployed to `~/.tmux.conf` by chezmoi). Prefix is `C-a`, vi-style bindings, platform-aware clipboard. See `docs/tmux.md` for the full cheat sheet.
 
 ### Git Configuration
 
@@ -132,7 +131,7 @@ GitHub Actions is disabled. Push through SSH, then publish fresh exact-tip local
 | --- | --- | --- |
 | `brewfile.md` | `Brewfile`, `Brewfile.work`, `Brewfile.personal`, `Brewfile.linux`, `Justfile` | Brewfile sync, work/personal overlays, alphabetical sorting, native-installer pattern (`just setup` as single source of truth) |
 
-Global Claude Code rules and skills (commit conventions, task lifecycle, code-planning, language-specific patterns, etc.) live in `dotfiles-private/claude/` and auto-load via the rcm symlinks at `~/.claude/`. Edit them there.
+Global Claude Code rules and skills (commit conventions, task lifecycle, code-planning, language-specific patterns, etc.) live in `dotfiles-private/claude/` and auto-load via symlinks at `~/.claude/`. Edit them there.
 
 ## Changelog
 

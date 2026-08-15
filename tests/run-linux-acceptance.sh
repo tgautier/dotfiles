@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Run the fresh-machine acceptance harness inside a Linux container.
-# The container image provides just, chezmoi, rcm, python3, and zsh.
+# The container image provides just, chezmoi, python3, and zsh.
 # Source trees are injected at runtime via git archive, never baked
 # into the image layer cache.
 

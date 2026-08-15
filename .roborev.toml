@@ -25,8 +25,8 @@ HARD INVARIANTS — flag violations as blockers:
 
 SCOPE CONTEXT — understand before flagging:
 
-- rcup symlinks: tracked files are symlinked into $HOME by rcm based on `rcrc`. Both this repo and `dotfiles-private` are merged via `DOTFILES_DIRS`. Their paths default to `$HOME/Workspace/tgautier/` and are overridable with `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR`, a contract shared by `rcrc`, the `Justfile` vars, and `_scan-stale-symlinks`.
-- Versioning: SemVer and changelog policy are defined in the global Claude Code config (in `dotfiles-private`) and auto-load via rcm. Don't expect a `versioning.md` file in this repo's tree.
+- chezmoi deployment: tracked files under `home/` are rendered into $HOME by chezmoi. Both this repo and `dotfiles-private` are sources. Their paths default to `$HOME/Workspace/tgautier/` and are overridable with `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR`, a contract shared by `just link`, `just setup`, and `_scan-stale-symlinks`.
+- Versioning: SemVer and changelog policy are defined in the global Claude Code config (in `dotfiles-private`) and auto-load via chezmoi. Don't expect a `versioning.md` file in this repo's tree.
 - CI: `just ci` runs the authoritative local repository checks. GitHub Actions is disabled. `just ci-attest` binds the complete gate to the exact unchanged clean `HEAD`, pre-push requires that evidence before transfer, and `just ci-publish` verifies the pushed SSH tip before publishing the branch-protection status.
 
 DO NOT FLAG:

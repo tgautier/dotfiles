@@ -1,6 +1,6 @@
 # Dotfiles Repository Conventions
 
-Cross-platform personal dotfiles for macOS, Linux, and WSL2, managed with rcm (Thoughtbot's dotfile manager). Symlinks are created via `rcup`, configured in `rcrc`. The global Claude Code config (rules, skills, hooks) lives in the companion private repo `dotfiles-private` and is NOT in this tree.
+Cross-platform personal dotfiles for macOS, Linux, and WSL2, deployed with chezmoi. The global Claude Code config (rules, skills, hooks) lives in the companion private repo `dotfiles-private` and is NOT in this tree.
 
 ## Hard Invariants
 

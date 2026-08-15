@@ -1,4 +1,0 @@
-owner	target	source_root	source
-private-agent-hooks	.agents/hooks/worktree_ownership.py	private	agents/hooks/worktree_ownership.py
-private-agent-hooks	.codex/hooks.json	private	codex/hooks.json
-private-skill-adapters	.agents/skills/*	private	agents/skills/*

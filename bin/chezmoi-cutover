@@ -854,7 +854,7 @@ def run_dedicated_private_owners(
 ) -> None:
     """Run the private aggregate without exposing companion command output."""
 
-    justfile = require_regular_file(private / "Justfile", label="private Justfile")
+    justfile = require_regular_file(private / "justfile", label="private justfile")
     environment = command_environment(home)
     environment["DOTFILES_DIR"] = str(public)
     environment["DOTFILES_PRIVATE_DIR"] = str(private)

@@ -343,7 +343,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
             checker = root / "tests/check-chezmoi-targets"
             checker.write_text("# fixture checker\n", encoding="utf-8")
         if private:
-            (root / "Justfile").write_text(
+            (root / "justfile").write_text(
                 "dedicated-targets-install:\n    @true\n",
                 encoding="utf-8",
             )
@@ -506,7 +506,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
             [
                 "--no-dotenv",
                 "--justfile",
-                str(CUTOVER.lexical_absolute(self.private) / "Justfile"),
+                str(CUTOVER.lexical_absolute(self.private) / "justfile"),
                 "--working-directory",
                 str(CUTOVER.lexical_absolute(self.private)),
                 "dedicated-targets-install",

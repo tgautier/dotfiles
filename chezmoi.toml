@@ -1,0 +1,2 @@
+# Keep public target modes deterministic across operator shells.
+umask = 18

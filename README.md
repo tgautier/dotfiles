@@ -220,6 +220,7 @@ Detailed guides live in the `docs/` folder:
 - [Homebrew](docs/homebrew.md) — update flow, cask-upgrade recovery, and `just update` troubleshooting
 - [Chezmoi migration inventory](docs/chezmoi-inventory.md) — complete rcm target map, explicit dispositions, parity guard, and rollback boundary
 - [Chezmoi cutover backup](docs/chezmoi-cutover-backup.md) — exact live-link backup, isolated restore rehearsal, and approval-bound rcm recovery
+- [Chezmoi operator cutover](docs/chezmoi-operator-cutover.md) — approval-bound status, diff, dry run, apply, interruption recovery, and working-state preservation
 - [Local shipping gate](docs/local-shipping-gate.md) — per-checkout setup, exact-tip operation, recovery, upgrade, and rollback
 - [Rcm link reconciliation](docs/rcm-link-reconciliation.md) — read-only ownership inventory before the chezmoi backup rehearsal
 - [tmux](docs/tmux.md) — configuration overview, cheat sheet, and troubleshooting
@@ -402,9 +403,16 @@ Individual targets:
 | `just lint-cleanup-symlinks` | Fixture-test the stale-symlink scanner |
 | `just test-rcm-links` | Fixture-test HOME link inventory, cleanup, cutover backup, and rcm restoration |
 | `just test-private-chezmoi-bridge` | Fixture-test bounded companion checks and output withholding |
+| `just test-chezmoi-operator` | Fixture-test guarded public/private operation, approval, idempotence, and recovery |
 | `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
 | `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |
+| `just chezmoi-status` | Inspect public/private chezmoi status without changing managed targets |
+| `just chezmoi-diff` | Print the local public/private target-state diff |
+| `just chezmoi-apply-dry-run` | Preview both applies without changing managed targets |
+| `just chezmoi-apply-plan <backup> <digest>` | Review and bind the exact apply to verified rcm recovery evidence |
+| `just chezmoi-apply <backup> <backup-digest> <apply-digest>` | Apply both sources twice and restore rcm automatically on failure |
+| `just chezmoi-recover <backup> <digest>` | Restore and verify the complete retained rcm link set |
 
 Wire the hooks after cloning, adding a worktree, or pulling hook changes:
 

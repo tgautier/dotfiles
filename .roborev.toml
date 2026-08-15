@@ -1,11 +1,12 @@
-# Codex is the configured reviewer by operator decision. Keep review execution
-# single-agent: an empty backup fails clearly instead of substituting another
-# model.
+# Claude Code is the configured reviewer by operator decision. Keep review
+# execution single-agent: an empty backup fails clearly instead of substituting
+# another model.
 #
 # Check installation with `command -v <binary>`. Do not run
 # `roborev check-agents`; it invokes every configured agent and may launch
 # authentication flows.
-agent = "codex"
+agent = "claude-code"
+model = "claude-opus-4-6"
 backup_agent = ""
 review_reasoning = "medium"
 

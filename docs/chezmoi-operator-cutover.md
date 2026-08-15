@@ -32,7 +32,7 @@ just chezmoi-apply-plan "$backup_file" "$BACKUP_DIGEST"
 
 The command verifies the current rcm links against the backup, runs the isolated public/private canary, then prints each source's status, diff, and verbose dry run. Diff and dry-run output can contain complete private values. Review it locally and never redirect, paste, or publish it.
 
-The final line prints `approval_sha256`. This digest binds the HOME and repository paths, the backup path and reviewed digest, both source trees and ownership contracts, the canary, the recovery helper and rcm configuration, the selected chezmoi, `lsrc`, and `rcup` executables, and the exact status, diff, and dry-run bytes. Copy only that digest:
+The final line prints `approval_sha256`. This digest binds the HOME and repository paths, the backup path and reviewed digest, both source trees and ownership contracts, the canonical operator helper path and bytes, the canary, the recovery helper and rcm configuration, the selected chezmoi, `lsrc`, and `rcup` executables, and the exact status, diff, and dry-run bytes. Copy only that digest:
 
 ```sh
 APPLY_DIGEST='paste the final approval_sha256 here'
@@ -48,9 +48,9 @@ Keep the reviewed terminal output visible and run:
 just chezmoi-apply "$backup_file" "$BACKUP_DIGEST" "$APPLY_DIGEST"
 ```
 
-The command reruns the isolated canary, recomputes the approval without reprinting inspection output, verifies the backup again immediately before mutation, and applies the public source before the private source. Every subprocess invocation is time-bounded. Every chezmoi invocation is config-bound, noninteractive, external-refresh-disabled, and limited to file entries. The mutating command uses `--force` only after the exact rcm link baseline, reviewed rendered output, source state, and recovery artifact have been revalidated, so no interactive prompt can weaken the approval boundary. It requires empty status, diff, and dry-run output after the first apply, applies both sources a second time, then requires the same empty state again.
+The command reruns the isolated canary, recomputes the approval without reprinting inspection output, verifies the backup again immediately before mutation, and applies the public source before the private source. Every subprocess invocation is time-bounded and runs in a dedicated process group. A timeout, interruption, command failure, or unexpectedly lingering descendant triggers bounded group-wide termination, escalation when needed, and leader reaping before recovery or the next phase. Every chezmoi invocation is config-bound, noninteractive, external-refresh-disabled, and limited to file entries. The mutating command uses `--force` only after the exact rcm link baseline, reviewed rendered output, source state, and recovery artifact have been revalidated, so no interactive prompt can weaken the approval boundary. It requires empty status, diff, and dry-run output after the first apply, applies both sources a second time, then requires the same empty state again.
 
-If either source apply, either settled-state check, or the second apply fails or is interrupted, the command invokes the digest-bound complete rcm restore. `SIGHUP`, `SIGINT`, and `SIGTERM` received after mutation starts are recorded and deferred until that restore finishes. A successful automatic restore still returns failure so the cutover cannot look complete.
+If either source apply, either settled-state check, or the second apply fails or is interrupted, the command first stops its complete subprocess group, then invokes the digest-bound complete rcm restore. The first `SIGHUP`, `SIGINT`, or `SIGTERM` starts that cleanup after mutation begins; repeated handled signals are recorded without interrupting process cleanup or restore. A successful automatic restore still returns failure so the cutover cannot look complete.
 
 The sequence is not an operating-system transaction across HOME. The shared lock serializes these recipes only, and there is still a narrow race with unrelated writers after the final backup verification. Keep other installers and edits stopped until apply or recovery finishes.
 

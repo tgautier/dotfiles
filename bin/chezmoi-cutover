@@ -18,6 +18,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from typing import Iterator, Sequence
 
 
@@ -27,6 +28,8 @@ MAX_SOURCE_BYTES = 64 * 1024 * 1024
 CHEZMOI_TIMEOUT_SECONDS = 120
 CANARY_TIMEOUT_SECONDS = 180
 RCM_HELPER_TIMEOUT_SECONDS = 90
+PROCESS_GROUP_CLEANUP_SECONDS = 2
+PROCESS_GROUP_TERM_GRACE_SECONDS = 0.1
 
 
 class CutoverError(RuntimeError):
@@ -69,8 +72,8 @@ def recoverable_termination_signals() -> Iterator[TerminationState]:
     def request_termination(signum: int, _frame: object) -> None:
         if state.signum is None:
             state.signum = signum
-        if not state.recovering:
-            raise TerminationRequested(state.signum)
+            if not state.recovering:
+                raise TerminationRequested(signum)
 
     handled = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
     try:
@@ -314,6 +317,91 @@ def command_environment(home: Path) -> dict[str, str]:
     return environment
 
 
+def wait_without_reaping(process: subprocess.Popen[bytes], timeout: int | float) -> bool:
+    """Wait for a child while retaining its process-group identity."""
+
+    deadline = time.monotonic() + timeout
+    while True:
+        result = os.waitid(
+            os.P_PID,
+            process.pid,
+            os.WEXITED | os.WNOHANG | os.WNOWAIT,
+        )
+        if result is not None:
+            return True
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(0.01, remaining))
+
+
+def terminate_process_group(process: subprocess.Popen[bytes], *, label: str) -> None:
+    """Terminate a child process group, escalate if needed, and reap its leader."""
+
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except (ProcessLookupError, PermissionError):
+        try:
+            process.wait(timeout=PROCESS_GROUP_CLEANUP_SECONDS)
+        except subprocess.TimeoutExpired as exc:
+            raise CutoverError(f"cannot reap {label} process") from exc
+        return
+
+    time.sleep(PROCESS_GROUP_TERM_GRACE_SECONDS)
+    try:
+        # The unreaped leader pins the numeric process-group identity against
+        # PID reuse until every descendant has received the final signal.
+        os.killpg(process.pid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+    try:
+        process.wait(timeout=PROCESS_GROUP_CLEANUP_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise CutoverError(f"cannot reap {label} process") from exc
+
+
+def run_bounded_process(
+    arguments: Sequence[str],
+    *,
+    cwd: Path,
+    environment: dict[str, str],
+    stdin: object,
+    stdout: object,
+    stderr: object,
+    timeout: int | float,
+    label: str,
+) -> int:
+    """Run one command in a private process group with bounded cleanup."""
+
+    try:
+        process = subprocess.Popen(
+            arguments,
+            cwd=cwd,
+            env=environment,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            start_new_session=True,
+        )
+    except OSError as exc:
+        raise CutoverError(f"cannot run {label}: {exc}") from exc
+
+    completed = False
+    try:
+        completed = wait_without_reaping(process, timeout)
+    except BaseException:
+        terminate_process_group(process, label=label)
+        raise
+
+    terminate_process_group(process, label=label)
+    if not completed:
+        raise CutoverError(f"{label} exceeded {timeout} seconds")
+    if process.returncode is None:
+        raise CutoverError(f"cannot determine {label} status")
+    return process.returncode
+
+
 def capture_operation(
     operation: str,
     *,
@@ -328,49 +416,42 @@ def capture_operation(
 
     environment = command_environment(home)
     print(f"==> {source.label} chezmoi {operation}", file=sys.stderr)
-    try:
-        with tempfile.TemporaryFile() as output:
-            completed = subprocess.run(
-                command_arguments(
-                    executable,
-                    source,
-                    home=home,
-                    cache_root=cache_root,
-                    state_root=state_root,
-                    operation=operation,
-                ),
-                cwd=source.root,
-                env=environment,
-                stdin=subprocess.DEVNULL,
-                stdout=output,
-                stderr=subprocess.STDOUT,
-                check=False,
-                timeout=CHEZMOI_TIMEOUT_SECONDS,
+    with tempfile.TemporaryFile() as output:
+        returncode = run_bounded_process(
+            command_arguments(
+                executable,
+                source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                operation=operation,
+            ),
+            cwd=source.root,
+            environment=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=output,
+            stderr=subprocess.STDOUT,
+            timeout=CHEZMOI_TIMEOUT_SECONDS,
+            label=f"{source.label} chezmoi {operation}",
+        )
+        size = output.tell()
+        if size > MAX_COMMAND_OUTPUT_BYTES:
+            raise CutoverError(
+                f"{source.label} chezmoi {operation} output exceeds the safety limit"
             )
-            size = output.tell()
-            if size > MAX_COMMAND_OUTPUT_BYTES:
-                raise CutoverError(
-                    f"{source.label} chezmoi {operation} output exceeds the safety limit"
-                )
-            output.seek(0)
-            captured = output.read()
-            if show_output and captured:
-                sys.stdout.buffer.write(captured)
-                sys.stdout.buffer.flush()
-            if completed.returncode != 0:
-                raise CutoverError(
-                    f"{source.label} chezmoi {operation} failed with status "
-                    f"{completed.returncode}"
-                )
-    except subprocess.TimeoutExpired as exc:
+        output.seek(0)
+        captured = output.read()
+        if show_output and captured:
+            sys.stdout.buffer.write(captured)
+            sys.stdout.buffer.flush()
+        if returncode != 0:
+            raise CutoverError(
+                f"{source.label} chezmoi {operation} failed with status {returncode}"
+            )
+    if not isinstance(captured, bytes):
         raise CutoverError(
-            f"{source.label} chezmoi {operation} exceeded "
-            f"{CHEZMOI_TIMEOUT_SECONDS} seconds"
-        ) from exc
-    except OSError as exc:
-        raise CutoverError(
-            f"cannot run {source.label} chezmoi {operation}: {exc}"
-        ) from exc
+            f"{source.label} chezmoi {operation} returned unsupported output"
+        )
     return captured
 
 
@@ -554,31 +635,24 @@ def run_rcm_helper(
     ]
     if backup_confirm is not None:
         arguments.extend(("--confirm", backup_confirm, "--rcup", rcup))
-    try:
-        with tempfile.TemporaryFile() as output:
-            completed = subprocess.run(
-                arguments,
-                cwd=public,
-                env=command_environment(home),
-                stdin=subprocess.DEVNULL,
-                stdout=output,
-                stderr=None,
-                check=False,
-                timeout=RCM_HELPER_TIMEOUT_SECONDS,
-            )
-            size = output.tell()
-            if size > MAX_COMMAND_OUTPUT_BYTES:
-                raise CutoverError(f"rcm {command} output exceeds the safety limit")
-            output.seek(0)
-            captured = output.read()
-    except subprocess.TimeoutExpired as exc:
-        raise CutoverError(
-            f"rcm {command} exceeded {RCM_HELPER_TIMEOUT_SECONDS} seconds"
-        ) from exc
-    except OSError as exc:
-        raise CutoverError(f"cannot run rcm {command}: {exc}") from exc
-    if completed.returncode != 0:
-        raise CutoverError(f"rcm {command} failed with status {completed.returncode}")
+    with tempfile.TemporaryFile() as output:
+        returncode = run_bounded_process(
+            arguments,
+            cwd=public,
+            environment=command_environment(home),
+            stdin=subprocess.DEVNULL,
+            stdout=output,
+            stderr=None,
+            timeout=RCM_HELPER_TIMEOUT_SECONDS,
+            label=f"rcm {command}",
+        )
+        size = output.tell()
+        if size > MAX_COMMAND_OUTPUT_BYTES:
+            raise CutoverError(f"rcm {command} output exceeds the safety limit")
+        output.seek(0)
+        captured = output.read()
+    if returncode != 0:
+        raise CutoverError(f"rcm {command} failed with status {returncode}")
     try:
         return captured.decode("utf-8").strip()
     except UnicodeError as exc:
@@ -684,6 +758,12 @@ def approval_digest(
             label="chezmoi executable",
             limit=MAX_SOURCE_BYTES,
         ),
+        "operator": str(Path(__file__).resolve()),
+        "operator_sha256": hash_regular_file(
+            Path(__file__).resolve(),
+            label="chezmoi operator",
+            limit=MAX_SOURCE_BYTES,
+        ),
         "canary_sha256": hash_regular_file(
             canary,
             label="chezmoi canary",
@@ -752,25 +832,19 @@ def prepare_approval(
         environment["DOTFILES_PRIVATE_DIR"] = str(private)
         environment["PATH"] = f"{executable.parent}{os.pathsep}{environment.get('PATH', '')}"
         print("==> isolated public/private chezmoi canary", file=sys.stderr)
-        try:
-            completed = subprocess.run(
-                [str(canary)],
-                cwd=public,
-                env=environment,
-                stdin=subprocess.DEVNULL,
-                stdout=None if show_output else subprocess.DEVNULL,
-                check=False,
-                timeout=CANARY_TIMEOUT_SECONDS,
-            )
-        except subprocess.TimeoutExpired as exc:
+        returncode = run_bounded_process(
+            [str(canary)],
+            cwd=public,
+            environment=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=None if show_output else subprocess.DEVNULL,
+            stderr=None,
+            timeout=CANARY_TIMEOUT_SECONDS,
+            label="chezmoi canary",
+        )
+        if returncode != 0:
             raise CutoverError(
-                f"chezmoi canary exceeded {CANARY_TIMEOUT_SECONDS} seconds"
-            ) from exc
-        except OSError as exc:
-            raise CutoverError(f"cannot run chezmoi canary: {exc}") from exc
-        if completed.returncode != 0:
-            raise CutoverError(
-                f"chezmoi canary failed with status {completed.returncode}"
+                f"chezmoi canary failed with status {returncode}"
             )
     observations = observation_digests(
         executable=executable,
@@ -1026,7 +1100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             label="chezmoi operator cache directory",
         )
-        with operator_lock(state_root):
+        with operator_lock(state_root), recoverable_termination_signals():
             for source in sources:
                 ensure_private_directory(
                     cache_root / source.label,

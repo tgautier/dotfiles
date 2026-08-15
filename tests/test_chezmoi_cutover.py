@@ -42,10 +42,11 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.backup = self.root / "rcm-links.json"
         self.canary_log = self.root / "canary.log"
         self.ready = self.root / "apply-ready"
-        self.script = SCRIPT_PATH
+        self.descendant_pid = self.root / "descendant.pid"
         self.fake_chezmoi = self.root / "fake-chezmoi"
         self.home.mkdir()
         self._make_repository(self.public, private=False)
+        self.script = self.public / "bin/chezmoi-cutover"
         self.fake_chezmoi.write_text(
             textwrap.dedent(
                 """\
@@ -53,6 +54,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 import json
                 import os
                 from pathlib import Path
+                import subprocess
                 import sys
                 import time
 
@@ -96,6 +98,18 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     marker.touch()
                     (Path(os.environ["HOME"]) / "unexpected-mutation").touch()
                     if os.environ.get("FAKE_CHEZMOI_WAIT_AFTER_APPLY_CWD") == source:
+                        descendant = subprocess.Popen(
+                            [
+                                sys.executable,
+                                "-c",
+                                "import signal, time; "
+                                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                                "time.sleep(60)",
+                            ]
+                        )
+                        Path(os.environ["FAKE_DESCENDANT_PID"]).write_text(
+                            str(descendant.pid), encoding="utf-8"
+                        )
                         Path(os.environ["FAKE_CHEZMOI_READY"]).touch()
                         while True:
                             time.sleep(1)
@@ -131,6 +145,9 @@ class ChezmoiCutoverTests(unittest.TestCase):
             (root / "rcrc").write_text("EXCLUDES=\"\"\n", encoding="utf-8")
             helper = root / "bin/rcm-links"
             helper.parent.mkdir()
+            operator = root / "bin/chezmoi-cutover"
+            operator.write_bytes(SCRIPT_PATH.read_bytes())
+            operator.chmod(0o700)
             helper.write_text(
                 textwrap.dedent(
                     """\
@@ -155,6 +172,14 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     elif command == "cutover-restore":
                         if os.environ.get("FAKE_RCM_RESTORE_FAIL") == "1":
                             raise SystemExit(31)
+                        descendant_path = Path(os.environ["FAKE_DESCENDANT_PID"])
+                        if descendant_path.exists():
+                            try:
+                                os.kill(int(descendant_path.read_text(encoding="utf-8")), 0)
+                            except ProcessLookupError:
+                                pass
+                            else:
+                                raise SystemExit(33)
                         print("cutover restore complete")
                     else:
                         raise SystemExit(32)
@@ -170,6 +195,9 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     #!/usr/bin/env python3
                     import os
                     from pathlib import Path
+                    import subprocess
+                    import sys
+                    import time
 
                     with Path(os.environ["FAKE_CANARY_LOG"]).open(
                         "a", encoding="utf-8"
@@ -177,6 +205,22 @@ class ChezmoiCutoverTests(unittest.TestCase):
                         handle.write("passed\\n")
                     if os.environ.get("FAKE_CANARY_FAIL") == "1":
                         raise SystemExit(37)
+                    if os.environ.get("FAKE_CANARY_WAIT") == "1":
+                        descendant = subprocess.Popen(
+                            [
+                                sys.executable,
+                                "-c",
+                                "import signal, time; "
+                                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                                "time.sleep(60)",
+                            ]
+                        )
+                        Path(os.environ["FAKE_DESCENDANT_PID"]).write_text(
+                            str(descendant.pid), encoding="utf-8"
+                        )
+                        Path(os.environ["FAKE_CHEZMOI_READY"]).touch()
+                        while True:
+                            time.sleep(1)
                     """
                 ),
                 encoding="utf-8",
@@ -221,6 +265,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
                 "FAKE_CANARY_LOG": str(self.canary_log),
                 "FAKE_CHEZMOI_READY": str(self.ready),
+                "FAKE_DESCENDANT_PID": str(self.descendant_pid),
                 "CHEZMOI_CONFIG_FILE": str(self.root / "foreign-config"),
                 "DOTFILES_DIR": str(self.root / "foreign-public"),
                 "GIT_DIR": str(self.root / "foreign-git-dir"),
@@ -296,6 +341,50 @@ class ChezmoiCutoverTests(unittest.TestCase):
             json.loads(line)
             for line in self.log.read_text(encoding="utf-8").splitlines()
         ]
+
+    def _descendant_launcher(self, *, wait: bool) -> Path:
+        launcher = self.root / f"descendant-launcher-{wait}"
+        final_action = "time.sleep(60)" if wait else "raise SystemExit(0)"
+        launcher.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env python3
+                import os
+                from pathlib import Path
+                import subprocess
+                import sys
+                import time
+
+                child = subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-c",
+                        "import signal, time; "
+                        "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                        "time.sleep(60)",
+                    ]
+                )
+                Path(os.environ["FAKE_DESCENDANT_PID"]).write_text(
+                    str(child.pid), encoding="utf-8"
+                )
+                {final_action}
+                """
+            ),
+            encoding="utf-8",
+        )
+        launcher.chmod(0o700)
+        return launcher
+
+    def _assert_process_gone(self, process_id: int) -> None:
+        deadline = time.monotonic() + 1
+        while True:
+            try:
+                os.kill(process_id, 0)
+            except ProcessLookupError:
+                return
+            if time.monotonic() >= deadline:
+                self.fail(f"descendant process {process_id} survived group cleanup")
+            time.sleep(0.01)
 
     def test_public_status_uses_explicit_isolated_state(self) -> None:
         completed = self._run("status")
@@ -545,6 +634,28 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn("apply approval differs", completed.stderr)
         self.assertFalse(self.applied.exists())
 
+    def test_operator_change_invalidates_approval_before_mutation(self) -> None:
+        approval = self._approval()
+        with self.script.open("a", encoding="utf-8") as handle:
+            handle.write("\n# changed after review\n")
+
+        completed = self._run(
+            "apply",
+            private=True,
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("apply approval differs", completed.stderr)
+        self.assertFalse(self.applied.exists())
+
     def test_private_apply_failure_restores_the_complete_rcm_set(self) -> None:
         approval = self._approval()
         completed = self._run(
@@ -643,6 +754,69 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertEqual(self._records(), [])
         self.assertFalse(self.applied.exists())
 
+    def test_sigterm_during_plan_stops_canary_descendant_without_restore(self) -> None:
+        self._make_repository(self.private, private=True)
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
+                "FAKE_CANARY_LOG": str(self.canary_log),
+                "FAKE_CANARY_WAIT": "1",
+                "FAKE_CHEZMOI_APPLIED": str(self.applied),
+                "FAKE_CHEZMOI_LOG": str(self.log),
+                "FAKE_CHEZMOI_READY": str(self.ready),
+                "FAKE_DESCENDANT_PID": str(self.descendant_pid),
+                "FAKE_RCM_LOG": str(self.rcm_log),
+            }
+        )
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                str(self.script),
+                "plan",
+                "--home",
+                str(self.home),
+                "--public-dir",
+                str(self.public),
+                "--private-dir",
+                str(self.private),
+                "--cache-dir",
+                str(self.cache),
+                "--state-dir",
+                str(self.state),
+                "--chezmoi",
+                str(self.fake_chezmoi),
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+            ],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.addCleanup(lambda: process.poll() is None and process.kill())
+        for _ in range(200):
+            if self.ready.exists():
+                break
+            if process.poll() is not None:
+                self.fail("plan exited before reaching the canary signal fixture")
+            time.sleep(0.05)
+        else:
+            self.fail("plan did not reach the canary signal fixture")
+
+        process.send_signal(signal.SIGTERM)
+        _stdout, stderr = process.communicate(timeout=10)
+
+        self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
+        self.assertIn("received SIGTERM", stderr)
+        self.assertNotIn("restored", stderr)
+        self.assertNotIn("cutover-restore", [record[0] for record in self._rcm_records()])
+        descendant = int(self.descendant_pid.read_text(encoding="utf-8"))
+        self._assert_process_gone(descendant)
+
     def test_chezmoi_timeout_is_reported_distinctly(self) -> None:
         source = CUTOVER.require_source(
             self.public,
@@ -651,9 +825,9 @@ class ChezmoiCutoverTests(unittest.TestCase):
         )
         with (
             mock.patch.object(
-                CUTOVER.subprocess,
-                "run",
-                side_effect=subprocess.TimeoutExpired(["chezmoi"], 120),
+                CUTOVER,
+                "run_bounded_process",
+                side_effect=CUTOVER.CutoverError("public chezmoi status exceeded 120 seconds"),
             ),
             self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 120 seconds"),
         ):
@@ -667,6 +841,48 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 show_output=False,
             )
 
+    def test_process_timeout_kills_sigterm_ignoring_descendant(self) -> None:
+        launcher = self._descendant_launcher(wait=True)
+        environment = os.environ.copy()
+        environment["FAKE_DESCENDANT_PID"] = str(self.descendant_pid)
+        started = time.monotonic()
+
+        with self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 1.0 seconds"):
+            CUTOVER.run_bounded_process(
+                [str(launcher)],
+                cwd=self.root,
+                environment=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=1.0,
+                label="descendant timeout fixture",
+            )
+
+        self.assertLess(time.monotonic() - started, 3)
+        descendant = int(self.descendant_pid.read_text(encoding="utf-8"))
+        self._assert_process_gone(descendant)
+
+    def test_completed_process_cleans_remaining_descendant(self) -> None:
+        launcher = self._descendant_launcher(wait=False)
+        environment = os.environ.copy()
+        environment["FAKE_DESCENDANT_PID"] = str(self.descendant_pid)
+
+        returncode = CUTOVER.run_bounded_process(
+            [str(launcher)],
+            cwd=self.root,
+            environment=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+            label="completed descendant fixture",
+        )
+
+        self.assertEqual(returncode, 0)
+        descendant = int(self.descendant_pid.read_text(encoding="utf-8"))
+        self._assert_process_gone(descendant)
+
     def test_chezmoi_output_limit_is_enforced_before_reading_it(self) -> None:
         source = CUTOVER.require_source(
             self.public,
@@ -674,13 +890,13 @@ class ChezmoiCutoverTests(unittest.TestCase):
             config=Path("chezmoi.toml"),
         )
 
-        def oversized_run(*arguments: object, **keywords: object) -> subprocess.CompletedProcess[bytes]:
+        def oversized_run(*arguments: object, **keywords: object) -> int:
             output = keywords["stdout"]
             output.write(b"x" * (CUTOVER.MAX_COMMAND_OUTPUT_BYTES + 1))
-            return subprocess.CompletedProcess(arguments[0], 0)
+            return 0
 
         with (
-            mock.patch.object(CUTOVER.subprocess, "run", side_effect=oversized_run),
+            mock.patch.object(CUTOVER, "run_bounded_process", side_effect=oversized_run),
             self.assertRaisesRegex(CUTOVER.CutoverError, "output exceeds the safety limit"),
         ):
             CUTOVER.capture_operation(
@@ -696,9 +912,9 @@ class ChezmoiCutoverTests(unittest.TestCase):
     def test_rcm_helper_timeout_is_reported_distinctly(self) -> None:
         with (
             mock.patch.object(
-                CUTOVER.subprocess,
-                "run",
-                side_effect=subprocess.TimeoutExpired(["rcm-links"], 90),
+                CUTOVER,
+                "run_bounded_process",
+                side_effect=CUTOVER.CutoverError("rcm cutover-backup-verify exceeded 90 seconds"),
             ),
             self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 90 seconds"),
         ):
@@ -714,13 +930,13 @@ class ChezmoiCutoverTests(unittest.TestCase):
             )
 
     def test_rcm_helper_rejects_oversized_output_before_reading_it(self) -> None:
-        def oversized_run(*arguments: object, **keywords: object) -> subprocess.CompletedProcess[bytes]:
+        def oversized_run(*arguments: object, **keywords: object) -> int:
             output = keywords["stdout"]
             output.write(b"x" * (CUTOVER.MAX_COMMAND_OUTPUT_BYTES + 1))
-            return subprocess.CompletedProcess(arguments[0], 0)
+            return 0
 
         with (
-            mock.patch.object(CUTOVER.subprocess, "run", side_effect=oversized_run),
+            mock.patch.object(CUTOVER, "run_bounded_process", side_effect=oversized_run),
             self.assertRaisesRegex(CUTOVER.CutoverError, "output exceeds the safety limit"),
         ):
             CUTOVER.run_rcm_helper(
@@ -769,11 +985,9 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 ),
             ),
             mock.patch.object(
-                CUTOVER.subprocess,
-                "run",
-                side_effect=subprocess.TimeoutExpired(
-                    ["test-chezmoi-canary"], 180
-                ),
+                CUTOVER,
+                "run_bounded_process",
+                side_effect=CUTOVER.CutoverError("chezmoi canary exceeded 180 seconds"),
             ),
             self.assertRaisesRegex(CUTOVER.CutoverError, "exceeded 180 seconds"),
         ):
@@ -886,6 +1100,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 "FAKE_CHEZMOI_APPLIED": str(self.applied),
                 "FAKE_CHEZMOI_LOG": str(self.log),
                 "FAKE_CHEZMOI_READY": str(self.ready),
+                "FAKE_DESCENDANT_PID": str(self.descendant_pid),
                 "FAKE_CHEZMOI_WAIT_AFTER_APPLY_CWD": self.public.name,
                 "FAKE_RCM_LOG": str(self.rcm_log),
             }
@@ -933,10 +1148,12 @@ class ChezmoiCutoverTests(unittest.TestCase):
         process.send_signal(signal.SIGTERM)
         _stdout, stderr = process.communicate(timeout=10)
 
-        self.assertEqual(process.returncode, 128 + signal.SIGTERM)
+        self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
         self.assertIn("received SIGTERM", stderr)
         self.assertIn("complete rcm link set was restored", stderr)
         self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
+        descendant = int(self.descendant_pid.read_text(encoding="utf-8"))
+        self._assert_process_gone(descendant)
 
     def test_public_only_plan_uses_one_source(self) -> None:
         approval = self._approval(private=False)

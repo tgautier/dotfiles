@@ -72,8 +72,6 @@ class ChezmoiCutoverTests(unittest.TestCase):
                             "HOME",
                             "NO_COLOR",
                             "PYTHONPATH",
-                            "RCM_LIB",
-                            "RCRC",
                             "TERM",
                         )
                     },
@@ -519,8 +517,6 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIsNone(environment["DOTFILES_DIR"])
         self.assertIsNone(environment["GIT_DIR"])
         self.assertIsNone(environment["PYTHONPATH"])
-        self.assertIsNone(environment["RCM_LIB"])
-        self.assertIsNone(environment["RCRC"])
         self.assertEqual(environment["HOME"], str(self.home.resolve()))
         self.assertEqual(environment["NO_COLOR"], "1")
         self.assertEqual(environment["TERM"], "dumb")

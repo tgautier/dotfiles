@@ -12,7 +12,6 @@ RUN apt-get update \
         jq \
         libsqlite3-0 \
         python3 \
-        rcm=1.3.4-1 \
         ruby \
         zsh \
     && rm -rf /var/lib/apt/lists/*

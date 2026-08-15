@@ -183,7 +183,6 @@ def clean_environment(home: Path, fake_bin: Path, log_path: Path) -> dict[str, s
             "ENV",
             "PYTHONHOME",
             "PYTHONPATH",
-            "RCRC",
             "SHELLOPTS",
             "ZDOTDIR",
         }
@@ -292,10 +291,7 @@ def verify_public_targets(public: Path, home: Path) -> set[Path]:
             mode = 0o755 if row["mode"] == "executable" else 0o644
             assert_regular_target(target, public / "home" / row["chezmoi_source"], mode)
             targets.add(target)
-        elif disposition.startswith("defer-"):
-            assert_symlink_target(target, public / row["rcm_source"])
-            targets.add(target)
-        elif disposition in {"repository-only", "retire-at-cutover"}:
+        elif disposition == "repository-only":
             continue
         else:
             raise AcceptanceError(f"unknown public disposition: {disposition}")

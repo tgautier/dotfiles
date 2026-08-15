@@ -31,14 +31,14 @@ check_duplicates() {
 
 main() {
     local script_dir repo_root manifest private_bridge private_session tmp header line_no
-    local rcm_source target disposition chezmoi_source mode extra
+    local source_col target disposition chezmoi_source mode extra
     local source_state expected_source_state diff_output
     script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
     repo_root=${1:-$(cd "$script_dir/.." && pwd -P)}
     manifest=${2:-"$repo_root/docs/chezmoi-targets.tsv"}
     private_bridge="$script_dir/private_chezmoi_bridge.py"
 
-    for command_name in chezmoi jq lsrc sort uniq cmp comm mktemp python3 wc tr; do
+    for command_name in chezmoi jq sort uniq cmp comm mktemp python3 wc tr; do
         require_command "$command_name"
     done
     [[ -f "$private_bridge" ]] || fail "missing private chezmoi bridge"
@@ -54,19 +54,17 @@ main() {
     : > "$tmp/config.toml"
     : > "$tmp/all-sources"
     : > "$tmp/all-targets"
-    : > "$tmp/actual-rcm-map"
-    : > "$tmp/expected-rcm-map"
     : > "$tmp/expected-map"
 
     {
         IFS= read -r header || fail "empty target manifest: $manifest"
-        [[ "$header" == $'rcm_source\ttarget\tdisposition\tchezmoi_source\tmode' ]] || fail "invalid target manifest header"
+        [[ "$header" == $'source\ttarget\tdisposition\tchezmoi_source\tmode' ]] || fail "invalid target manifest header"
         line_no=1
-        while IFS=$'\t' read -r rcm_source target disposition chezmoi_source mode extra; do
+        while IFS=$'\t' read -r source_col target disposition chezmoi_source mode extra; do
             line_no=$((line_no + 1))
-            [[ -n "$rcm_source" && -n "$target" && -n "$disposition" && -n "$chezmoi_source" && -n "$mode" && -z "${extra:-}" ]] || fail "invalid target manifest row at line $line_no"
-            case "$rcm_source" in
-                /*|../*|*/../*) fail "unsafe rcm source at line $line_no: $rcm_source" ;;
+            [[ -n "$source_col" && -n "$target" && -n "$disposition" && -n "$chezmoi_source" && -n "$mode" && -z "${extra:-}" ]] || fail "invalid target manifest row at line $line_no"
+            case "$source_col" in
+                /*|../*|*/../*) fail "unsafe source path at line $line_no: $source_col" ;;
             esac
             case "$target" in
                 .*/*|.*) ;;
@@ -79,15 +77,14 @@ main() {
                 file|executable) ;;
                 *) fail "invalid mode at line $line_no: $mode" ;;
             esac
-            [[ -f "$repo_root/$rcm_source" ]] || fail "missing rcm source at line $line_no: $rcm_source"
+            [[ -f "$repo_root/$source_col" ]] || fail "missing source at line $line_no: $source_col"
             if [[ "$mode" == executable ]]; then
-                [[ -x "$repo_root/$rcm_source" ]] || fail "rcm source is not executable at line $line_no: $rcm_source"
+                [[ -x "$repo_root/$source_col" ]] || fail "source is not executable at line $line_no: $source_col"
             else
-                [[ ! -x "$repo_root/$rcm_source" ]] || fail "rcm source is unexpectedly executable at line $line_no: $rcm_source"
+                [[ "$mode" == file ]] && [[ -x "$repo_root/$source_col" ]] && fail "source is unexpectedly executable at line $line_no: $source_col"
             fi
-            printf '%s\n' "$rcm_source" >> "$tmp/all-sources"
+            printf '%s\n' "$source_col" >> "$tmp/all-sources"
             printf '%s\n' "$target" >> "$tmp/all-targets"
-            printf '%s\t%s\n' "$rcm_source" "$target" >> "$tmp/expected-rcm-map"
             case "$disposition" in
                 shadow)
                     case "$chezmoi_source" in
@@ -96,8 +93,8 @@ main() {
                     [[ -f "$repo_root/home/$chezmoi_source" ]] || fail "missing chezmoi source at line $line_no: $chezmoi_source"
                     printf '%s\t%s\n' "$target" "$chezmoi_source" >> "$tmp/expected-map"
                     ;;
-                defer-homebrew-link|repository-only|defer-machine-overrides|defer-private-overlay|retire-at-cutover)
-                    [[ "$chezmoi_source" == - ]] || fail "deferred target has a chezmoi source at line $line_no: $target"
+                repository-only)
+                    [[ "$chezmoi_source" == - ]] || fail "repository-only target has a chezmoi source at line $line_no: $target"
                     ;;
                 *) fail "unknown disposition at line $line_no: $disposition" ;;
             esac
@@ -108,31 +105,8 @@ main() {
     [[ -s "$tmp/expected-map" ]] || fail "target manifest has no shadow entries"
     check_duplicates sources "$tmp/all-sources"
     check_duplicates targets "$tmp/all-targets"
-    LC_ALL=C sort "$tmp/expected-rcm-map" > "$tmp/expected-rcm-map.sorted"
     LC_ALL=C sort "$tmp/expected-map" > "$tmp/expected-map.sorted"
     check_duplicates 'shadow target mappings' "$tmp/expected-map.sorted"
-
-    local target_absolute source_absolute target_relative source_relative
-    HOME="$tmp/operator-home" RCRC="$repo_root/rcrc" DOTFILES_DIR="$repo_root" DOTFILES_PRIVATE_DIR="$tmp/absent-private" lsrc -d "$repo_root" > "$tmp/lsrc-map"
-    while IFS=: read -r target_absolute source_absolute; do
-        case "$target_absolute" in
-            "$tmp/operator-home"/*) target_relative=${target_absolute#"$tmp/operator-home"/} ;;
-            *) fail "lsrc returned a target outside the isolated HOME: $target_absolute" ;;
-        esac
-        case "$source_absolute" in
-            "$repo_root"/*) source_relative=${source_absolute#"$repo_root"/} ;;
-            *) fail "lsrc returned a source outside the public repository: $source_absolute" ;;
-        esac
-        printf '%s\t%s\n' "$source_relative" "$target_relative" >> "$tmp/actual-rcm-map"
-    done < "$tmp/lsrc-map"
-    LC_ALL=C sort "$tmp/actual-rcm-map" > "$tmp/actual-rcm-map.sorted"
-    if ! cmp -s "$tmp/expected-rcm-map.sorted" "$tmp/actual-rcm-map.sorted"; then
-        printf 'ERROR: rcm target map mismatch\nMissing manifest mappings:\n' >&2
-        LC_ALL=C comm -13 "$tmp/expected-rcm-map.sorted" "$tmp/actual-rcm-map.sorted" >&2
-        printf 'Stale or misnamed manifest mappings:\n' >&2
-        LC_ALL=C comm -23 "$tmp/expected-rcm-map.sorted" "$tmp/actual-rcm-map.sorted" >&2
-        exit 1
-    fi
 
     local chezmoi_bin jq_bin
     chezmoi_bin=$(command -v chezmoi)
@@ -162,13 +136,13 @@ main() {
     python3 -B "$private_bridge" ownership --session-state "$private_session" --public-targets "$manifest"
 
     run_chezmoi apply
-    while IFS=$'\t' read -r rcm_source target disposition chezmoi_source mode extra; do
-        [[ "$rcm_source" == rcm_source || "$disposition" != shadow ]] && continue
-        cmp -s "$repo_root/$rcm_source" "$tmp/destination/$target" || fail "rendered bytes differ for $target"
+    while IFS=$'\t' read -r source_col target disposition chezmoi_source mode extra; do
+        [[ "$source_col" == source || "$disposition" == repository-only ]] && continue
+        cmp -s "$repo_root/$source_col" "$tmp/destination/$target" || fail "rendered bytes differ for $target"
         if [[ "$mode" == executable ]]; then
             [[ -x "$tmp/destination/$target" ]] || fail "rendered target is not executable: $target"
         else
-            [[ ! -x "$tmp/destination/$target" ]] || fail "rendered target is unexpectedly executable: $target"
+            [[ "$mode" == file ]] && [[ -x "$tmp/destination/$target" ]] && fail "rendered target is unexpectedly executable: $target"
         fi
     done < "$manifest"
 
@@ -180,10 +154,10 @@ main() {
 
     python3 -B "$private_bridge" source --session-state "$private_session"
 
-    local rcm_count shadow_count
-    rcm_count=$(wc -l < "$tmp/all-targets" | tr -d ' ')
+    local total_count shadow_count
+    total_count=$(wc -l < "$tmp/all-targets" | tr -d ' ')
     shadow_count=$(wc -l < "$tmp/expected-map.sorted" | tr -d ' ')
-    printf 'chezmoi parity OK (%s rcm targets, %s exact shadow mappings, idempotent apply)\n' "$rcm_count" "$shadow_count"
+    printf 'chezmoi parity OK (%s targets, %s shadow mappings, idempotent apply)\n' "$total_count" "$shadow_count"
 }
 
 main "$@"

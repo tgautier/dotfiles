@@ -48,15 +48,15 @@ expect_failure_withheld() {
 
 make_fixture() {
     local destination=$1
-    local rcm_source
+    local source_col
     mkdir -p "$destination/docs"
     cp -p "$repo_root/.chezmoiroot" "$destination/.chezmoiroot"
     cp -R "$repo_root/home" "$destination/home"
     cp -p "$manifest" "$destination/docs/chezmoi-targets.tsv"
-    while IFS=$'\t' read -r rcm_source _; do
-        [[ "$rcm_source" == rcm_source ]] && continue
-        mkdir -p "$destination/$(dirname "$rcm_source")"
-        cp -p "$repo_root/$rcm_source" "$destination/$rcm_source"
+    while IFS=$'\t' read -r source_col _; do
+        [[ "$source_col" == source ]] && continue
+        mkdir -p "$destination/$(dirname "$source_col")"
+        cp -p "$repo_root/$source_col" "$destination/$source_col"
     done < "$manifest"
 }
 
@@ -192,13 +192,13 @@ PY
         env DOTFILES_PRIVATE_DIR="$tmp/rejecting-source" "$checker" "$repo_root" "$manifest"
 
     awk 'BEGIN { FS=OFS="\t" } $2 == ".zsh/zaliases" { $2=".zsh/.zaliases" } { print }' "$manifest" > "$tmp/misnamed.tsv"
-    expect_failure misnamed 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/misnamed.tsv"
+    expect_failure misnamed 'target map mismatch' "$checker" "$repo_root" "$tmp/misnamed.tsv"
 
     awk 'BEGIN { FS=OFS="\t" } $2 != ".zsh/zaliases" { print }' "$manifest" > "$tmp/shadow-omitted.tsv"
-    expect_failure 'shadow omission' 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/shadow-omitted.tsv"
+    expect_failure 'shadow omission' 'target map mismatch' "$checker" "$repo_root" "$tmp/shadow-omitted.tsv"
 
     awk 'BEGIN { FS=OFS="\t" } $2 != ".Brewfile" { print }' "$manifest" > "$tmp/deferred-omitted.tsv"
-    expect_failure 'deferred omission' 'rcm target map mismatch' "$checker" "$repo_root" "$tmp/deferred-omitted.tsv"
+    expect_failure 'deferred omission' 'target map mismatch' "$checker" "$repo_root" "$tmp/deferred-omitted.tsv"
 
     awk 'BEGIN { FS=OFS="\t" } $2 == ".Brewfile" { $3="drop-empty-placeholder" } { print }' "$manifest" > "$tmp/retired-disposition.tsv"
     expect_failure 'retired disposition' 'unknown disposition' "$checker" "$repo_root" "$tmp/retired-disposition.tsv"

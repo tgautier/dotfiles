@@ -272,6 +272,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- The approval-bound chezmoi canary now invokes the exact selected `lsrc` through an owner-only wrapper instead of relocating it with a symlink. Homebrew's `lsrc` derives its support library from its invocation path, so the temporary symlink broke `../share/rcm/rcm.sh` and blocked the live approval plan before mutation. The regression fixture uses the same executable-relative layout and proves the selected real script runs ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - Live cutover backup and restore now accept the private companion's current eight-column target manifest. The public parser pins the seven-column rcm ownership prefix while accepting trailing private metadata it does not consume, and fixtures cover the current chezmoi source suffix, a further metadata suffix, and a reordered-prefix rejection ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - The Linux validation environment now installs `rcm`, whose `lsrc` command is
   the independent rcm-side oracle for the chezmoi target-map parity guard

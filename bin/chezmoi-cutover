@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import selectors
+import shlex
 import shutil
 import signal
 import stat
@@ -970,7 +971,12 @@ def prepare_approval(
             with tempfile.TemporaryDirectory(prefix="chezmoi-canary-tools-") as temporary:
                 tool_directory = Path(temporary)
                 (tool_directory / "chezmoi").symlink_to(executable)
-                (tool_directory / "lsrc").symlink_to(lsrc)
+                lsrc_wrapper = tool_directory / "lsrc"
+                lsrc_wrapper.write_text(
+                    f"#!/bin/sh\nexec {shlex.quote(str(lsrc))} \"$@\"\n",
+                    encoding="utf-8",
+                )
+                lsrc_wrapper.chmod(0o700)
                 environment["PATH"] = (
                     f"{tool_directory}{os.pathsep}{environment.get('PATH', '')}"
                 )

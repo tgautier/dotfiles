@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -32,6 +33,23 @@ class CutoverError(RuntimeError):
     """The operator command cannot establish a safe chezmoi invocation."""
 
 
+class TerminationRequested(BaseException):
+    """A recoverable termination signal interrupted the operator command."""
+
+    def __init__(self, signum: int, *, restored: bool = False) -> None:
+        self.signum = signum
+        self.restored = restored
+        super().__init__(signal.Signals(signum).name)
+
+
+@dataclass
+class TerminationState:
+    """Track the first termination request and defer repeats during recovery."""
+
+    signum: int | None = None
+    recovering: bool = False
+
+
 @dataclass(frozen=True)
 class SourceState:
     """One independently configured chezmoi source repository."""
@@ -39,6 +57,30 @@ class SourceState:
     label: str
     root: Path
     config: Path
+
+
+@contextmanager
+def recoverable_termination_signals() -> Iterator[TerminationState]:
+    """Convert termination signals into exceptions while preserving handlers."""
+
+    state = TerminationState()
+    previous: dict[int, signal.Handlers] = {}
+
+    def request_termination(signum: int, _frame: object) -> None:
+        if state.signum is None:
+            state.signum = signum
+        if not state.recovering:
+            raise TerminationRequested(state.signum)
+
+    handled = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
+    try:
+        for signum in handled:
+            previous[signum] = signal.getsignal(signum)
+            signal.signal(signum, request_termination)
+        yield state
+    finally:
+        for signum, handler in previous.items():
+            signal.signal(signum, handler)
 
 
 def lexical_absolute(path: Path) -> Path:
@@ -850,66 +892,70 @@ def apply_with_recovery(
         rcup=rcup,
     )
 
-    mutation_started = False
-    try:
-        for source in sources:
-            mutation_started = True
-            capture_operation(
-                "apply",
-                executable=executable,
-                source=source,
-                home=home,
-                cache_root=cache_root,
-                state_root=state_root,
-                show_output=False,
-            )
-        require_settled_state(
-            executable=executable,
-            sources=sources,
-            home=home,
-            cache_root=cache_root,
-            state_root=state_root,
-            label="first apply",
-        )
-        for source in sources:
-            capture_operation(
-                "apply",
-                executable=executable,
-                source=source,
-                home=home,
-                cache_root=cache_root,
-                state_root=state_root,
-                show_output=False,
-            )
-        require_settled_state(
-            executable=executable,
-            sources=sources,
-            home=home,
-            cache_root=cache_root,
-            state_root=state_root,
-            label="second apply",
-        )
-    except (CutoverError, KeyboardInterrupt) as exc:
-        if not mutation_started:
-            raise
+    with recoverable_termination_signals() as termination:
+        mutation_started = False
         try:
-            restore_rcm(
-                public=public,
-                private=private,
+            for source in sources:
+                mutation_started = True
+                capture_operation(
+                    "apply",
+                    executable=executable,
+                    source=source,
+                    home=home,
+                    cache_root=cache_root,
+                    state_root=state_root,
+                    show_output=False,
+                )
+            require_settled_state(
+                executable=executable,
+                sources=sources,
                 home=home,
-                backup=backup,
-                backup_confirm=backup_confirm,
-                lsrc=lsrc,
-                rcup=rcup,
+                cache_root=cache_root,
+                state_root=state_root,
+                label="first apply",
             )
-        except (CutoverError, KeyboardInterrupt) as recovery_exc:
+            for source in sources:
+                capture_operation(
+                    "apply",
+                    executable=executable,
+                    source=source,
+                    home=home,
+                    cache_root=cache_root,
+                    state_root=state_root,
+                    show_output=False,
+                )
+            require_settled_state(
+                executable=executable,
+                sources=sources,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                label="second apply",
+            )
+        except (CutoverError, KeyboardInterrupt, TerminationRequested) as exc:
+            if not mutation_started:
+                raise
+            termination.recovering = True
+            try:
+                restore_rcm(
+                    public=public,
+                    private=private,
+                    home=home,
+                    backup=backup,
+                    backup_confirm=backup_confirm,
+                    lsrc=lsrc,
+                    rcup=rcup,
+                )
+            except (CutoverError, KeyboardInterrupt) as recovery_exc:
+                raise CutoverError(
+                    "chezmoi apply failed and automatic rcm recovery also failed; "
+                    "run the documented recovery command immediately"
+                ) from recovery_exc
+            if isinstance(exc, TerminationRequested):
+                raise TerminationRequested(exc.signum, restored=True) from exc
             raise CutoverError(
-                "chezmoi apply failed and automatic rcm recovery also failed; "
-                "run the documented recovery command immediately"
-            ) from recovery_exc
-        raise CutoverError(
-            f"chezmoi apply failed ({exc}); the complete rcm link set was restored"
-        ) from exc
+                f"chezmoi apply failed ({exc}); the complete rcm link set was restored"
+            ) from exc
     print("chezmoi apply complete: both sources are idempotent", file=sys.stderr)
 
 
@@ -1050,6 +1096,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except CutoverError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+    except TerminationRequested as exc:
+        name = signal.Signals(exc.signum).name
+        suffix = "; the complete rcm link set was restored" if exc.restored else ""
+        print(f"ERROR: received {name}{suffix}", file=sys.stderr)
+        return 128 + exc.signum
     except KeyboardInterrupt:
         print("ERROR: chezmoi operator command interrupted before completion", file=sys.stderr)
         return 130

@@ -50,7 +50,7 @@ just chezmoi-apply "$backup_file" "$BACKUP_DIGEST" "$APPLY_DIGEST"
 
 The command reruns the isolated canary, recomputes the approval without reprinting inspection output, verifies the backup again immediately before mutation, and applies the public source before the private source. Every subprocess invocation is time-bounded. Every chezmoi invocation is config-bound, noninteractive, external-refresh-disabled, and limited to file entries. The mutating command uses `--force` only after the exact rcm link baseline, reviewed rendered output, source state, and recovery artifact have been revalidated, so no interactive prompt can weaken the approval boundary. It requires empty status, diff, and dry-run output after the first apply, applies both sources a second time, then requires the same empty state again.
 
-If either source apply, either settled-state check, or the second apply fails or is interrupted, the command invokes the digest-bound complete rcm restore. A successful automatic restore still returns failure so the cutover cannot look complete.
+If either source apply, either settled-state check, or the second apply fails or is interrupted, the command invokes the digest-bound complete rcm restore. `SIGHUP`, `SIGINT`, and `SIGTERM` received after mutation starts are recorded and deferred until that restore finishes. A successful automatic restore still returns failure so the cutover cannot look complete.
 
 The sequence is not an operating-system transaction across HOME. The shared lock serializes these recipes only, and there is still a narrow race with unrelated writers after the final backup verification. Keep other installers and edits stopped until apply or recovery finishes.
 

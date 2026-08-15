@@ -5,11 +5,13 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 from unittest import mock
 
@@ -39,6 +41,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.applied = self.root / "applied"
         self.backup = self.root / "rcm-links.json"
         self.canary_log = self.root / "canary.log"
+        self.ready = self.root / "apply-ready"
         self.script = SCRIPT_PATH
         self.fake_chezmoi = self.root / "fake-chezmoi"
         self.home.mkdir()
@@ -51,6 +54,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 import os
                 from pathlib import Path
                 import sys
+                import time
 
                 arguments = sys.argv[1:]
                 operation = "apply" if "apply" in arguments else (
@@ -91,6 +95,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     applied.mkdir(exist_ok=True)
                     marker.touch()
                     (Path(os.environ["HOME"]) / "unexpected-mutation").touch()
+                    if os.environ.get("FAKE_CHEZMOI_WAIT_AFTER_APPLY_CWD") == source:
+                        Path(os.environ["FAKE_CHEZMOI_READY"]).touch()
+                        while True:
+                            time.sleep(1)
                 elif not marker.exists():
                     print(f"fixture {source} {operation}")
                 elif (
@@ -212,6 +220,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 "FAKE_RCM_LOG": str(self.rcm_log),
                 "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
                 "FAKE_CANARY_LOG": str(self.canary_log),
+                "FAKE_CHEZMOI_READY": str(self.ready),
                 "CHEZMOI_CONFIG_FILE": str(self.root / "foreign-config"),
                 "DOTFILES_DIR": str(self.root / "foreign-public"),
                 "GIT_DIR": str(self.root / "foreign-git-dir"),
@@ -864,6 +873,70 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertNotIn("fixture private status", completed.stdout)
         self.assertNotIn("fixture private status", completed.stderr)
         self.assertFalse(self.applied.exists())
+
+    def test_sigterm_after_mutation_defers_exit_until_rcm_is_restored(self) -> None:
+        approval = self._approval()
+        if not self.private.exists():
+            self._make_repository(self.private, private=True)
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "FAKE_BACKUP_DIGEST": BACKUP_DIGEST,
+                "FAKE_CANARY_LOG": str(self.canary_log),
+                "FAKE_CHEZMOI_APPLIED": str(self.applied),
+                "FAKE_CHEZMOI_LOG": str(self.log),
+                "FAKE_CHEZMOI_READY": str(self.ready),
+                "FAKE_CHEZMOI_WAIT_AFTER_APPLY_CWD": self.public.name,
+                "FAKE_RCM_LOG": str(self.rcm_log),
+            }
+        )
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                str(self.script),
+                "apply",
+                "--home",
+                str(self.home),
+                "--public-dir",
+                str(self.public),
+                "--private-dir",
+                str(self.private),
+                "--cache-dir",
+                str(self.cache),
+                "--state-dir",
+                str(self.state),
+                "--chezmoi",
+                str(self.fake_chezmoi),
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--apply-confirm",
+                approval,
+            ],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        self.addCleanup(lambda: process.poll() is None and process.kill())
+        for _ in range(200):
+            if self.ready.exists():
+                break
+            if process.poll() is not None:
+                self.fail("apply exited before reaching the mutation signal fixture")
+            time.sleep(0.05)
+        else:
+            self.fail("apply did not reach the mutation signal fixture")
+
+        process.send_signal(signal.SIGTERM)
+        _stdout, stderr = process.communicate(timeout=10)
+
+        self.assertEqual(process.returncode, 128 + signal.SIGTERM)
+        self.assertIn("received SIGTERM", stderr)
+        self.assertIn("complete rcm link set was restored", stderr)
+        self.assertIn("cutover-restore", [record[0] for record in self._rcm_records()])
 
     def test_public_only_plan_uses_one_source(self) -> None:
         approval = self._approval(private=False)

@@ -94,11 +94,17 @@ def _invoke_private(
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
+        timed_out: subprocess.TimeoutExpired | None = None
         try:
             process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
+            timed_out = exc
+        finally:
+            # A checker can exit after spawning a descendant. Stop its process
+            # group before deleting the temporary HOME on every exit path.
             _stop_process_group(process)
-            raise BridgeError("companion check exceeded its bounded deadline") from exc
+        if timed_out is not None:
+            raise BridgeError("companion check exceeded its bounded deadline") from timed_out
         if process.returncode != 0:
             raise BridgeError(
                 f"companion check failed with status {process.returncode}; output withheld"

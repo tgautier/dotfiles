@@ -204,6 +204,56 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
                 self.fail("timeout cleanup left a SIGTERM-ignoring descendant")
             time.sleep(0.01)
 
+    def test_completed_check_terminates_remaining_descendants(self) -> None:
+        child_pid_file = self.root / "completed-child.pid"
+        self._module(
+            "check_private_source",
+            f"""
+            import os
+            from pathlib import Path
+            import subprocess
+            import sys
+            import time
+
+            child = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    "import os, signal, time; "
+                    "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                    "open(os.environ['BRIDGE_CHILD_PID_FILE'], 'w').write(str(os.getpid())); "
+                    "time.sleep(60)",
+                ],
+                env={{**os.environ, "BRIDGE_CHILD_PID_FILE": {str(child_pid_file)!r}}},
+            )
+            while not Path({str(child_pid_file)!r}).exists():
+                if child.poll() is not None:
+                    raise SystemExit("fixture child exited before becoming ready")
+                time.sleep(0.01)
+            """,
+        )
+
+        started = time.monotonic()
+        with self._environment():
+            bridge._invoke_private(
+                self.checkout,
+                bridge.PRIVATE_MODULES["source"],
+                [],
+                timeout=2,
+            )
+
+        self.assertLess(time.monotonic() - started, 3)
+        child_pid = int(child_pid_file.read_text(encoding="utf-8"))
+        deadline = time.monotonic() + 1
+        while True:
+            try:
+                os.kill(child_pid, 0)
+            except ProcessLookupError:
+                break
+            if time.monotonic() >= deadline:
+                self.fail("completed-check cleanup left a descendant running")
+            time.sleep(0.01)
+
     def test_cleanup_bounds_wait_after_sigkill(self) -> None:
         process = mock.Mock()
         process.pid = 123

@@ -30,7 +30,7 @@ Run the approval plan in the local terminal:
 just chezmoi-apply-plan "$backup_file" "$BACKUP_DIGEST"
 ```
 
-The command verifies the current rcm links against the backup, runs the isolated public/private canary, then prints each source's status, diff, and verbose dry run. Diff and dry-run output can contain complete private values. Review it locally and never redirect, paste, or publish it.
+The command verifies the current rcm links against the backup, runs the isolated public/private canary with the exact selected chezmoi and `lsrc` executables, then prints each source's status, diff, and verbose dry run. Diff and dry-run output can contain complete private values. Review it locally and never redirect, paste, or publish it.
 
 The final line prints `approval_sha256`. This digest binds the HOME and repository paths, the backup path and reviewed digest, both source trees and ownership contracts, the canonical operator helper path and bytes, the canary, the recovery helper and rcm configuration, the selected chezmoi, `lsrc`, and `rcup` executables, and the exact status, diff, and dry-run bytes. Copy only that digest:
 

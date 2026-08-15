@@ -830,18 +830,27 @@ def prepare_approval(
         environment = command_environment(home)
         environment["DOTFILES_DIR"] = str(public)
         environment["DOTFILES_PRIVATE_DIR"] = str(private)
-        environment["PATH"] = f"{executable.parent}{os.pathsep}{environment.get('PATH', '')}"
         print("==> isolated public/private chezmoi canary", file=sys.stderr)
-        returncode = run_bounded_process(
-            [str(canary)],
-            cwd=public,
-            environment=environment,
-            stdin=subprocess.DEVNULL,
-            stdout=None if show_output else subprocess.DEVNULL,
-            stderr=None,
-            timeout=CANARY_TIMEOUT_SECONDS,
-            label="chezmoi canary",
-        )
+        try:
+            with tempfile.TemporaryDirectory(prefix="chezmoi-canary-tools-") as temporary:
+                tool_directory = Path(temporary)
+                (tool_directory / "chezmoi").symlink_to(executable)
+                (tool_directory / "lsrc").symlink_to(lsrc)
+                environment["PATH"] = (
+                    f"{tool_directory}{os.pathsep}{environment.get('PATH', '')}"
+                )
+                returncode = run_bounded_process(
+                    [str(canary)],
+                    cwd=public,
+                    environment=environment,
+                    stdin=subprocess.DEVNULL,
+                    stdout=None if show_output else subprocess.DEVNULL,
+                    stderr=None,
+                    timeout=CANARY_TIMEOUT_SECONDS,
+                    label="chezmoi canary",
+                )
+        except OSError as exc:
+            raise CutoverError(f"cannot prepare exact canary executables: {exc}") from exc
         if returncode != 0:
             raise CutoverError(
                 f"chezmoi canary failed with status {returncode}"

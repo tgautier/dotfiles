@@ -200,6 +200,7 @@ class ChezmoiCutoverTests(unittest.TestCase):
                     #!/usr/bin/env python3
                     import os
                     from pathlib import Path
+                    import shutil
                     import subprocess
                     import sys
                     import time
@@ -210,6 +211,17 @@ class ChezmoiCutoverTests(unittest.TestCase):
                         handle.write("passed\\n")
                     if os.environ.get("FAKE_CANARY_FAIL") == "1":
                         raise SystemExit(37)
+                    for name, variable in (
+                        ("chezmoi", "FAKE_EXPECTED_CHEZMOI"),
+                        ("lsrc", "FAKE_EXPECTED_LSRC"),
+                    ):
+                        expected = os.environ.get(variable)
+                        selected = shutil.which(name)
+                        if expected and (
+                            selected is None
+                            or Path(selected).resolve() != Path(expected).resolve()
+                        ):
+                            raise SystemExit(38)
                     if os.environ.get("FAKE_CANARY_WAIT") == "1":
                         descendant = subprocess.Popen(
                             [
@@ -759,6 +771,30 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn("chezmoi canary failed with status 37", completed.stderr)
         self.assertEqual(self._records(), [])
         self.assertFalse(self.applied.exists())
+
+    def test_canary_uses_the_exact_selected_chezmoi_and_lsrc(self) -> None:
+        selected_lsrc = self.root / "selected-lsrc"
+        selected_lsrc.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        selected_lsrc.chmod(0o700)
+        completed = self._run(
+            "plan",
+            private=True,
+            extra_environment={
+                "FAKE_EXPECTED_CHEZMOI": str(self.fake_chezmoi),
+                "FAKE_EXPECTED_LSRC": str(selected_lsrc),
+            },
+            extra_arguments=[
+                "--backup",
+                str(self.backup),
+                "--backup-confirm",
+                BACKUP_DIGEST,
+                "--lsrc",
+                str(selected_lsrc),
+            ],
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("approval_sha256=", completed.stdout)
 
     def test_sigterm_during_plan_stops_canary_descendant_without_restore(self) -> None:
         self._make_repository(self.private, private=True)

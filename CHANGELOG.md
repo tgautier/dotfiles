@@ -192,14 +192,7 @@ grouped by **date** rather than by semantic version. Newest first.
   slash can't silently produce a prefix that matches nothing, and a failed scan
   now aborts loudly instead of reporting a clean tree
   ([#215](https://github.com/tgautier/dotfiles/issues/215)).
-- `.roborev.toml` now names `claude-code` directly instead of `copilot`. roborev
-  could not invoke `copilot`, so every review silently fell through to
-  `backup_agent` — 112 of 112 jobs on record ran `claude-code`. claude-code is the
-  only agent with a paid subscription behind it: copilot, codex and
-  gemini/antigravity are all installed but have no API credit (codex returns
-  `401 Unauthorized`), so a second reviewer is not one install away. The `codex`
-  and `copilot-cli` casks stay in the Brewfile for interactive use and are
-  deliberately not review agents.
+- `.roborev.toml` now uses Codex at medium reasoning as the only reviewer. An empty fallback makes unavailable-reviewer failures explicit and prevents duplicate reviews. This replaces the previous Claude-only setting, which could no longer run in the Roborev worker and produced no code review.
 - Bump mise Flutter (`vfox-flutter`) 3.44.7 → 3.44.8.
 - Bump mise `yarn` 4.17.1 → 4.18.0.
 - Tap trust is now declared in the Brewfiles: `trusted: true` on

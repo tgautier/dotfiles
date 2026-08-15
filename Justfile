@@ -19,7 +19,7 @@ test-local-gate:
 
 [doc("Compile tracked Python helpers with warnings promoted to errors")]
 lint-python:
-    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "bin/rcm-links", "tests/private_chezmoi_bridge.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_rcm_links.py")]'
+    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "bin/rcm-links", "tests/private_chezmoi_bridge.py", "tests/setup_acceptance.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_rcm_links.py")]'
 
 [doc("Fixture-test rcm link inventory, cleanup, cutover backup, and restore")]
 test-rcm-links:
@@ -32,6 +32,14 @@ test-private-chezmoi-bridge:
 [doc("Fixture-test guarded public/private chezmoi operation and recovery")]
 test-chezmoi-operator:
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_chezmoi_cutover.py' -v
+
+[doc("Run setup twice from a fresh public checkout into an isolated HOME")]
+test-setup-acceptance:
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/setup_acceptance.py
+
+[doc("Run fresh setup acceptance with and without the private companion")]
+test-setup-acceptance-private:
+    PYTHONDONTWRITEBYTECODE=1 python3 tests/setup_acceptance.py --private-source {{quote(private_dir)}}
 
 [doc("Print the read-only ownership inventory for current and historical rcm HOME targets")]
 link-inventory:

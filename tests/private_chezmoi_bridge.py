@@ -58,7 +58,10 @@ def _stop_process_group(process: subprocess.Popen[bytes]) -> None:
     except ProcessLookupError:
         pass
     if process.poll() is None:
-        process.communicate()
+        try:
+            process.communicate(timeout=CLEANUP_TIMEOUT_SECONDS)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def _invoke_private(

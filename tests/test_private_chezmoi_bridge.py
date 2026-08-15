@@ -163,6 +163,33 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
                 self.fail("timeout cleanup left a SIGTERM-ignoring descendant")
             time.sleep(0.01)
 
+    def test_cleanup_bounds_wait_after_sigkill(self) -> None:
+        process = mock.Mock()
+        process.pid = 123
+        process.poll.return_value = None
+        process.communicate.side_effect = [
+            bridge.subprocess.TimeoutExpired("child", bridge.CLEANUP_TIMEOUT_SECONDS),
+            bridge.subprocess.TimeoutExpired("child", bridge.CLEANUP_TIMEOUT_SECONDS),
+        ]
+
+        with mock.patch.object(bridge.os, "killpg") as killpg:
+            bridge._stop_process_group(process)
+
+        self.assertEqual(
+            process.communicate.call_args_list,
+            [
+                mock.call(timeout=bridge.CLEANUP_TIMEOUT_SECONDS),
+                mock.call(timeout=bridge.CLEANUP_TIMEOUT_SECONDS),
+            ],
+        )
+        self.assertEqual(
+            killpg.call_args_list,
+            [
+                mock.call(process.pid, bridge.signal.SIGTERM),
+                mock.call(process.pid, bridge.signal.SIGKILL),
+            ],
+        )
+
     def test_non_directory_and_stale_checkout_fail_generically(self) -> None:
         self.checkout.write_text(PRIVATE_SENTINEL, encoding="utf-8")
         with self._environment(), self.assertRaisesRegex(

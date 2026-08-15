@@ -55,6 +55,9 @@ class TerminationState:
     committed: bool = False
 
 
+HANDLED_TERMINATION_SIGNALS = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
+
+
 @dataclass(frozen=True)
 class SourceState:
     """One independently configured chezmoi source repository."""
@@ -65,8 +68,10 @@ class SourceState:
 
 
 @contextmanager
-def recoverable_termination_signals() -> Iterator[TerminationState]:
-    """Convert termination signals into exceptions while preserving handlers."""
+def recoverable_termination_signals(
+    *, retain_committed_handlers: bool = False
+) -> Iterator[TerminationState]:
+    """Convert termination signals and restore handlers unless success retains them."""
 
     state = TerminationState()
     previous: dict[int, signal.Handlers] = {}
@@ -77,23 +82,37 @@ def recoverable_termination_signals() -> Iterator[TerminationState]:
             if not state.recovering and not state.committed:
                 raise TerminationRequested(signum)
 
-    handled = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
     try:
-        for signum in handled:
+        for signum in HANDLED_TERMINATION_SIGNALS:
             previous[signum] = signal.getsignal(signum)
             signal.signal(signum, request_termination)
         yield state
     finally:
-        for signum, handler in previous.items():
-            signal.signal(signum, handler)
+        if not (state.committed and retain_committed_handlers):
+            try:
+                previous_mask = signal.pthread_sigmask(
+                    signal.SIG_BLOCK,
+                    set(HANDLED_TERMINATION_SIGNALS),
+                )
+                try:
+                    for signum, handler in previous.items():
+                        signal.signal(signum, handler)
+                finally:
+                    signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+            except (AttributeError, OSError) as exc:
+                raise CutoverError(
+                    f"cannot restore the termination signal handlers: {exc}"
+                ) from exc
 
 
 def mark_apply_committed(state: TerminationState) -> None:
     """Atomically commit success before termination handlers are removed."""
 
-    handled = {signal.SIGHUP, signal.SIGINT, signal.SIGTERM}
     try:
-        previous_mask = signal.pthread_sigmask(signal.SIG_BLOCK, handled)
+        previous_mask = signal.pthread_sigmask(
+            signal.SIG_BLOCK,
+            set(HANDLED_TERMINATION_SIGNALS),
+        )
         state.committed = True
         signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
     except (AttributeError, OSError) as exc:
@@ -1265,7 +1284,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             label="chezmoi operator cache directory",
         )
-        with operator_lock(state_root), recoverable_termination_signals() as termination:
+        with operator_lock(state_root), recoverable_termination_signals(
+            retain_committed_handlers=True
+        ) as termination:
             for source in sources:
                 ensure_private_directory(
                     cache_root / source.label,

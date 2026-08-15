@@ -1198,6 +1198,32 @@ class ChezmoiCutoverTests(unittest.TestCase):
             self.assertEqual(termination.signum, signal.SIGTERM)
             self.assertTrue(termination.committed)
 
+    def test_committed_handlers_remain_installed_until_process_exit(self) -> None:
+        previous = {
+            signum: signal.getsignal(signum)
+            for signum in CUTOVER.HANDLED_TERMINATION_SIGNALS
+        }
+        termination = None
+        try:
+            with CUTOVER.recoverable_termination_signals(
+                retain_committed_handlers=True
+            ) as termination:
+                CUTOVER.mark_apply_committed(termination)
+
+            os.kill(os.getpid(), signal.SIGTERM)
+            self.assertEqual(termination.signum, signal.SIGTERM)
+            self.assertTrue(termination.committed)
+        finally:
+            previous_mask = signal.pthread_sigmask(
+                signal.SIG_BLOCK,
+                set(CUTOVER.HANDLED_TERMINATION_SIGNALS),
+            )
+            try:
+                for signum, handler in previous.items():
+                    signal.signal(signum, handler)
+            finally:
+                signal.pthread_sigmask(signal.SIG_SETMASK, previous_mask)
+
     def test_apply_reruns_canary_and_refuses_mutation_when_it_fails(self) -> None:
         approval = self._approval()
         completed = self._run(

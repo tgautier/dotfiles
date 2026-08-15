@@ -79,7 +79,7 @@ git push
 just ci-publish
 ```
 
-After the pull, the gate-specific commands change only the checkout's local Git configuration and its private attestation marker. They do not run rcm, chezmoi, `just link`, or `just setup`.
+After the pull, the gate-specific commands change only the checkout's local Git configuration and its private attestation marker. They do not run chezmoi, `just link`, or `just setup`.
 
 Keep the checkout on its current working branch until its changes are committed. Do not switch or reset over unrelated work to perform this upgrade.
 
@@ -126,7 +126,7 @@ test "$(printf '%s\n' "$protection" | jq -r '[.contexts[] | select(. == "local/e
 
 The old local attestation file may remain under the Git directory because no restored hook reads it.
 
-Rollback does not require an rcm or chezmoi operation. This change never takes ownership of deployed dotfiles or modifies HOME.
+Rollback does not require a chezmoi operation. This change never takes ownership of deployed dotfiles or modifies HOME.
 
 ## Know the evidence boundary
 

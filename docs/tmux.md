@@ -6,7 +6,7 @@ terminal.
 
 ## Configuration overview
 
-The config lives in `tmux.conf` (symlinked to `~/.tmux.conf` by rcm).
+The config lives in `tmux.conf` (deployed to `~/.tmux.conf` by chezmoi).
 
 ### Prefix
 

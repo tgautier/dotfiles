@@ -328,7 +328,6 @@ def command_environment(home: Path) -> dict[str, str]:
         "PYTHONPATH",
         "PYTHONSTARTUP",
         "PYTHONWARNINGS",
-        "RCRC",
         "VIRTUAL_ENV",
         "__PYVENV_LAUNCHER__",
     }

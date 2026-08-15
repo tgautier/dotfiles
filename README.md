@@ -1,6 +1,6 @@
 # Dotfiles
 
-Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, deployed primarily with [chezmoi](https://www.chezmoi.io/). A small manifest-declared set remains linked through [rcm](https://github.com/thoughtbot/rcm), which is also retained as the full rollback authority during migration acceptance.
+Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, deployed with [chezmoi](https://www.chezmoi.io/).
 
 ## Features
 
@@ -189,9 +189,7 @@ The `cd` matters: `~/.justfile` is a symlink to the private repo's justfile, so
 
 `just setup` also runs the same refresh, but it is the whole bootstrap. Use `just link` for config deployment alone.
 
-The recipe first runs the public/private ownership and source parity check in isolation. It then uses rcm only for the six public targets whose manifest disposition starts with `defer-`, invokes the private dedicated-owner aggregate when that checkout exists, and applies the public and private chezmoi sources twice. Neither routine owner uses force: rcm runs only after exact-link or absence preflight, and chezmoi enables conflict errors. A modified or pre-existing managed file therefore stops the refresh instead of being overwritten. Empty status, diff, and dry-run state after each pass proves idempotence.
-
-Do not use bare `rcup` for routine deployment. The unchanged broad `rcrc` graph is retained for the digest-bound full rollback and would return migrated targets to symlinks. If `just link` stops after one owner has run, resolve the reported conflict or tool failure and rerun it; each owner is designed to converge independently.
+The recipe first runs the public/private ownership and source parity check in isolation, then applies the public and private chezmoi sources twice and invokes the private dedicated-owner aggregate when that checkout exists. Chezmoi enables conflict errors, so a modified or pre-existing managed file stops the refresh instead of being overwritten. Empty status, diff, and dry-run state after each pass proves idempotence.
 
 ### Custom checkout locations
 
@@ -201,21 +199,18 @@ consumer moves together:
 
 | Variable               | Default                                 | Used by                                                            |
 | ---------------------- | --------------------------------------- | ------------------------------------------------------------------ |
-| `DOTFILES_DIR`         | `~/Workspace/tgautier/dotfiles`         | chezmoi orchestration, retained rcm links, rollback, and inventory |
-| `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | optional private chezmoi source, dedicated owners, and rollback    |
+| `DOTFILES_DIR`         | `~/Workspace/tgautier/dotfiles`         | chezmoi orchestration and stale-symlink scanner                    |
+| `DOTFILES_PRIVATE_DIR` | `~/Workspace/tgautier/dotfiles-private` | optional private chezmoi source and dedicated owners               |
 
-Export them before `just link` or `just setup`. The operator passes the same paths to chezmoi, the retained rcm helper, the optional private dedicated owners, inventory, and rollback. A trailing slash is normalized. An absent private repository is skipped, not fatal.
+Export them before `just link` or `just setup`. The operator passes the same paths to chezmoi and the optional private dedicated owners. A trailing slash is normalized. An absent private repository is skipped, not fatal.
 
 ## Documentation
 
 Detailed guides live in the `docs/` folder:
 
 - [Homebrew](docs/homebrew.md) — update flow, cask-upgrade recovery, and `just update` troubleshooting
-- [Chezmoi migration inventory](docs/chezmoi-inventory.md) — complete rcm target map, explicit dispositions, parity guard, and rollback boundary
-- [Chezmoi cutover backup](docs/chezmoi-cutover-backup.md) — exact live-link backup, isolated restore rehearsal, and approval-bound rcm recovery
-- [Chezmoi operator cutover](docs/chezmoi-operator-cutover.md) — approval-bound status, diff, dry run, apply, interruption recovery, and working-state preservation
+- [Chezmoi target inventory](docs/chezmoi-inventory.md) — public target manifest, dispositions, parity guard, and private companion ownership
 - [Local shipping gate](docs/local-shipping-gate.md) — per-checkout setup, exact-tip operation, recovery, upgrade, and rollback
-- [Rcm link reconciliation](docs/rcm-link-reconciliation.md) — read-only ownership inventory before the chezmoi backup rehearsal
 - [tmux](docs/tmux.md) — configuration overview, cheat sheet, and troubleshooting
 
 ## Structure
@@ -239,7 +234,6 @@ gitignore               # Global gitignore (OS, editor, build noise)
 agignore                # ack/ag ignore patterns
 editorconfig            # Cross-editor whitespace defaults
 psqlrc                  # psql prompt and output defaults
-rcrc                    # rcm config (DOTFILES_DIRS, EXCLUDES, SYMLINK_DIRS)
 Brewfile                # macOS shared base + profile-overlay tail
 Brewfile.work           # macOS work-only casks/apps
 Brewfile.personal       # macOS personal-only casks/apps
@@ -271,7 +265,6 @@ Chezmoi installs each managed script into `~/.bin`, which `zshenv` adds to `PATH
 | `kshow`       | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)     |
 | `obsidian`    | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+)   |
 | `op-ssh-sign` | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)   |
-| `rcm-links`   | Inventory HOME links, refresh retained rcm targets, and perform recovery    |
 
 ## Shell functions (`zsh/functions/`)
 
@@ -337,13 +330,13 @@ just test-setup-acceptance-linux            # public-only
 just test-setup-acceptance-linux-private    # with private companion
 ```
 
-Builds a digest-pinned Ubuntu image with just 1.58.0, chezmoi 2.72.0, rcm, Python 3, and zsh. Source trees enter the container as `git archive` tarballs mounted at runtime; nothing private is baked into an image layer. The container runs on a tmpfs HOME. Docker is the only host dependency.
+Builds a digest-pinned Ubuntu image with just 1.58.0, chezmoi 2.72.0, Python 3, and zsh. Source trees enter the container as `git archive` tarballs mounted at runtime; nothing private is baked into an image layer. The container runs on a tmpfs HOME. Docker is the only host dependency.
 
 ### Evidence boundaries
 
 - macOS acceptance runs on the host kernel and filesystem. HFS+ is case-insensitive; Linux is not. Both platforms must pass.
 - The Linux container is not WSL2. WSL2 acceptance requires a real Windows host and is deferred until one is available. The container proves the full `just setup` chain on a case-sensitive ext4 filesystem under a real Linux kernel.
-- External provisioning commands are stubbed. The harness does not install real Homebrew packages, mise runtimes, or Mac App Store apps. It proves the setup orchestration, chezmoi rendering, rcm retained links, Git hooks, and companion ownership paths.
+- External provisioning commands are stubbed. The harness does not install real Homebrew packages, mise runtimes, or Mac App Store apps. It proves the setup orchestration, chezmoi rendering, Git hooks, and companion ownership paths.
 
 ## Configuration files
 
@@ -355,7 +348,6 @@ Builds a digest-pinned Ubuntu image with just 1.58.0, chezmoi 2.72.0, rcm, Pytho
 | `editorconfig`            | Editors    | UTF-8, LF, 2-space indent; tabs for `Makefile`                    |
 | `psqlrc`                  | psql       | Unicode borders, timing, `¤` for null, coloured prompt            |
 | `agignore`                | ack/ag     | Skip `.git`, `node_modules`, build output                         |
-| `rcrc`                    | rcm        | `DOTFILES_DIRS`, `EXCLUDES`, `SYMLINK_DIRS`                       |
 | `config/mise/config.toml` | mise       | Pinned runtimes — node, python, ruby, go, erlang, elixir, …       |
 | `config/ghostty/config`   | Ghostty    | Font, auto light/dark theme, window size                          |
 
@@ -413,15 +405,13 @@ Individual targets:
 
 | Target | Description |
 | --- | --- |
-| `just lint-shell` | ShellCheck on scripts, tests, `rcrc`, and zsh |
+| `just lint-shell` | ShellCheck on scripts, tests, and zsh |
 | `just lint-python` | Compile Python helpers with warnings as errors |
 | `just lint-markdown` | markdownlint-cli2 |
 | `just lint-brewfile` | Ruby syntax check on Brewfiles |
 | `just lint-mise` | Validate mise config |
 | `just lint-just` | Check in-body `just <recipe>` calls resolve |
-| `just lint-rcrc` | Check `rcrc` dirs, excludes, normalisation |
 | `just lint-cleanup-symlinks` | Fixture-test the stale-symlink scanner |
-| `just test-rcm-links` | Fixture-test HOME link inventory, cleanup, cutover backup, and rcm restoration |
 | `just test-private-chezmoi-bridge` | Fixture-test bounded companion checks and output withholding |
 | `just test-chezmoi-operator` | Fixture-test guarded public/private operation, approval, idempotence, and recovery |
 | `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
@@ -431,13 +421,10 @@ Individual targets:
 | `just test-setup-acceptance-linux` | Run the same harness inside a pinned Linux container (public-only) |
 | `just test-setup-acceptance-linux-private` | Linux container acceptance with the private companion |
 | `just ci-publish` | Publish the pushed exact-tip attestation for strict GitHub branch protection |
-| `just link` | Refresh retained rcm links, private dedicated targets, and public/private chezmoi sources |
+| `just link` | Refresh public/private chezmoi sources and private dedicated targets |
 | `just chezmoi-status` | Inspect public/private chezmoi status without changing managed targets |
 | `just chezmoi-diff` | Print the local public/private target-state diff |
 | `just chezmoi-apply-dry-run` | Preview both applies without changing managed targets |
-| `just chezmoi-apply-plan <backup> <digest>` | Review and bind the exact apply to verified rcm recovery evidence |
-| `just chezmoi-apply <backup> <backup-digest> <apply-digest>` | Apply both sources twice and restore rcm automatically on failure |
-| `just chezmoi-recover <backup> <digest>` | Restore and verify the complete retained rcm link set |
 
 Wire the hooks after cloning, adding a worktree, or pulling hook changes:
 

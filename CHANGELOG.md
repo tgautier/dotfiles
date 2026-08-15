@@ -245,6 +245,8 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- Rcm deployment and all supporting artifacts. Every public target is now deployed by chezmoi; the six previously deferred targets (four Brewfiles, mise config, gitconfig) moved to chezmoi source state. Deleted: `rcrc`, `bin/rcm-links`, `tests/test_rcm_links.py`, and four migration-era docs. Removed `brew "rcm"` from both Brewfiles, twelve Justfile recipes, the `lint-rcrc` and `test-rcm-links` CI gates, and all rcm references from README, CLAUDE.md, and remaining docs ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+
 - The unused `git_template/hooks/gitkeep` placeholder and its rcm target. The effective `init.templateDir` is unset, no repository config include points Git at this directory, and the tracked per-repository `.githooks` mechanism does not use Git's copy-on-init template mechanism. After pulling, run `just link-inventory`; if `.git_template/hooks/gitkeep` is obsolete, use the approval-bound cleanup and restore flow in `docs/rcm-link-reconciliation.md` rather than deleting unreviewed HOME paths ([#224](https://github.com/tgautier/dotfiles/issues/224)).
 - The retired private keyword-guard call from `just ci`. The public gate no
   longer depends on a recipe that the companion repository does not provide

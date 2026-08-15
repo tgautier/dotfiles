@@ -230,8 +230,6 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 "DOTFILES_DIR": str(self.root / "foreign-public"),
                 "GIT_DIR": str(self.root / "foreign-git-dir"),
                 "PYTHONPATH": str(self.root / "foreign-python"),
-                "RCM_LIB": str(self.root / "foreign-rcm"),
-                "RCRC": str(self.root / "foreign-rcrc"),
             }
         )
         if extra_environment:

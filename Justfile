@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-rcrc lint-cleanup-symlinks test-rcm-links test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
+ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
 
 [doc("Run the complete local gate and attest the exact clean HEAD")]
 ci-attest:
@@ -19,11 +19,7 @@ test-local-gate:
 
 [doc("Compile tracked Python helpers with warnings promoted to errors")]
 lint-python:
-    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "bin/rcm-links", "tests/private_chezmoi_bridge.py", "tests/setup_acceptance.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_rcm_links.py", "tests/test_setup_helpers.py")]'
-
-[doc("Fixture-test rcm link inventory, cleanup, cutover backup, and restore")]
-test-rcm-links:
-    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_rcm_links.py' -v
+    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "tests/private_chezmoi_bridge.py", "tests/setup_acceptance.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_setup_helpers.py")]'
 
 [doc("Fixture-test bounded, output-withholding private chezmoi orchestration")]
 test-private-chezmoi-bridge:
@@ -45,34 +41,6 @@ test-setup-acceptance-private:
 test-setup-helpers:
     PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_setup_helpers.py' -v
 
-[doc("Print the read-only ownership inventory for current and historical rcm HOME targets")]
-link-inventory:
-    python3 bin/rcm-links inventory --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
-
-[doc("Print a digest-bound cleanup plan containing only current obsolete rcm links")]
-link-cleanup-plan:
-    python3 bin/rcm-links plan --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
-
-[doc("Remove only obsolete links matching an explicitly approved cleanup plan and digest")]
-link-cleanup plan confirm:
-    python3 bin/rcm-links cleanup --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --plan {{quote(plan)}} --confirm {{quote(confirm)}}
-
-[doc("Restore absent links from the same explicitly approved cleanup plan and digest")]
-link-restore plan confirm:
-    python3 bin/rcm-links restore --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --plan {{quote(plan)}} --confirm {{quote(confirm)}}
-
-[doc("Capture every manifested live rcm link in a private digest-bound cutover backup")]
-link-cutover-backup output:
-    python3 bin/rcm-links cutover-backup --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --output {{quote(output)}}
-
-[doc("Verify a cutover backup against current manifests and live rcm links")]
-link-cutover-backup-verify backup:
-    python3 bin/rcm-links cutover-backup-verify --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}}
-
-[doc("Restore the exact backed-up link set through rcm after digest confirmation")]
-link-cutover-restore backup confirm:
-    python3 bin/rcm-links cutover-restore --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}} --confirm {{quote(confirm)}}
-
 [doc("Show how managed public and private targets differ from their source state")]
 chezmoi-status:
     python3 bin/chezmoi-cutover status --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
@@ -84,145 +52,6 @@ chezmoi-diff:
 [doc("Preview the public and private apply without changing managed targets")]
 chezmoi-apply-dry-run:
     python3 bin/chezmoi-cutover dry-run --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
-
-[doc("Review and bind the exact public/private apply to a verified rcm backup")]
-chezmoi-apply-plan backup backup_confirm:
-    python3 bin/chezmoi-cutover plan --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}} --backup-confirm {{quote(backup_confirm)}}
-
-[doc("Apply the approved public/private plan twice with automatic rcm recovery")]
-chezmoi-apply backup backup_confirm apply_confirm:
-    python3 bin/chezmoi-cutover apply --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}} --backup {{quote(backup)}} --backup-confirm {{quote(backup_confirm)}} --apply-confirm {{quote(apply_confirm)}}
-
-[doc("Restore the complete retained rcm link set after a chezmoi trial")]
-chezmoi-recover backup backup_confirm:
-    just link-cutover-restore {{quote(backup)}} {{quote(backup_confirm)}}
-
-# Assert `rcrc` resolves the way README documents, on both halves of the
-# override contract: DOTFILES_DIRS, which reaches the operator's real $HOME
-# through rcm (a stray trailing slash becomes a doubled separator and rcm derives
-# a wrongly-named link from it), and EXCLUDES, whose private sourcing fails
-# silently behind a `2>/dev/null` when PRIVATE_DIR drifts. Both are pinned rather
-# than asserted. Sourcing rcrc is side-effect-free: it only assigns, and its one
-# external touch is that guarded grep.
-[doc("Check rcrc resolves DOTFILES_DIRS + EXCLUDES and normalises the paths")]
-lint-rcrc:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # One place that sources rcrc under a clean environment. `var` picks which
-    # resolved variable to read, so the DOTFILES_DIRS and EXCLUDES cases share
-    # this rather than each hand-rolling its own `env -u … sh -c`.
-    #
-    # The `-u` pair is a clean-slate default, not a contradiction with a caller's
-    # `NAME=value` operand: env processes options before operands, so an operand
-    # deliberately re-supplies what `-u` cleared.
-    read_var() {
-        local var=$1; shift
-        env -u DOTFILES_DIR -u DOTFILES_PRIVATE_DIR ${1:+"$@"} \
-            sh -c 'set -e; . ./rcrc; eval "printf %s \"\${$1}\""' sh "$var"
-    }
-    resolve() { read_var DOTFILES_DIRS ${1:+"$@"}; }
-    expect() {
-        local label=$1 want=$2 got=$3
-        if [[ "$got" != "$want" ]]; then
-            echo "ERROR [$label]: want [$want] got [$got]" >&2
-            exit 1
-        fi
-    }
-    expect_has() {
-        local label=$1 needle=$2 got=$3
-        if [[ "$got" != *"$needle"* ]]; then
-            echo "ERROR [$label]: expected to contain [$needle], got [$got]" >&2
-            exit 1
-        fi
-    }
-    expect_lacks() {
-        local label=$1 needle=$2 got=$3
-        if [[ "$got" == *"$needle"* ]]; then
-            echo "ERROR [$label]: expected NOT to contain [$needle], got [$got]" >&2
-            exit 1
-        fi
-    }
-
-    home_default="$HOME/Workspace/tgautier/dotfiles"
-    priv_default="$HOME/Workspace/tgautier/dotfiles-private"
-
-    expect "no override" \
-        "$home_default $priv_default" "$(resolve)"
-    expect "both overridden" \
-        "/tmp/pub /tmp/priv" "$(resolve DOTFILES_DIR=/tmp/pub DOTFILES_PRIVATE_DIR=/tmp/priv)"
-    expect "private only" \
-        "$home_default /tmp/priv" "$(resolve DOTFILES_PRIVATE_DIR=/tmp/priv)"
-    # One trailing slash, and several — `${VAR%/}` alone strips only one, which
-    # is why rcrc loops.
-    expect "single trailing slash" \
-        "/tmp/pub $priv_default" "$(resolve DOTFILES_DIR=/tmp/pub/)"
-    expect "multiple trailing slashes" \
-        "/tmp/pub $priv_default" "$(resolve DOTFILES_DIR=/tmp/pub///)"
-    # A root value must survive as `/`, never collapse to empty — an empty entry
-    # in DOTFILES_DIRS would make the derived prefix match anything.
-    expect "root value not emptied" \
-        "$home_default /" "$(resolve DOTFILES_PRIVATE_DIR=/)"
-
-    # EXCLUDES is the other half of the contract, and the one rcrc's own header
-    # names as the silent-failure path: if PRIVATE_DIR drifts, the exclude
-    # sourcing no-ops behind `2>/dev/null` and rcup resumes hanging on the
-    # excluded directory — a well-formed DOTFILES_DIRS with an EXCLUDES quietly
-    # missing every private pattern. Pin the path derivation and the
-    # comment/blank-line filter together.
-    tmp=$(mktemp -d)
-    trap 'rm -rf "$tmp"' EXIT
-    # The regex's two alternatives, its `[[:space:]]*` tolerance and the `tr` join
-    # are each pinned, but by DIFFERENT assertions — don't delete either one
-    # believing the other covers it:
-    #
-    #   fixture ingredient      pins                      caught by
-    #   ----------------------  ------------------------  ---------------------------
-    #   two patterns            the `tr` join             expect_has (joined needle)
-    #   blank line, mid-list    the `$` alternative       expect_has (joined needle)
-    #   indented comment        `#` alt + `[[:space:]]*`  expect_lacks "comment"
-    #
-    # Boundary, so the table isn't read as totality over the whole pipeline.
-    # `-v` and `-E` are pinned incidentally — drop either and the joined-needle
-    # assertion fails (it runs first and exits, so the expect_lacks case is never
-    # reached): without `-v` only the comment and blank lines survive, and without
-    # `-E` the pattern is a BRE where `(`, `)` and `|` are literal, so nothing
-    # matches and every line survives. `-h` is NOT pinned and cannot be here:
-    # grep only prefixes filenames for multiple inputs or `-H`, and rcrc passes
-    # exactly one file, so dropping it changes nothing observable.
-    #
-    # The fixture's column-0 comment pins nothing on its own — drop the `#`
-    # alternative and the INDENTED comment still survives `^[[:space:]]*$`, so
-    # expect_lacks fires from it alone. It stays as belt and braces.
-    #
-    # The blank line sits BETWEEN the patterns on purpose: a leaked blank then
-    # breaks the contiguity of "sentinel-pattern second-pattern". Before the first
-    # pattern it would only add a space outside the needle and slip through.
-    # A leaked comment, by contrast, survives as leading tokens that don't break
-    # that contiguity, which is why it needs expect_lacks rather than the needle.
-    printf '# a comment line\n\t  # indented comment\nsentinel-pattern\n\nsecond-pattern\n' \
-        > "$tmp/rcm-excludes"
-    excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp")
-    expect_has   "EXCLUDES sources the private file" "sentinel-pattern second-pattern" "$excludes"
-    expect_lacks "EXCLUDES drops comment lines"      "comment"                         "$excludes"
-    # An absent private repo must leave the base excludes intact, not blank.
-    excludes=$(read_var EXCLUDES DOTFILES_PRIVATE_DIR="$tmp/nope")
-    expect_has   "absent private repo keeps base EXCLUDES" "CHANGELOG.md" "$excludes"
-    expect_has   "base EXCLUDES keeps chezmoi metadata private" ".chezmoiroot" "$excludes"
-    expect_has   "base EXCLUDES keeps chezmoi config repository-only" "chezmoi.toml" "$excludes"
-    expect_has   "base EXCLUDES keeps operator helper repository-only" "bin/chezmoi-cutover" "$excludes"
-    expect_has   "base EXCLUDES keeps test harnesses private" "tests" "$excludes"
-
-    # The strip helper and its temp var must not leak into the sourcing shell.
-    leaked=$(sh -c '. ./rcrc; printf "%s" "${_v-unset}"')
-    if [[ "$leaked" != "unset" ]]; then
-        echo "ERROR: rcrc leaked \$_v into the sourcing shell as [$leaked]" >&2
-        exit 1
-    fi
-    if sh -c '. ./rcrc; command -v _rcrc_strip_slashes' >/dev/null 2>&1; then
-        echo "ERROR: rcrc left _rcrc_strip_slashes defined in the sourcing shell" >&2
-        exit 1
-    fi
-    echo "rcrc OK (defaults, both overrides, slash normalisation, root value, EXCLUDES sourcing, no leaks)"
 
 [doc("Render the chezmoi canary in an isolated HOME and verify source equivalence plus idempotence")]
 test-chezmoi-canary:
@@ -369,7 +198,7 @@ setup: _ensure-profile
 
     # 2. Refresh dotfiles through their manifest-declared owners. Called here
     #    rather than declared as a dependency because dependencies run before
-    #    the recipe body, and chezmoi and rcm come from the bundle in step 1.
+    #    the recipe body, and chezmoi comes from the bundle in step 1.
     just link
 
     # 3. Language runtimes from the pinned mise config. Install mise first if the
@@ -406,11 +235,9 @@ git-hooks:
     @echo "Git hooks wired for this checkout"
 
 # Run this after editing managed config. The operator validates public/private
-# ownership in isolation, refreshes only the manifest-deferred public rcm links,
-# runs the private dedicated owners when that checkout exists, then applies the
-# public and private chezmoi sources without force. Both apply passes must finish
-# settled. The unchanged broad rcm configuration remains available only to the
-# digest-bound full rollback. An absent private repo is skipped, not fatal.
+# ownership in isolation, applies the public and private chezmoi sources without
+# force, and runs the private dedicated owners when that checkout exists. Both
+# apply passes must finish settled. An absent private repo is skipped, not fatal.
 #
 # Must be run from this checkout: `~/.justfile` is a symlink to the PRIVATE
 # repo's justfile, so `just link` from $HOME resolves there and fails with an
@@ -509,18 +336,11 @@ _ensure-profile:
 #
 # Rationale lives here rather than in the body: this is a LINEWISE recipe, so
 # every indented line — comments included — is echoed and handed to a shell.
-#
-# `rcrc` is checked with --shell=sh, not in the zsh group below, because rcm
-# sources it and it must stay portable to whatever shell rcm uses. SC2034
-# (appears unused) is excluded for that file ONLY: setting variables for rcm to
-# read IS its purpose, so every assignment is consumed externally. Scoped to the
-# file rather than added to the shared zsh_excludes list.
 [doc("Lint shell scripts with ShellCheck")]
 lint-shell:
     shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
     shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary tests/test-local-gate
     shellcheck --severity=warning .githooks/pre-commit .githooks/pre-push .githooks/ci-attest .githooks/ci-publish .githooks/lib/*.sh
-    shellcheck --severity=warning --shell=sh --exclude=SC2034 rcrc
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 
 # Lint markdown files
@@ -632,13 +452,8 @@ dotfiles_dir := parent_directory(canonicalize(justfile()))
 # dotfiles_dir. Inside a nested worktree, dotfiles_dir points at the worktree;
 # its sibling is not the configured private checkout.
 #
-# DOTFILES_DIR / DOTFILES_PRIVATE_DIR are the shared contract across the two
-# remaining consumers: `DOTFILES_DIRS` + `EXCLUDES` in `rcrc`, and the repo list
-# in `_scan-stale-symlinks`.
-#
-# The two defaults below live in three places on purpose — here, `rcrc`, and
-# `lint-rcrc`'s expected values (which run under `env -u`, so they cannot
-# inherit these). Change one, change all three; see the note in `rcrc`.
+# DOTFILES_DIR / DOTFILES_PRIVATE_DIR are the shared contract with the stale
+# symlink scanner (_scan-stale-symlinks).
 public_dir := env("DOTFILES_DIR", env("HOME") / "Workspace/tgautier/dotfiles")
 private_dir := env("DOTFILES_PRIVATE_DIR", env("HOME") / "Workspace/tgautier/dotfiles-private")
 
@@ -803,8 +618,8 @@ lint-cleanup-symlinks:
     # or the derived prefix becomes `…//*` and matches no single-slash target.
     assert_scan "trailing-slash override" "$(scan "$override/")"
 
-    # An absent configured dir must be a no-op, not fatal — `rcrc` already
-    # treats a missing private repo that way. Dropping `(N)` from the repos glob
+    # An absent configured dir must be a no-op, not fatal. Dropping `(N)` from
+    # the repos glob
     # makes zsh abort the scan with "no matches found" instead, which this case
     # catches: the scan must still run, still fire the segment predicate, and
     # still spare the unrelated link.
@@ -861,8 +676,8 @@ lint-cleanup-symlinks:
 # The predicate is a UNION of two matches, because neither subsumes the other:
 #
 #   1. Basename-segment match on the literal `dotfiles` / `dotfiles-private`
-#      path components. rcm records ABSOLUTE targets, so after a checkout is
-#      moved or renamed the leftover links still name the OLD path — which is
+#      path components. After a checkout is moved or renamed the leftover
+#      symlinks still name the OLD path — which is
 #      the main thing a stale sweeper is for. A prefix built from the CURRENT
 #      paths cannot see those, and setting the override to the new location
 #      does not help, because the stale targets name the old one.
@@ -880,8 +695,8 @@ _scan-stale-symlinks:
     # `:a` absolutises and cleans, so a trailing slash (shell completion adds
     # one routinely), a doubled slash, or a `..` segment can't produce a prefix
     # that matches nothing while glob-based discovery still succeeds. NOT `:A`,
-    # which also resolves symlinks: rcm recorded whatever DOTFILES_DIRS said, so
-    # resolving could stop matching the targets actually on disk.
+    # which also resolves symlinks: targets were recorded as whatever DOTFILES_DIRS
+    # said, so resolving could stop matching the targets actually on disk.
     # quote() not "…": double quotes protect spaces but not `$`, backtick or
     # backslash, and this value gates an `rm`. Matches the convention already
     # used for set-profile's argument. A glob qualifier after a single-quoted
@@ -890,7 +705,7 @@ _scan-stale-symlinks:
     # (N) above drops a configured dir that doesn't exist on this machine, so an
     # absent private repo contributes no prefix. Without it zsh aborts the whole
     # scan with "no matches found" (verified), making an absent private repo
-    # fatal rather than the no-op `rcrc` already treats it as.
+    # fatal rather than a no-op.
 
     # Discovery of nested link dirs needs the repos to exist; the prefix
     # predicate does not. Keep them independent so a moved checkout is still
@@ -899,7 +714,7 @@ _scan-stale-symlinks:
     for repo in "${repos[@]}"; do
         for d in "$repo"/*(N/); do
             name=${d:t}
-            # Skip repo-only dirs that rcm doesn't symlink
+            # Skip repo-only dirs that aren't deployed to HOME
             [[ "$name" == .* || "$name" == README* || "$name" == CLAUDE* ]] && continue
             candidate="$scan_home/.$name"
             [[ -d "$candidate" ]] && nested+=("$candidate")

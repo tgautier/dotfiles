@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import hmac
 import os
 from pathlib import Path
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -17,26 +20,32 @@ from typing import Sequence
 OWNERSHIP_TIMEOUT_SECONDS = 15
 SOURCE_TIMEOUT_SECONDS = 60
 CLEANUP_TIMEOUT_SECONDS = 2
+CLEANUP_TERM_GRACE_SECONDS = 0.1
 PRIVATE_MODULES = {
     "ownership": "shared.chezmoi.check_target_ownership",
     "source": "shared.chezmoi.check_private_source",
 }
+PUBLIC_ONLY_STATE = "public-only"
+COMPANION_STATE_PREFIX = "companion:"
 
 
 class BridgeError(RuntimeError):
     """The optional companion checkout cannot satisfy its canary contract."""
 
 
-def _wait_for_process_group_exit(process_group: int) -> None:
-    deadline = time.monotonic() + CLEANUP_TIMEOUT_SECONDS
+def _wait_without_reaping(process: subprocess.Popen[bytes], timeout: int | float) -> bool:
+    deadline = time.monotonic() + timeout
     while True:
-        try:
-            os.killpg(process_group, 0)
-        except ProcessLookupError:
-            return
+        result = os.waitid(
+            os.P_PID,
+            process.pid,
+            os.WEXITED | os.WNOHANG | os.WNOWAIT,
+        )
+        if result is not None:
+            return True
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise BridgeError("companion process group exceeded its cleanup deadline")
+            return False
         time.sleep(min(0.01, remaining))
 
 
@@ -45,6 +54,84 @@ def _companion_path() -> Path:
     if configured:
         return Path(configured).expanduser()
     return Path.home() / "Workspace/tgautier/dotfiles-private"
+
+
+def _resolved_companion() -> Path | None:
+    checkout = _companion_path()
+    if not checkout.exists() and not checkout.is_symlink():
+        return None
+    if not checkout.is_dir():
+        raise BridgeError("companion checkout path is not a directory")
+    try:
+        return checkout.resolve(strict=True)
+    except RuntimeError as exc:
+        raise BridgeError("companion checkout path cannot be resolved") from exc
+
+
+def _checkout_identity(checkout: Path) -> str:
+    metadata = checkout.stat()
+    identity = b"\0".join(
+        (
+            os.fsencode(checkout),
+            str(metadata.st_dev).encode("ascii"),
+            str(metadata.st_ino).encode("ascii"),
+        )
+    )
+    return hashlib.sha256(identity).hexdigest()
+
+
+def _publish_session_state(path: Path, state_value: str) -> None:
+    if not path.is_absolute() or not path.parent.is_dir():
+        raise BridgeError("companion canary state location is invalid")
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="ascii",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            delete=False,
+        ) as state_file:
+            temporary = Path(state_file.name)
+            state_file.write(f"{state_value}\n")
+            state_file.flush()
+            os.fsync(state_file.fileno())
+        os.link(temporary, path, follow_symlinks=False)
+    except FileExistsError as exc:
+        raise BridgeError("companion canary state already exists") from exc
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def _read_session_state(path: Path) -> str:
+    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except OSError as exc:
+        raise BridgeError("companion canary state is unavailable") from exc
+    with os.fdopen(descriptor, "rb") as state_file:
+        metadata = os.fstat(state_file.fileno())
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.getuid()
+            or stat.S_IMODE(metadata.st_mode) & 0o077
+        ):
+            raise BridgeError("companion canary state is unsafe")
+        serialized_state = state_file.read(129)
+        if len(serialized_state) > 128 or not serialized_state.endswith(b"\n"):
+            raise BridgeError("companion canary state is invalid")
+    try:
+        state_value = serialized_state[:-1].decode("ascii")
+    except UnicodeDecodeError as exc:
+        raise BridgeError("companion canary state is invalid") from exc
+    if state_value == PUBLIC_ONLY_STATE:
+        return state_value
+    if state_value.startswith(COMPANION_STATE_PREFIX):
+        identity = state_value.removeprefix(COMPANION_STATE_PREFIX)
+        if len(identity) == 64 and all(character in "0123456789abcdef" for character in identity):
+            return state_value
+    raise BridgeError("companion canary state is invalid")
 
 
 def _isolated_environment(root: Path) -> dict[str, str]:
@@ -70,26 +157,22 @@ def _isolated_environment(root: Path) -> dict[str, str]:
 def _stop_process_group(process: subprocess.Popen[bytes]) -> None:
     try:
         os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        process.communicate()
+    except (ProcessLookupError, PermissionError):
+        # waitid(..., WNOWAIT) keeps an exited leader unreaped, so ESRCH here
+        # or macOS EPERM for a zombie-only group cannot expose a recycled PGID.
+        process.wait(timeout=CLEANUP_TIMEOUT_SECONDS)
         return
+    time.sleep(CLEANUP_TERM_GRACE_SECONDS)
     try:
-        process.communicate(timeout=CLEANUP_TIMEOUT_SECONDS)
-    except subprocess.TimeoutExpired:
-        pass
-    try:
-        # The direct child may have exited on SIGTERM while one of its own
-        # children ignored the group signal. Always address the group again;
-        # ProcessLookupError is the positive signal that no member remains.
+        # The group leader remains unreaped until after this signal, pinning
+        # the numeric process-group identity against PID reuse.
         os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
+    except (ProcessLookupError, PermissionError):
         pass
-    if process.poll() is None:
-        try:
-            process.communicate(timeout=CLEANUP_TIMEOUT_SECONDS)
-        except subprocess.TimeoutExpired:
-            pass
-    _wait_for_process_group_exit(process.pid)
+    try:
+        process.wait(timeout=CLEANUP_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired as exc:
+        raise BridgeError("companion process group exceeded its cleanup deadline") from exc
 
 
 def _invoke_private(
@@ -109,33 +192,38 @@ def _invoke_private(
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
-        timed_out: subprocess.TimeoutExpired | None = None
-        try:
-            process.communicate(timeout=timeout)
-        except subprocess.TimeoutExpired as exc:
-            timed_out = exc
-        finally:
-            # A checker can exit after spawning a descendant. Stop its process
-            # group before deleting the temporary HOME on every exit path.
-            _stop_process_group(process)
-        if timed_out is not None:
-            raise BridgeError("companion check exceeded its bounded deadline") from timed_out
+        completed = _wait_without_reaping(process, timeout)
+        # A checker can exit after spawning a descendant. Keep its leader
+        # unreaped until the complete group has received bounded cleanup.
+        _stop_process_group(process)
+        if not completed:
+            raise BridgeError("companion check exceeded its bounded deadline")
         if process.returncode != 0:
             raise BridgeError(
                 f"companion check failed with status {process.returncode}; output withheld"
             )
 
 
-def run(mode: str, public_targets: Path | None = None) -> str:
-    checkout = _companion_path()
-    if not checkout.exists() and not checkout.is_symlink():
-        return "skipped"
-    if not checkout.is_dir():
-        raise BridgeError("companion checkout path is not a directory")
-    try:
-        checkout = checkout.resolve(strict=True)
-    except RuntimeError as exc:
-        raise BridgeError("companion checkout path cannot be resolved") from exc
+def run(mode: str, session_state: Path, public_targets: Path | None = None) -> str:
+    expected_state = None
+    if mode == "source":
+        expected_state = _read_session_state(session_state)
+
+    checkout = _resolved_companion()
+    if checkout is None:
+        if mode == "ownership":
+            _publish_session_state(session_state, PUBLIC_ONLY_STATE)
+            return "skipped"
+        if expected_state == PUBLIC_ONLY_STATE:
+            return "skipped"
+        raise BridgeError("companion checkout changed during canary")
+    identity = _checkout_identity(checkout)
+    if mode == "source":
+        if expected_state == PUBLIC_ONLY_STATE or not hmac.compare_digest(
+            expected_state or "",
+            f"{COMPANION_STATE_PREFIX}{identity}",
+        ):
+            raise BridgeError("companion checkout changed during canary")
 
     module = PRIVATE_MODULES[mode]
     module_path = checkout.joinpath(*module.split(".")).with_suffix(".py")
@@ -151,12 +239,25 @@ def run(mode: str, public_targets: Path | None = None) -> str:
         timeout = OWNERSHIP_TIMEOUT_SECONDS
 
     _invoke_private(checkout, module, arguments, timeout=timeout)
+    current_checkout = _resolved_companion()
+    if (
+        current_checkout is None
+        or current_checkout != checkout
+        or not hmac.compare_digest(_checkout_identity(current_checkout), identity)
+    ):
+        raise BridgeError("companion checkout changed during canary")
+    if mode == "ownership":
+        _publish_session_state(
+            session_state,
+            f"{COMPANION_STATE_PREFIX}{identity}",
+        )
     return "passed"
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=tuple(PRIVATE_MODULES))
+    parser.add_argument("--session-state", required=True, type=Path)
     parser.add_argument("--public-targets", type=Path)
     return parser.parse_args(argv)
 
@@ -164,7 +265,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_args(argv)
     try:
-        result = run(arguments.mode, arguments.public_targets)
+        result = run(arguments.mode, arguments.session_state, arguments.public_targets)
     except BridgeError as exc:
         print(f"companion chezmoi: {exc}", file=sys.stderr)
         return 1

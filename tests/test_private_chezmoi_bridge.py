@@ -23,6 +23,7 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.checkout = self.root / "companion"
         self.manifest = self.root / "public-targets.tsv"
+        self.session_state = self.root / "companion-session"
         self.manifest.write_text("fixture\n", encoding="utf-8")
 
     def _module(self, name: str, body: str) -> None:
@@ -38,10 +39,22 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             clear=False,
         )
 
+    def _main_arguments(self, mode: str) -> list[str]:
+        arguments = [mode, "--session-state", str(self.session_state)]
+        if mode == "ownership":
+            arguments.extend(("--public-targets", str(self.manifest)))
+        return arguments
+
+    def _authorize_source(self) -> None:
+        self._module("check_target_ownership", "")
+        with self._environment():
+            result = bridge.run("ownership", self.session_state, self.manifest)
+        self.assertEqual(result, "passed")
+
     def test_absent_checkout_skips_without_printing_its_path(self) -> None:
         output = io.StringIO()
         with self._environment(), redirect_stdout(output):
-            result = bridge.main(["ownership", "--public-targets", str(self.manifest)])
+            result = bridge.main(self._main_arguments("ownership"))
 
         self.assertEqual(result, 0)
         self.assertIn("skipped", output.getvalue())
@@ -91,12 +104,46 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             "XDG_STATE_HOME": str(caller_home / "state"),
         }
         with mock.patch.dict(os.environ, environment, clear=False), redirect_stdout(output):
-            result = bridge.main(["ownership", "--public-targets", str(self.manifest)])
+            result = bridge.main(self._main_arguments("ownership"))
 
         self.assertEqual(result, 0)
         self.assertIn("passed", output.getvalue())
         self.assertNotIn(PRIVATE_SENTINEL, output.getvalue())
         self.assertFalse((caller_home / "companion-attempt").exists())
+        self.assertNotIn(
+            str(self.checkout),
+            self.session_state.read_text(encoding="ascii"),
+        )
+        self.assertEqual(self.session_state.stat().st_mode & 0o777, 0o600)
+
+    def test_session_state_fails_closed_without_overwriting_existing_data(self) -> None:
+        self.session_state.write_text("malformed", encoding="ascii")
+        self.session_state.chmod(0o600)
+        with self.assertRaisesRegex(bridge.BridgeError, "state is invalid"):
+            bridge._read_session_state(self.session_state)
+
+        self.session_state.write_text("public-only\n", encoding="ascii")
+        self.session_state.chmod(0o644)
+        with self.assertRaisesRegex(bridge.BridgeError, "state is unsafe"):
+            bridge._read_session_state(self.session_state)
+
+        self.session_state.unlink()
+        symlink_target = self.root / "foreign-state"
+        symlink_target.write_text("public-only\n", encoding="ascii")
+        self.session_state.symlink_to(symlink_target)
+        with self.assertRaisesRegex(bridge.BridgeError, "state is unavailable"):
+            bridge._read_session_state(self.session_state)
+
+        self.session_state.unlink()
+        self.session_state.write_text("preserve me\n", encoding="ascii")
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "state already exists"
+        ):
+            bridge.run("ownership", self.session_state, self.manifest)
+        self.assertEqual(
+            self.session_state.read_text(encoding="ascii"),
+            "preserve me\n",
+        )
 
     def test_private_failure_withholds_stdout_and_stderr(self) -> None:
         self._module(
@@ -108,9 +155,10 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             raise SystemExit(23)
             """,
         )
+        self._authorize_source()
         error = io.StringIO()
         with self._environment(), redirect_stderr(error):
-            result = bridge.main(["source"])
+            result = bridge.main(self._main_arguments("source"))
 
         self.assertEqual(result, 1)
         self.assertIn("status 23", error.getvalue())
@@ -118,6 +166,7 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
 
     def test_operating_system_error_withholds_private_path(self) -> None:
         self._module("check_private_source", "")
+        self._authorize_source()
         error = io.StringIO()
         launch_error = OSError(13, "Permission denied", str(self.checkout))
         with (
@@ -125,7 +174,7 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             mock.patch.object(bridge.subprocess, "Popen", side_effect=launch_error),
             redirect_stderr(error),
         ):
-            result = bridge.main(["source"])
+            result = bridge.main(self._main_arguments("source"))
 
         self.assertEqual(result, 1)
         self.assertEqual(
@@ -135,7 +184,8 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         self.assertNotIn(str(self.checkout), error.getvalue())
 
     def test_resolution_error_withholds_private_path(self) -> None:
-        self.checkout.mkdir()
+        self._module("check_private_source", "")
+        self._authorize_source()
         error = io.StringIO()
         resolution_error = RuntimeError(f"Symlink loop from {self.checkout}")
         with (
@@ -143,7 +193,7 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
             mock.patch.object(Path, "resolve", side_effect=resolution_error),
             redirect_stderr(error),
         ):
-            result = bridge.main(["source"])
+            result = bridge.main(self._main_arguments("source"))
 
         self.assertEqual(result, 1)
         self.assertEqual(
@@ -257,58 +307,87 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
     def test_cleanup_bounds_wait_after_sigkill(self) -> None:
         process = mock.Mock()
         process.pid = 123
-        process.poll.return_value = None
-        process.communicate.side_effect = [
-            bridge.subprocess.TimeoutExpired("child", bridge.CLEANUP_TIMEOUT_SECONDS),
-            bridge.subprocess.TimeoutExpired("child", bridge.CLEANUP_TIMEOUT_SECONDS),
-        ]
 
-        with mock.patch.object(
-            bridge.os,
-            "killpg",
-            side_effect=[None, None, ProcessLookupError],
-        ) as killpg:
+        with (
+            mock.patch.object(bridge.os, "killpg") as killpg,
+            mock.patch.object(bridge.time, "sleep") as sleep,
+        ):
             bridge._stop_process_group(process)
 
-        self.assertEqual(
-            process.communicate.call_args_list,
-            [
-                mock.call(timeout=bridge.CLEANUP_TIMEOUT_SECONDS),
-                mock.call(timeout=bridge.CLEANUP_TIMEOUT_SECONDS),
-            ],
-        )
         self.assertEqual(
             killpg.call_args_list,
             [
                 mock.call(process.pid, bridge.signal.SIGTERM),
                 mock.call(process.pid, bridge.signal.SIGKILL),
-                mock.call(process.pid, 0),
             ],
         )
+        sleep.assert_called_once_with(bridge.CLEANUP_TERM_GRACE_SECONDS)
+        process.wait.assert_called_once_with(timeout=bridge.CLEANUP_TIMEOUT_SECONDS)
 
-    def test_cleanup_fails_if_the_process_group_survives_sigkill(self) -> None:
+    def test_completion_wait_is_bounded_and_does_not_reap_the_leader(self) -> None:
+        process = mock.Mock()
+        process.pid = 123
         with (
-            mock.patch.object(bridge.os, "killpg") as killpg,
+            mock.patch.object(bridge.os, "waitid", return_value=None) as waitid,
             mock.patch.object(bridge.time, "monotonic", side_effect=[10, 13]),
-            self.assertRaisesRegex(bridge.BridgeError, "cleanup deadline"),
         ):
-            bridge._wait_for_process_group_exit(123)
+            completed = bridge._wait_without_reaping(process, timeout=2)
 
-        killpg.assert_called_once_with(123, 0)
+        self.assertFalse(completed)
+        waitid.assert_called_once_with(
+            bridge.os.P_PID,
+            process.pid,
+            bridge.os.WEXITED | bridge.os.WNOHANG | bridge.os.WNOWAIT,
+        )
+        process.wait.assert_not_called()
 
     def test_non_directory_and_stale_checkout_fail_generically(self) -> None:
         self.checkout.write_text(PRIVATE_SENTINEL, encoding="utf-8")
         with self._environment(), self.assertRaisesRegex(
             bridge.BridgeError, "not a directory"
         ):
-            bridge.run("source")
+            bridge.run("ownership", self.session_state, self.manifest)
 
         self.checkout.unlink()
         self.checkout.mkdir()
         with self._environment(), self.assertRaisesRegex(
             bridge.BridgeError, "incompatible"
         ):
-            bridge.run("source")
+            bridge.run("ownership", self.session_state, self.manifest)
+
+    def test_source_rejects_checkout_removed_after_ownership(self) -> None:
+        self._module("check_private_source", "")
+        self._authorize_source()
+        moved_checkout = self.root / "moved-companion"
+        self.checkout.rename(moved_checkout)
+
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "changed during canary"
+        ):
+            bridge.run("source", self.session_state)
+
+    def test_source_rejects_checkout_replaced_after_ownership(self) -> None:
+        self._module("check_private_source", "")
+        self._authorize_source()
+        moved_checkout = self.root / "original-companion"
+        self.checkout.rename(moved_checkout)
+        self._module("check_private_source", "")
+
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "changed during canary"
+        ):
+            bridge.run("source", self.session_state)
+
+    def test_public_only_session_rejects_a_late_companion(self) -> None:
+        with self._environment():
+            result = bridge.run("ownership", self.session_state, self.manifest)
+        self.assertEqual(result, "skipped")
+        self._module("check_private_source", "")
+
+        with self._environment(), self.assertRaisesRegex(
+            bridge.BridgeError, "changed during canary"
+        ):
+            bridge.run("source", self.session_state)
 
 
 if __name__ == "__main__":

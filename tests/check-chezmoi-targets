@@ -30,7 +30,7 @@ check_duplicates() {
 }
 
 main() {
-    local script_dir repo_root manifest private_bridge tmp header line_no
+    local script_dir repo_root manifest private_bridge private_session tmp header line_no
     local rcm_source target disposition chezmoi_source mode extra
     local source_state expected_source_state diff_output
     script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
@@ -49,6 +49,7 @@ main() {
     tmp=$(mktemp -d)
     cleanup_root=$tmp
     trap cleanup EXIT
+    private_session="$tmp/private-session"
     mkdir -p "$tmp/cache" "$tmp/destination" "$tmp/operator-home"
     : > "$tmp/config.toml"
     : > "$tmp/all-sources"
@@ -158,7 +159,7 @@ main() {
         exit 1
     fi
 
-    python3 -B "$private_bridge" ownership --public-targets "$manifest"
+    python3 -B "$private_bridge" ownership --session-state "$private_session" --public-targets "$manifest"
 
     run_chezmoi apply
     while IFS=$'\t' read -r rcm_source target disposition chezmoi_source mode extra; do
@@ -177,7 +178,7 @@ main() {
     diff_output=$(run_chezmoi diff)
     [[ -z "$diff_output" ]] || fail "second apply left a non-empty chezmoi diff"
 
-    python3 -B "$private_bridge" source
+    python3 -B "$private_bridge" source --session-state "$private_session"
 
     local rcm_count shadow_count
     rcm_count=$(wc -l < "$tmp/all-targets" | tr -d ' ')

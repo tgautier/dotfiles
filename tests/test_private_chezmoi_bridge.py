@@ -93,6 +93,24 @@ class PrivateChezmoiBridgeTests(unittest.TestCase):
         self.assertIn("status 23", error.getvalue())
         self.assertNotIn(PRIVATE_SENTINEL, error.getvalue())
 
+    def test_operating_system_error_withholds_private_path(self) -> None:
+        self._module("check_private_source", "")
+        error = io.StringIO()
+        launch_error = OSError(13, "Permission denied", str(self.checkout))
+        with (
+            self._environment(),
+            mock.patch.object(bridge.subprocess, "Popen", side_effect=launch_error),
+            redirect_stderr(error),
+        ):
+            result = bridge.main(["source"])
+
+        self.assertEqual(result, 1)
+        self.assertEqual(
+            error.getvalue(),
+            "companion chezmoi: companion check could not complete; details withheld\n",
+        )
+        self.assertNotIn(str(self.checkout), error.getvalue())
+
     def test_timeout_terminates_the_private_process_group(self) -> None:
         child_pid_file = self.root / "child.pid"
         self._module(

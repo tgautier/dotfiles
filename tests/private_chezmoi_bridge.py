@@ -124,8 +124,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     arguments = parse_args(argv)
     try:
         result = run(arguments.mode, arguments.public_targets)
-    except (BridgeError, OSError) as exc:
+    except BridgeError as exc:
         print(f"companion chezmoi: {exc}", file=sys.stderr)
+        return 1
+    except OSError:
+        print(
+            "companion chezmoi: companion check could not complete; details withheld",
+            file=sys.stderr,
+        )
         return 1
     print(f"companion chezmoi {arguments.mode}: {result}")
     return 0

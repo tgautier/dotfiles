@@ -944,6 +944,7 @@ def apply_with_recovery(
     lsrc: str,
     rcup: str,
     canary: Path,
+    termination: TerminationState,
 ) -> None:
     """Apply both sources twice and restore rcm after any mutation failure."""
 
@@ -975,71 +976,71 @@ def apply_with_recovery(
         rcup=rcup,
     )
 
-    with recoverable_termination_signals() as termination:
-        mutation_started = False
+    mutation_started = False
+    try:
+        for source in sources:
+            mutation_started = True
+            capture_operation(
+                "apply",
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                show_output=False,
+            )
+        require_settled_state(
+            executable=executable,
+            sources=sources,
+            home=home,
+            cache_root=cache_root,
+            state_root=state_root,
+            label="first apply",
+        )
+        for source in sources:
+            capture_operation(
+                "apply",
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                show_output=False,
+            )
+        require_settled_state(
+            executable=executable,
+            sources=sources,
+            home=home,
+            cache_root=cache_root,
+            state_root=state_root,
+            label="second apply",
+        )
+        print("chezmoi apply complete: both sources are idempotent", file=sys.stderr)
+        return
+    except (CutoverError, KeyboardInterrupt, TerminationRequested) as exc:
+        if not mutation_started:
+            raise
+        termination.recovering = True
         try:
-            for source in sources:
-                mutation_started = True
-                capture_operation(
-                    "apply",
-                    executable=executable,
-                    source=source,
-                    home=home,
-                    cache_root=cache_root,
-                    state_root=state_root,
-                    show_output=False,
-                )
-            require_settled_state(
-                executable=executable,
-                sources=sources,
+            restore_rcm(
+                public=public,
+                private=private,
                 home=home,
-                cache_root=cache_root,
-                state_root=state_root,
-                label="first apply",
+                backup=backup,
+                backup_confirm=backup_confirm,
+                lsrc=lsrc,
+                rcup=rcup,
             )
-            for source in sources:
-                capture_operation(
-                    "apply",
-                    executable=executable,
-                    source=source,
-                    home=home,
-                    cache_root=cache_root,
-                    state_root=state_root,
-                    show_output=False,
-                )
-            require_settled_state(
-                executable=executable,
-                sources=sources,
-                home=home,
-                cache_root=cache_root,
-                state_root=state_root,
-                label="second apply",
-            )
-        except (CutoverError, KeyboardInterrupt, TerminationRequested) as exc:
-            if not mutation_started:
-                raise
-            termination.recovering = True
-            try:
-                restore_rcm(
-                    public=public,
-                    private=private,
-                    home=home,
-                    backup=backup,
-                    backup_confirm=backup_confirm,
-                    lsrc=lsrc,
-                    rcup=rcup,
-                )
-            except (CutoverError, KeyboardInterrupt) as recovery_exc:
-                raise CutoverError(
-                    "chezmoi apply failed and automatic rcm recovery also failed; "
-                    "run the documented recovery command immediately"
-                ) from recovery_exc
-            if termination.signum is not None:
-                raise TerminationRequested(termination.signum, restored=True) from exc
+        except (CutoverError, KeyboardInterrupt) as recovery_exc:
             raise CutoverError(
-                f"chezmoi apply failed ({exc}); the complete rcm link set was restored"
-            ) from exc
-    print("chezmoi apply complete: both sources are idempotent", file=sys.stderr)
+                "chezmoi apply failed and automatic rcm recovery also failed; "
+                "run the documented recovery command immediately"
+            ) from recovery_exc
+        if termination.signum is not None:
+            raise TerminationRequested(termination.signum, restored=True) from exc
+        raise CutoverError(
+            f"chezmoi apply failed ({exc}); the complete rcm link set was restored"
+        ) from exc
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -1109,7 +1110,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
             label="chezmoi operator cache directory",
         )
-        with operator_lock(state_root), recoverable_termination_signals():
+        with operator_lock(state_root), recoverable_termination_signals() as termination:
             for source in sources:
                 ensure_private_directory(
                     cache_root / source.label,
@@ -1175,6 +1176,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         lsrc=str(lsrc),
                         rcup=str(rcup),
                         canary=canary,
+                        termination=termination,
                     )
     except CutoverError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)

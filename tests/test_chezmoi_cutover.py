@@ -1080,7 +1080,52 @@ class ChezmoiCutoverTests(unittest.TestCase):
                 lsrc="lsrc",
                 rcup="rcup",
                 canary=self.public / "tests/test-chezmoi-canary",
+                termination=CUTOVER.TerminationState(),
             )
+        restore.assert_called_once()
+
+    def test_termination_at_completion_handoff_restores_rcm(self) -> None:
+        source = CUTOVER.require_source(
+            self.public,
+            label="public",
+            config=Path("chezmoi.toml"),
+        )
+        termination = CUTOVER.TerminationState()
+
+        def interrupt_completion(*arguments: object, **_keywords: object) -> None:
+            if arguments and arguments[0] == (
+                "chezmoi apply complete: both sources are idempotent"
+            ):
+                termination.signum = signal.SIGTERM
+                raise CUTOVER.TerminationRequested(signal.SIGTERM)
+
+        with (
+            mock.patch.object(CUTOVER, "prepare_approval", return_value=BACKUP_DIGEST),
+            mock.patch.object(CUTOVER, "verify_backup"),
+            mock.patch.object(CUTOVER, "capture_operation"),
+            mock.patch.object(CUTOVER, "require_settled_state"),
+            mock.patch.object(CUTOVER, "restore_rcm") as restore,
+            mock.patch("builtins.print", side_effect=interrupt_completion),
+            self.assertRaises(CUTOVER.TerminationRequested) as raised,
+        ):
+            CUTOVER.apply_with_recovery(
+                executable=self.fake_chezmoi,
+                sources=(source,),
+                public=self.public.resolve(),
+                private=self.private,
+                home=self.home,
+                cache_root=self.cache,
+                state_root=self.state,
+                backup=self.backup,
+                backup_confirm=BACKUP_DIGEST,
+                apply_confirm=BACKUP_DIGEST,
+                lsrc="lsrc",
+                rcup="rcup",
+                canary=self.public / "tests/test-chezmoi-canary",
+                termination=termination,
+            )
+
+        self.assertTrue(raised.exception.restored)
         restore.assert_called_once()
 
     def test_apply_reruns_canary_and_refuses_mutation_when_it_fails(self) -> None:

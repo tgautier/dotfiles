@@ -216,16 +216,29 @@ class ChezmoiCutoverTests(unittest.TestCase):
                         handle.write("passed\\n")
                     if os.environ.get("FAKE_CANARY_FAIL") == "1":
                         raise SystemExit(37)
-                    for name, variable in (
-                        ("chezmoi", "FAKE_EXPECTED_CHEZMOI"),
-                        ("lsrc", "FAKE_EXPECTED_LSRC"),
+                    expected_chezmoi = os.environ.get("FAKE_EXPECTED_CHEZMOI")
+                    selected_chezmoi = shutil.which("chezmoi")
+                    if expected_chezmoi and (
+                        selected_chezmoi is None
+                        or Path(selected_chezmoi).resolve()
+                        != Path(expected_chezmoi).resolve()
                     ):
-                        expected = os.environ.get(variable)
-                        selected = shutil.which(name)
-                        if expected and (
-                            selected is None
-                            or Path(selected).resolve() != Path(expected).resolve()
-                        ):
+                        raise SystemExit(38)
+                    expected_lsrc = os.environ.get("FAKE_EXPECTED_LSRC")
+                    selected_lsrc = shutil.which("lsrc")
+                    if expected_lsrc:
+                        if selected_lsrc is None:
+                            raise SystemExit(38)
+                        lsrc_probe = subprocess.run(
+                            [selected_lsrc, "--canary-probe"],
+                            check=False,
+                            env=os.environ.copy(),
+                            stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=5,
+                        )
+                        if lsrc_probe.returncode != 0:
                             raise SystemExit(38)
                     if os.environ.get("FAKE_CANARY_WAIT") == "1":
                         descendant = subprocess.Popen(
@@ -850,15 +863,30 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertFalse(self.applied.exists())
 
     def test_canary_uses_the_exact_selected_chezmoi_and_lsrc(self) -> None:
-        selected_lsrc = self.root / "selected-lsrc"
-        selected_lsrc.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        selected_root = self.root / "selected-rcm"
+        selected_lsrc = selected_root / "bin/lsrc"
+        selected_library = selected_root / "share/rcm/probe.sh"
+        selected_lsrc.parent.mkdir(parents=True)
+        selected_library.parent.mkdir(parents=True)
+        selected_library.write_text("probe_loaded=1\n", encoding="utf-8")
+        selected_lsrc.write_text(
+            "#!/bin/sh\n"
+            ': "${FAKE_LSRC_LOG:?}"\n'
+            '. "$(dirname "$0")/../share/rcm/probe.sh"\n'
+            '[ "${probe_loaded:-}" = "1" ] || exit 39\n'
+            '[ "${1:-}" = "--canary-probe" ] || exit 40\n'
+            'printf "%s\\n" "$0" > "$FAKE_LSRC_LOG"\n',
+            encoding="utf-8",
+        )
         selected_lsrc.chmod(0o700)
+        lsrc_log = self.root / "selected-lsrc.log"
         completed = self._run(
             "plan",
             private=True,
             extra_environment={
                 "FAKE_EXPECTED_CHEZMOI": str(self.fake_chezmoi),
                 "FAKE_EXPECTED_LSRC": str(selected_lsrc),
+                "FAKE_LSRC_LOG": str(lsrc_log),
             },
             extra_arguments=[
                 "--backup",
@@ -872,6 +900,10 @@ class ChezmoiCutoverTests(unittest.TestCase):
 
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("approval_sha256=", completed.stdout)
+        self.assertEqual(
+            Path(lsrc_log.read_text(encoding="utf-8").strip()).resolve(),
+            selected_lsrc.resolve(),
+        )
 
     def test_sigterm_during_plan_stops_canary_descendant_without_restore(self) -> None:
         self._make_repository(self.private, private=True)

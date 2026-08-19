@@ -189,6 +189,8 @@ The `cd` matters: `~/.justfile` is a symlink to the private repo's justfile, so
 
 `just setup` also runs the same refresh, but it is the whole bootstrap. Use `just link` for config deployment alone.
 
+One target flows the other way. `just update-mise` runs `mise upgrade --bump`, which rewrites the *deployed* `~/.config/mise/config.toml` rather than the tracked source. chezmoi refuses to overwrite a target that changed since it last wrote it, so `just link` fails until that bump is copied back into both `home/dot_config/mise/config.toml` (the chezmoi source) and `config/mise/config.toml` (the repo-root copy the parity canary compares against the rendered target). Check the dart URL while copying back: the drifted copy carried mise's `{{ os() }}` / `{{ arch() }}` template flattened to the current machine's values, which breaks the entry on the other platforms.
+
 The recipe first runs the public/private ownership and source parity check in isolation, then applies the public and private chezmoi sources twice and invokes the private dedicated-owner aggregate when that checkout exists. Chezmoi enables conflict errors, so a modified or pre-existing managed file stops the refresh instead of being overwritten. Empty status, diff, and dry-run state after each pass proves idempotence.
 
 ### Custom checkout locations

@@ -82,7 +82,9 @@ Custom functions live in `zsh/functions/`, which `zsh/zcompletion` prepends to
 
 ### Tool Version Management (mise)
 
-Runtime versions are managed by **mise** via `config/mise/config.toml` (symlinked to `~/.config/mise/config.toml`). Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn.
+Runtime versions are managed by **mise**. The chezmoi source is `home/dot_config/mise/config.toml`, mirrored at the repo root as `config/mise/config.toml`, and chezmoi deploys a *copy* to `~/.config/mise/config.toml`. Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn.
+
+mise owns that deployed copy and rewrites it: `mise upgrade --bump`, which `just update` runs, edits `~/.config/mise/config.toml` in place. chezmoi then refuses to overwrite a target that changed since it last wrote it, so `just link` and `just setup` fail until the bump is copied back into **both** source paths. Both are required: chezmoi renders from `home/dot_config/mise/config.toml`, and the parity canary compares the repo-root copy against the rendered target. Check the dart URL while copying back: the drifted copy carried mise's `{{ os() }}` / `{{ arch() }}` template flattened to this machine's values, which breaks the entry on Linux and WSL.
 
 ### Performance
 
@@ -112,7 +114,7 @@ GitHub Actions is disabled. Push through SSH, then publish fresh exact-tip local
   Homebrew on every platform — `/opt/homebrew/bin` on macOS,
   `/home/linuxbrew/.linuxbrew/bin` on Linux/WSL (`Brewfile.linux` declares
   `brew "gh"`, and `zshenv` puts that directory on `PATH`) — never `/usr/bin`,
-  and this file is symlinked to all three platforms. Caveat: being PATH-resolved,
+  and this file is deployed to all three platforms. Caveat: being PATH-resolved,
   git invoked from
   a minimal-`PATH` context on macOS (a GUI client launched from Finder,
   `launchd`, `cron`) needs `/opt/homebrew/bin` on its `PATH` for the helper to

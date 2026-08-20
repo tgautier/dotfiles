@@ -453,10 +453,14 @@ lint-mise:
 #
 # The fixtures below are not decorative. A detector whose only evidence is a
 # clean run on a clean file is indistinguishable from a dead one, so each
-# planted secret must be caught AND each legitimate line must survive. The
-# `dartsdk-` case is the near miss that motivated anchoring the OpenAI-key arm
-# to a length: an unanchored `sk-` matches nothing in `dartsdk-`, but the arm
-# is one careless edit away from doing so.
+# planted secret must be caught AND each legitimate line must survive. Every
+# literal-token arm of the pattern carries its own probe, because a per-arm
+# typo is invisible to a probe that another arm happens to catch: review 177
+# found `github_pat_` and `xoxb-` unprobed while both still worked, which is
+# the state a later edit turns into a silent hole. The `dartsdk-` case is the
+# near miss that motivated anchoring the OpenAI-key arm to a length: an
+# unanchored `sk-` matches nothing in `dartsdk-`, but the arm is one careless
+# edit away from doing so.
 lint-mise-config-hygiene:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -493,8 +497,10 @@ lint-mise-config-hygiene:
     x = "ghp_abcdefghijklmnopqrst"
     k = "sk-abcdefghijklmnopqrstuvwx"
     a = "AKIAABCDEFGHIJKLMN"
+    t = "github_pat_abcdefghijklmnopq"
+    s = "xoxb-1234567890abc"
     PROBES
-    [[ "$caught" -eq 8 ]] || { echo "ERROR: expected 8 planted secrets, scanned $caught" >&2; exit 1; }
+    [[ "$caught" -eq 10 ]] || { echo "ERROR: expected 10 planted secrets, scanned $caught" >&2; exit 1; }
 
     # Every legitimate line must survive, or the guard blocks real config.
     survived=0

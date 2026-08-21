@@ -32,7 +32,7 @@ check_duplicates() {
 main() {
     local script_dir repo_root manifest private_bridge private_session tmp header line_no
     local source_col target disposition chezmoi_source mode extra
-    local source_state expected_source_state diff_output
+    local source_state expected_source_state diff_output link_destination
     script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
     repo_root=${1:-$(cd "$script_dir/.." && pwd -P)}
     manifest=${2:-"$repo_root/docs/chezmoi-targets.tsv"}
@@ -74,14 +74,14 @@ main() {
                 *'/../'*|*'/./'*|*'//'*) fail "unsafe target at line $line_no: $target" ;;
             esac
             case "$mode" in
-                file|executable) ;;
+                file|executable|symlink) ;;
                 *) fail "invalid mode at line $line_no: $mode" ;;
             esac
             [[ -f "$repo_root/$source_col" ]] || fail "missing source at line $line_no: $source_col"
             if [[ "$mode" == executable ]]; then
                 [[ -x "$repo_root/$source_col" ]] || fail "source is not executable at line $line_no: $source_col"
             else
-                [[ "$mode" == file ]] && [[ -x "$repo_root/$source_col" ]] && fail "source is unexpectedly executable at line $line_no: $source_col"
+                [[ -x "$repo_root/$source_col" ]] && fail "source is unexpectedly executable at line $line_no: $source_col"
             fi
             printf '%s\n' "$source_col" >> "$tmp/all-sources"
             printf '%s\n' "$target" >> "$tmp/all-targets"
@@ -122,7 +122,7 @@ main() {
     expected_source_state=$(cd "$repo_root/home" && pwd -P)
     [[ "$source_state" == "$expected_source_state" ]] || fail ".chezmoiroot was not honored: expected $expected_source_state, got $source_state"
 
-    run_chezmoi managed --include files --path-style all --format json \
+    run_chezmoi managed --include files,symlinks --path-style all --format json \
         | "$jq_bin" -r 'to_entries[] | [.key, .value.sourceRelative] | @tsv' \
         | LC_ALL=C sort > "$tmp/actual-map"
     if ! cmp -s "$tmp/expected-map.sorted" "$tmp/actual-map"; then
@@ -138,6 +138,16 @@ main() {
     run_chezmoi apply
     while IFS=$'\t' read -r source_col target disposition chezmoi_source mode extra; do
         [[ "$source_col" == source || "$disposition" == repository-only ]] && continue
+        if [[ "$mode" == symlink ]]; then
+            # A symlink row is verified by where it points, never by content: `cmp`
+            # follows the link to the very file in the source column, so a byte
+            # comparison passes even when the destination is wrong.
+            [[ -L "$tmp/destination/$target" ]] || fail "rendered target is not a symlink: $target"
+            link_destination=$(readlink "$tmp/destination/$target")
+            [[ "$link_destination" == "$repo_root/$source_col" ]] \
+                || fail "symlink destination differs for $target: expected $repo_root/$source_col, got $link_destination"
+            continue
+        fi
         cmp -s "$repo_root/$source_col" "$tmp/destination/$target" || fail "rendered bytes differ for $target"
         if [[ "$mode" == executable ]]; then
             [[ -x "$tmp/destination/$target" ]] || fail "rendered target is not executable: $target"

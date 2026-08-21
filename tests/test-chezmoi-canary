@@ -210,11 +210,22 @@ PY
     rm "$tmp/missing/home/dot_zsh/zaliases"
     expect_failure missing 'missing chezmoi source' "$checker" "$tmp/missing" "$tmp/missing/docs/chezmoi-targets.tsv"
 
+    # A symlink row is verified by its DESTINATION, never by content. `cmp`
+    # follows the link to the very file named in the source column, so a byte
+    # comparison passes even when the link points somewhere else entirely.
+    # Repoint the template at a sibling and require the checker to notice.
+    make_fixture "$tmp/wrong-symlink"
+    printf '%s\n' '{{ .chezmoi.workingTree }}/config/mise/decoy.toml' \
+        > "$tmp/wrong-symlink/home/dot_config/mise/symlink_config.toml.tmpl"
+    cp -p "$repo_root/config/mise/config.toml" "$tmp/wrong-symlink/config/mise/decoy.toml"
+    expect_failure 'wrong symlink destination' 'symlink destination differs' \
+        "$checker" "$tmp/wrong-symlink" "$tmp/wrong-symlink/docs/chezmoi-targets.tsv"
+
     make_fixture "$tmp/extra"
     printf 'unexpected fixture\n' > "$tmp/extra/home/dot_unexpected"
     expect_failure extra 'target map mismatch' "$checker" "$tmp/extra" "$tmp/extra/docs/chezmoi-targets.tsv"
 
-    printf 'chezmoi canary fixtures OK (companion available/conflicting-package/absent/non-directory/stale/ownership-rejected/source-rejected, misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra)\n'
+    printf 'chezmoi canary fixtures OK (companion available/conflicting-package/absent/non-directory/stale/ownership-rejected/source-rejected, misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra, wrong symlink destination)\n'
 }
 
 main "$@"

@@ -82,9 +82,11 @@ Custom functions live in `zsh/functions/`, which `zsh/zcompletion` prepends to
 
 ### Tool Version Management (mise)
 
-Runtime versions are managed by **mise**. The chezmoi source is `home/dot_config/mise/config.toml`, mirrored at the repo root as `config/mise/config.toml`, and chezmoi deploys a *copy* to `~/.config/mise/config.toml`. Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn.
+Runtime versions are managed by **mise**. The tracked file is `config/mise/config.toml`, and chezmoi deploys `~/.config/mise/config.toml` as a **symlink** to it, rendered from `home/dot_config/mise/symlink_config.toml.tmpl`. Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn.
 
-mise owns that deployed copy and rewrites it: `mise upgrade --bump`, which `just update` runs, edits `~/.config/mise/config.toml` in place. chezmoi then refuses to overwrite a target that changed since it last wrote it, so `just link` and `just setup` fail until the bump is copied back into **both** source paths. Both are required: chezmoi renders from `home/dot_config/mise/config.toml`, and the parity canary compares the repo-root copy against the rendered target. Check the dart URL while copying back: the drifted copy carried mise's `{{ os() }}` / `{{ arch() }}` template flattened to this machine's values, which breaks the entry on Linux and WSL.
+The symlink exists because mise owns this file and rewrites it: `mise upgrade --bump` (which `just update` runs), `mise use`, and `mise settings set` all edit it in place. A deployed copy therefore drifted from tracked source on every update, and chezmoi's conflict-refusing apply then blocked `just link` and `just setup` permanently (#267). With the symlink, a mise write lands in the checkout and shows up in `git status`, so the fix is to commit it.
+
+That makes mise a writer into this public repository, so `just lint-mise-config-hygiene` rejects an `[env]` table or a credential-shaped key in that file. Never route a secret through mise config here: put it in `dotfiles-private` and let mise read it from the environment.
 
 ### Performance
 

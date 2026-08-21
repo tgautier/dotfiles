@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
+ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-mise-config-hygiene lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
 
 [doc("Run the complete local gate and attest the exact clean HEAD")]
 ci-attest:
@@ -441,6 +441,93 @@ lint-brewfile:
 # Validate mise config
 lint-mise:
     mise config ls
+
+# Reject secret-shaped content in the mise config. This file is deployed as a
+# SYMLINK into this public checkout (see docs/chezmoi-targets.tsv), so mise
+# writes straight through to a tracked, public file: `mise use`, `mise settings
+# set` and `mise upgrade --bump` all edit it in place. Tool pins are fine, but
+# an `[env]` table or a credential-shaped key would be committed to a public
+# repo by a tool the operator never asked to review. Blocked outright rather
+# than reviewed by eye, per claude/rules/public-repo-hygiene.md: the operator
+# should not have to notice.
+#
+# The fixtures below are not decorative. A detector whose only evidence is a
+# clean run on a clean file is indistinguishable from a dead one, so each
+# planted secret must be caught AND each legitimate line must survive. Every
+# literal-token arm of the pattern carries its own probe, because a per-arm
+# typo is invisible to a probe that another arm happens to catch: review 177
+# found `github_pat_` and `xoxb-` unprobed while both still worked, which is
+# the state a later edit turns into a silent hole. The `dartsdk-` case is the
+# near miss that motivated anchoring the OpenAI-key arm to a length: an
+# unanchored `sk-` matches nothing in `dartsdk-`, but the arm is one careless
+# edit away from doing so.
+lint-mise-config-hygiene:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    config="config/mise/config.toml"
+    [[ -f "$config" ]] || { echo "ERROR: missing $config" >&2; exit 1; }
+
+    pattern='^[[:space:]]*\[env([].]|$)|^[[:space:]]*[A-Za-z0-9_]*(token|secret|password|passwd|credential|api_?key)[A-Za-z0-9_]*[[:space:]]*=|ghp_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{16,}|sk-[A-Za-z0-9]{16,}|AKIA[A-Z0-9]{12,}|xoxb-[A-Za-z0-9-]{10,}'
+
+    # Redirect to /dev/null rather than using `grep -q`: under `set -o pipefail`
+    # an early-exiting consumer SIGPIPEs the producer and inverts the verdict
+    # (see claude/rules/shell.md). Here the input is a file, not a pipe, but the
+    # habit is what keeps the next edit safe.
+    scan() { grep -niE "$pattern" "$1" > /dev/null; }
+
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+
+    # Every planted secret must be caught.
+    caught=0
+    while IFS= read -r probe; do
+        [[ -n "$probe" ]] || continue
+        printf '%s\n' "$probe" > "$tmp/probe.toml"
+        if ! scan "$tmp/probe.toml"; then
+            echo "ERROR: mise hygiene guard missed a planted secret: $probe" >&2
+            exit 1
+        fi
+        caught=$((caught + 1))
+    done <<'PROBES'
+    [env]
+    [env.PATH]
+    GITHUB_TOKEN = "x"
+    api_key = "y"
+    MY_SECRET="z"
+    x = "ghp_abcdefghijklmnopqrst"
+    k = "sk-abcdefghijklmnopqrstuvwx"
+    a = "AKIAABCDEFGHIJKLMN"
+    t = "github_pat_abcdefghijklmnopq"
+    s = "xoxb-1234567890abc"
+    PROBES
+    [[ "$caught" -eq 10 ]] || { echo "ERROR: expected 10 planted secrets, scanned $caught" >&2; exit 1; }
+
+    # Every legitimate line must survive, or the guard blocks real config.
+    survived=0
+    while IFS= read -r probe; do
+        [[ -n "$probe" ]] || continue
+        printf '%s\n' "$probe" > "$tmp/probe.toml"
+        if scan "$tmp/probe.toml"; then
+            echo "ERROR: mise hygiene guard false-positived on: $probe" >&2
+            exit 1
+        fi
+        survived=$((survived + 1))
+    done <<'ALLOWED'
+    dart = { url = "https://x/dartsdk-macos-arm64-release.zip" }
+    trusted_config_paths = ["~/Workspace/tgautier"]
+    node = "26"
+    not_found_auto_install = true
+    ALLOWED
+    [[ "$survived" -eq 4 ]] || { echo "ERROR: expected 4 allowed lines, scanned $survived" >&2; exit 1; }
+
+    # The real file, last: the fixtures above prove the verdict means something.
+    if scan "$config"; then
+        echo "ERROR: secret-shaped content in $config, which is a PUBLIC tracked file:" >&2
+        grep -niE "$pattern" "$config" >&2
+        echo "Route the value to dotfiles-private instead. See claude/rules/public-repo-hygiene.md." >&2
+        exit 1
+    fi
+    echo "mise config hygiene OK ($caught planted secrets caught, $survived allowed lines survived)"
 
 # Update everything (brew, mac app store, mise, rust)
 update: update-brew update-mas update-mise update-rust

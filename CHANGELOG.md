@@ -8,13 +8,20 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-08-24]
+
 ### Fixed
 
 - Rename chezmoi source `home/dot_bin` to `home/private_dot_bin` so the public apply declares 0700, matching the private chezmoi umask 077. Resolves the `--error-on-conflict` mode clash that broke `just link` ([dotfiles-private#492](https://github.com/tgautier/dotfiles-private/issues/492)).
 
+## [2026-08-23]
+
 ### Changed
 
 - Split the monolithic `[Unreleased]` CHANGELOG section (spanning June-August 2026) into date-based headings matching PR merge dates, per the rolling-repo convention in `claude/rules/versioning.md`. Each entry is now grouped under the date its shipping PR merged. `[Unreleased]` stays at the top for not-yet-dated work ([dotfiles-private#485](https://github.com/tgautier/dotfiles-private/issues/485)).
+- Tailscale CLI alias in `zsh/zaliases` corrected from nonexistent `.localized` path to `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+- README: added `chezmoi-cutover` to Scripts table, `post-commit`/`post-rewrite` to hooks table, `chezmoi.toml` to structure block; removed three dead functions from the Shell functions table.
+- `docs/chezmoi-targets.tsv`: removed rows for deleted functions.
 
 ### Added
 
@@ -25,17 +32,6 @@ grouped by **date** rather than by semantic version. Newest first.
 - Move `bin/kseal`, `bin/kshow`, and `bin/obsidian` to the private companion repository. These are convenience utilities not needed for first-machine bootstrap ([dotfiles-private#487](https://github.com/tgautier/dotfiles-private/issues/487)).
 - `confuse` from Brewfile: unused by any config or script, not installed ([dotfiles-private#486](https://github.com/tgautier/dotfiles-private/issues/486)).
 - macOS `DISPLAY=:1` export from `zshenv`: XQuartz is not installed or declared in Brewfiles. WSL and Linux DISPLAY exports are retained ([dotfiles-private#486](https://github.com/tgautier/dotfiles-private/issues/486)).
-
-## [2026-08-23]
-
-### Changed
-
-- Tailscale CLI alias in `zsh/zaliases` corrected from nonexistent `.localized` path to `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
-- README: added `chezmoi-cutover` to Scripts table, `post-commit`/`post-rewrite` to hooks table, `chezmoi.toml` to structure block; removed three dead functions from the Shell functions table.
-- `docs/chezmoi-targets.tsv`: removed rows for deleted functions.
-
-### Removed
-
 - Three dead shell functions (`load_env_kops`, `load_env_kubectl`, `plantuml`) and their chezmoi sources. None are installed or referenced anywhere.
 - Three stale `zshenv` entries: `DISABLE_AUTO_TITLE` (Oh My Zsh, not used), dapr PATH (not installed), dotfiles checkout root on PATH (no executables at repo root).
 - Empty `home/dot_git_template/` directory (no content, no chezmoi source).

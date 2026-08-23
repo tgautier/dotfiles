@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-brewfile lint-mise lint-mise-config-hygiene lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
+ci: lint-shell lint-python lint-markdown lint-changelog lint-brewfile lint-mise lint-mise-config-hygiene lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
 
 [doc("Run the complete local gate and attest the exact clean HEAD")]
 ci-attest:
@@ -346,6 +346,37 @@ lint-shell:
 # Lint markdown files
 lint-markdown:
     markdownlint-cli2
+
+# Reject duplicate subheadings within any CHANGELOG date section
+lint-changelog:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    check_changelog() {
+        awk '
+            /^## \[/ { section=$0; delete seen; next }
+            /^### / {
+                heading = substr($0, 5)
+                if (heading in seen) {
+                    printf "ERROR: duplicate \"### %s\" under \"%s\" at lines %d and %d\n", heading, section, seen[heading], NR > "/dev/stderr"
+                    errors++
+                } else {
+                    seen[heading] = NR
+                }
+            }
+            END { exit (errors > 0 ? 1 : 0) }
+        ' "$1"
+    }
+    check_changelog CHANGELOG.md
+    # Negative fixture: a planted duplicate must fire the guard
+    tmp=$(mktemp "${TMPDIR:-/tmp}/lint-changelog.XXXXXX")
+    trap 'rm -f -- "${tmp:-}"' EXIT
+    printf '## [Unreleased]\n### Added\nentry\n### Added\ndup\n' > "$tmp"
+    if check_changelog "$tmp" 2>/dev/null; then
+        echo "ERROR: lint-changelog negative fixture did not fire on a planted duplicate" >&2
+        exit 1
+    fi
+    echo "lint-changelog negative fixture OK"
+    echo "lint-changelog OK"
 
 # Set this machine's Brewfile profile (work|personal). Writes the marker the
 # Brewfile reads to pick Brewfile.work / Brewfile.personal — the Brewfile

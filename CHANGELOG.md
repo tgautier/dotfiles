@@ -8,19 +8,134 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+### Changed
+
+- Split the monolithic `[Unreleased]` CHANGELOG section (spanning June-August 2026) into date-based headings matching PR merge dates, per the rolling-repo convention in `claude/rules/versioning.md`. Each entry is now grouped under the date its shipping PR merged. `[Unreleased]` stays at the top for not-yet-dated work ([dotfiles-private#485](https://github.com/tgautier/dotfiles-private/issues/485)).
+
+### Added
+
+- `just lint-changelog`, wired into `just ci`, rejects duplicate subheadings (`### Added`, `### Fixed`, etc.) within any CHANGELOG date section. Uses awk for Bash 3.2 compatibility. A negative fixture asserts the guard fires on a planted duplicate ([dotfiles-private#485](https://github.com/tgautier/dotfiles-private/issues/485)).
+
+## [2026-08-23]
+
+### Changed
+
+- Tailscale CLI alias in `zsh/zaliases` corrected from nonexistent `.localized` path to `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+- README: added `chezmoi-cutover` to Scripts table, `post-commit`/`post-rewrite` to hooks table, `chezmoi.toml` to structure block; removed three dead functions from the Shell functions table.
+- `docs/chezmoi-targets.tsv`: removed rows for deleted functions.
+
+### Removed
+
+- Three dead shell functions (`load_env_kops`, `load_env_kubectl`, `plantuml`) and their chezmoi sources. None are installed or referenced anywhere.
+- Three stale `zshenv` entries: `DISABLE_AUTO_TITLE` (Oh My Zsh, not used), dapr PATH (not installed), dotfiles checkout root on PATH (no executables at repo root).
+- Empty `home/dot_git_template/` directory (no content, no chezmoi source).
+
+### Fixed
+
+- Chezmoi conflict diagnostics. When a public-source apply fails, `chezmoi-cutover` now runs `chezmoi status` and prints the conflicting paths before the error message. Private-source failures continue to withhold output ([#270](https://github.com/tgautier/dotfiles/issues/270)).
+- Homebrew download stall detection. `HOMEBREW_CURLRC` points at a chezmoi-deployed curlrc that aborts transfers stuck below 1000 bytes/s for 60 seconds, letting `--retry 3` reconnect and resume. Prevents `just update` from hanging indefinitely on a dead socket ([#266](https://github.com/tgautier/dotfiles/issues/266)).
+
+## [2026-08-21]
+
+### Changed
+
+- `~/.config/mise/config.toml` is deployed as a symlink to the tracked `config/mise/config.toml` instead of a copy. mise owns that file and rewrites it, so a copy drifted on every `just update` and chezmoi's conflict-refusing apply then blocked `just link` and `just setup` until the bump was reconciled by hand. A mise write now lands in the checkout and shows up in `git status`. The parity manifest gains a `symlink` mode, the canary verifies such a row by its link destination rather than by content (a byte comparison follows the link and passes even when the destination is wrong), and `bin/chezmoi-cutover` includes symlinks in every chezmoi invocation, without which the operator would never deploy the target. Because mise now writes into this public repository, `just lint-mise-config-hygiene` rejects an `[env]` table or a credential-shaped key in that file, with a planted probe for every literal-token arm so a per-arm typo cannot pass unnoticed ([#267](https://github.com/tgautier/dotfiles/issues/267)).
+
+### Fixed
+
+- `just setup` and `just link` no longer fail after `just update`. `mise upgrade --bump` rewrites the deployed `~/.config/mise/config.toml`, and chezmoi's conflict-refusing apply then blocked every later refresh with only an exit status to go on. The tracked mise sources now carry the bumped dart, flutter, go, and helm versions with the cross-platform dart URL template preserved, and `README.md` plus `CLAUDE.md` record that mise owns the deployed copy and that a bump must be copied back into both source paths before deploying ([#267](https://github.com/tgautier/dotfiles/issues/267)).
+
+## [2026-08-19]
+
+### Fixed
+
+- The private companion acceptance path no longer hard-codes an uppercase Justfile filename. macOS masked the case mismatch; Linux surfaced it because the private repository tracks a lowercase `justfile`. The harness now lets `just` auto-discover the file from its working directory ([#264](https://github.com/tgautier/dotfiles/issues/264)).
+
+## [2026-08-16]
+
+### Changed
+
+- Routine deployment now preserves the live chezmoi ownership split. `just link`, and therefore the linking phase of `just setup`, runs an isolated public/private parity preflight, invokes rcm without force only for the six public `defer-*` manifest rows through explicit `-d` and source operands, runs the optional private dedicated-owner aggregate with output withheld, and applies each chezmoi source twice without force. Retained targets refuse regular files and foreign links before rcm; chezmoi uses conflict errors instead of overwriting modified targets; status, diff, and dry-run must settle after each pass. A routine failure remains safely rerunnable and never silently triggers the broad rollback graph. The unchanged `rcrc` and digest-bound backup continue to provide explicit full rollback until fresh-machine and supported-profile acceptance permit rcm retirement ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+
+### Removed
+
+- Rcm deployment and all supporting artifacts. Every public target is now deployed by chezmoi; the six previously deferred targets (four Brewfiles, mise config, gitconfig) moved to chezmoi source state. Deleted: `rcrc`, `bin/rcm-links`, `tests/test_rcm_links.py`, and four migration-era docs. Removed `brew "rcm"` from both Brewfiles, twelve Justfile recipes, the `lint-rcrc` and `test-rcm-links` CI gates, and all rcm references from README, CLAUDE.md, and remaining docs ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+
+## [2026-08-15]
+
 ### Added
 
 - A pinned Linux container acceptance harness. Docker builds a digest-pinned Ubuntu image with just 1.58.0 and chezmoi 2.72.0, injects public and optional private source trees as git archive tarballs at runtime, and runs the full fresh-machine acceptance matrix inside a tmpfs HOME. Two Justfile recipes expose public-only and with-companion variants ([#264](https://github.com/tgautier/dotfiles/issues/264)).
 - Approval-bound public/private chezmoi application. The operator reviews exact status, diff, and dry-run output after the isolated canary, commits to a reviewed execution plan, and applies public then private chezmoi source state with bounded subprocess management and signal-safe completion. Fixtures cover tool selection, approval drift, public-only and two-source order, timeout, descendant cleanup, committed completion, concurrent invocation, and link idempotence ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - Optional two-source orchestration in the public chezmoi canary. A stdlib Python bridge runs the companion ownership preflight before the first public apply and the companion's isolated source canary after the public second apply is a no-op. It binds both phases to one opaque identity covering the checkout root, Git state, tracked and nonignored source content, every importable top-level Python module or package tree even when ignored, and in-checkout symlink referents; rejects symlinked checker import paths; replaces inherited HOME and XDG paths; scrubs Python, virtual-environment, and Git state; withholds all companion output; and performs bounded process-group cleanup after every checker exit. An absent companion reports a generic skip and preserves the complete public-only canary only while it remains absent for both phases. ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 - Cross-repository chezmoi ownership validation in the public parity canary. Before its first isolated apply, the canary invokes the private companion's committed target-ownership checker with Python-specific environment overrides and site-package discovery disabled, fails on an incompatible checkout, and reports an explicit public-only skip when it is absent. Behavioral fixtures cover the available, conflicting-package, absent, non-directory, stale, and rejecting-checker paths ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+
+### Changed
+
+- `.roborev.toml` now uses Codex at medium reasoning as the only reviewer. An empty fallback makes unavailable-reviewer failures explicit and prevents duplicate reviews. This replaces the previous Claude-only setting, which could no longer run in the Roborev worker and produced no code review.
+
+### Fixed
+
+- The approval-bound chezmoi canary now invokes the exact selected `lsrc` through an owner-only wrapper instead of relocating it with a symlink. Homebrew's `lsrc` derives its support library from its invocation path, so the temporary symlink broke `../share/rcm/rcm.sh` and blocked the live approval plan before mutation. The regression fixture uses the same executable-relative layout and proves the selected real script runs ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+- Live cutover backup and restore now accept the private companion's current eight-column target manifest. The public parser pins the seven-column rcm ownership prefix while accepting trailing private metadata it does not consume, and fixtures cover the current chezmoi source suffix, a further metadata suffix, and a reordered-prefix rejection ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+
+## [2026-08-14]
+
+### Added
+
 - A self-contained exact-tip local shipping gate that replaces hosted Actions. `just ci-attest` revokes prior evidence, runs the complete repository checks, and atomically records only an unchanged clean `HEAD`. Pre-push rejects direct protected-branch updates, post-cutoff ancestry without Git signature headers, shallow history, dirty or wrong checkout state, hook ownership mismatches, and missing, malformed, or stale evidence. After the SSH push, `just ci-publish` verifies the exact remote tip and current `main` ancestry, publishes the external `local/exact-tip` status, and reads it back; strict branch protection requires that status and an up-to-date branch before squash merge. `just git-hooks` wires each checkout without requiring the private companion repository, and focused positive and negative fixtures cover the failure boundaries ([#254](https://github.com/tgautier/dotfiles/pull/254)).
+
+### Removed
+
+- The unused `git_template/hooks/gitkeep` placeholder. The effective `init.templateDir` is unset, no repository config include points Git at this directory, and the tracked per-repository `.githooks` mechanism does not use Git's copy-on-init template mechanism ([#224](https://github.com/tgautier/dotfiles/issues/224)).
+
+## [2026-08-12]
+
+### Added
+
 - A machine-readable chezmoi parity guard. The guard verifies every shadow target/source mapping, rendered bytes, executable modes, isolated idempotent apply, and sabotage fixtures ([#248](https://github.com/tgautier/dotfiles/issues/248)).
+
+### Removed
+
+- The retired private keyword-guard call from `just ci`. The public gate no
+  longer depends on a recipe that the companion repository does not provide
+  ([#247](https://github.com/tgautier/dotfiles/issues/247)).
+
+### Fixed
+
+- The Linux validation environment now installs `rcm`, whose `lsrc` command is
+  the independent rcm-side oracle for the chezmoi target-map parity guard
+  ([#248](https://github.com/tgautier/dotfiles/issues/248)).
+- The zsh aliases and completion chezmoi source names now render to the paths consumed by `zshrc`. The former names added a second dot and the hand-maintained canary accepted the wrong targets ([#248](https://github.com/tgautier/dotfiles/issues/248)).
+
+## [2026-08-07]
+
+### Added
+
 - Chezmoi Phase 1 scaffolding: `.chezmoiroot` reserves `home/` for future
   source state, `docs/chezmoi-targets.tsv` records the pre-migration rcm target
   dispositions, and chezmoi is declared in the macOS/Linux Brewfiles.
   Rcm was the live deployment owner at this stage ([#232](https://github.com/tgautier/dotfiles/issues/232)).
+
+### Removed
+
+- Removed the obsolete iTerm2 cask, preferences plist, rcm inventory entry,
+  and documentation references now that Ghostty is the supported terminal.
+
+## [2026-08-05]
+
+### Added
+
 - `brew "cargo-audit"` in `Brewfile` and `Brewfile.linux`. A project's `just pre-push` invokes `cargo audit`; with the tool absent the recipe fails on the missing subcommand — and until that repo wired the recipe in, the audit simply never ran on this machine, letting four RUSTSEC advisories sit invisible. Declaring it in the bundle makes the gate real on every machine. ([#230](https://github.com/tgautier/dotfiles/pull/230))
+
+### Changed
+
+- Elixir 1.20.2 → 1.20.3 in `config/mise/config.toml`; OTP-29 suffix unchanged.
+
+## [2026-08-02]
+
+### Added
+
 - `brew "kimi-code"` (Moonshot's terminal coding agent) in `Brewfile.personal`,
   under a new `# CLI Tools & Development` block — the first formula in an
   overlay, which until now carried only `# Applications` and Mac App Store
@@ -30,6 +145,53 @@ grouped by **date** rather than by semantic version. Newest first.
   now states where a `brew` entry goes in an overlay, rather than enumerating
   two blocks as if they were the whole set
   ([#226](https://github.com/tgautier/dotfiles/issues/226)).
+- `docs/homebrew.md` — Homebrew update flow plus troubleshooting for the
+  recurring `just update` failure where an interrupted cask upgrade leaves
+  something behind in the Caskroom staging directory ("It seems there is
+  already an App at ..."). The leftover can be a truncated partial, a complete
+  backup of the live app, or a wrapper directory holding a nested `.app`; the
+  documented remedy is `brew reinstall --cask <cask>` followed by re-running
+  `just update`, which handles all three without inspecting which one you have.
+  Indexed from `README.md` and `CLAUDE.md`.
+
+### Fixed
+
+- `docs/homebrew.md`'s Caskroom fallback comparison is a membership test rather
+  than a versioned path
+  ([#227](https://github.com/tgautier/dotfiles/issues/227)). The Binary-conflict
+  section is scoped to casks whose CLI ships inside the app bundle; for the other
+  shape it pointed at
+  `$(brew --prefix)/Caskroom/<cask>/<version>/<source>`, which reintroduced the
+  version-lag trap the in-bundle rule exists to survive — the staged path carries
+  a version, `brew info` describes the tap version, and the stale link was made
+  by whichever version last linked it, so the reader would find no match and stop
+  on their own cask's link. It never said which version to substitute either. Now
+  `$(brew --caskroom)/<cask>/`, mirroring the in-bundle rule it parallels, which
+  is version-agnostic for the same reason.
+- `docs/homebrew.md` covers the second `just update` cask failure, "there is
+  already a **Binary** at `<prefix>/bin/<name>`" — hit on obsidian 1.12.7 →
+  1.13.4 ([#225](https://github.com/tgautier/dotfiles/issues/225)). A cask that
+  ships a CLI beside its app carries a Binary artifact in addition to the App,
+  and Homebrew replays the *installed* version's recorded artifact list to
+  uninstall it; obsidian 1.12.7's held only App and Zap, so it never unlinked
+  `/opt/homebrew/bin/obsidian` and the new version refused to overwrite it. The
+  fix is to drop the stale symlink and install, not to reinstall. Also corrects
+  the existing App-conflict section, which sold `brew reinstall --cask` as the
+  near-universal remedy for a wedged cask: its uninstall replays that same
+  recorded list, so against this failure it removes the app and *then* fails at
+  the identical point — verified the hard way before the real fix landed. A new
+  section explains why an `auto_updates` cask — an app that updates itself — is
+  upgraded at all: non-greedy checks skip such casks *unless* the installed app
+  bundle is behind the tap, which Homebrew upgrades by default.
+  `brew outdated --cask` runs that same predicate absent the greedy env vars, so
+  it previews the failure rather than disagreeing with it; where it does stay
+  quiet, `brew update && brew outdated --cask` separates a self-update from a
+  stale tap.
+
+## [2026-07-30]
+
+### Added
+
 - `README.md` reference tables for the executable and configuration surface,
   which was previously discoverable only by `ls`: **Scripts (`bin/`)** (4),
   **Shell functions (`zsh/functions/`)** (10), **Aliases (`zsh/zaliases`)**,
@@ -56,6 +218,35 @@ grouped by **date** rather than by semantic version. Newest first.
   `CLAUDE.md`'s load-order line gains the missing `zlogin` step and now defers to
   the README section instead of carrying a second partial copy
   ([#219](https://github.com/tgautier/dotfiles/issues/219)).
+
+### Fixed
+
+- `lint-rcrc`'s coverage comment now names every flag in the filter it describes.
+  It closed the set with `-v` and `-h` but omitted `-E`, which is pinned on the
+  same footing as `-v` — drop it and the pattern becomes a BRE where `(`, `)` and
+  `|` are literal, so nothing is filtered. The `column-0 comment` table row also
+  moved into the boundary prose, since it names a redundant ingredient rather
+  than an assertion and was the only row whose `caught by` column didn't answer
+  its own header. Verified by sabotage: dropping `-E` or `-v` fails the
+  joined-needle assertion, dropping `-h` changes nothing — and the claim that
+  *both* assertions fire was itself wrong, since the first one exits, so the
+  wording now says which one
+  ([#221](https://github.com/tgautier/dotfiles/pull/221) follow-up).
+- **`kfw` and `kxec` were silently truncated to bare `kubectl`.** `zsh/zaliases`
+  defined them unquoted (`alias kfw=kubectl port-forward`), and zsh's `alias`
+  builtin treats each whitespace-separated token as its own `name[=value]`
+  argument — so it defined `kfw=kubectl` and then tried to *look up* aliases
+  named `port-forward`, `exec` and `-it`. `kfw` therefore ran bare `kubectl`
+  (printing help) instead of forwarding a port, and `kxec` likewise. Now quoted,
+  matching the already-quoted `ll` / `la` / `ls`. Found by writing the alias
+  reference table for [#219](https://github.com/tgautier/dotfiles/issues/219):
+  documenting the intended expansion is what exposed that zsh never produced it
+  ([#219](https://github.com/tgautier/dotfiles/issues/219)).
+
+## [2026-07-29]
+
+### Added
+
 - `DOTFILES_DIR` / `DOTFILES_PRIVATE_DIR` are now honoured by both remaining
   consumers. `rcrc` reads them for `DOTFILES_DIRS` and `EXCLUDES` (it is sourced
   as shell by rcm, which is exactly why it can), and the stale-symlink scanner
@@ -117,71 +308,9 @@ grouped by **date** rather than by semantic version. Newest first.
   installed explicitly in CI rather than assumed present in the runner image
   ([#213](https://github.com/tgautier/dotfiles/issues/213),
   partially [#219](https://github.com/tgautier/dotfiles/issues/219)).
-- `!.claude/worktrees/**` to the `markdownlint-cli2` globs, completing the
-  worktree hygiene begun in [#212](https://github.com/tgautier/dotfiles/pull/212).
-  The path was already gitignored, but `markdownlint-cli2` globs are not
-  gitignore-aware, so a nested worktree's Markdown was linted as the working
-  branch's content. Measured in this repo with one worktree present: **14 files
-  before the exclusion, 7 after** — the repo tracks 7 `.md` files and a nested
-  worktree is a full second checkout of them. Markdown is the only exposed lint;
-  `lint-shell`, `lint-brewfile` and
-  `lint-mise` all use explicit paths that cannot recurse into it. `CLAUDE.md` now
-  documents the `.claude/worktrees/<name>` convention, which the global
-  `git-conventions.md` rule deliberately leaves to each project
-  ([#211](https://github.com/tgautier/dotfiles/issues/211)).
-- `libreoffice` in `Brewfile.work` — headless `soffice` is the renderer that
-  converts generated `.pptx` decks to PDF for visual verification, so it belongs
-  on the work laptop only. It had been installed by hand with `brew install
-  --cask`, and `just update-brew` then removed it in two steps: `brew cleanup
-  --prune=all` dropped the cached download, and `brew bundle cleanup --force`
-  uninstalled the undeclared cask — a direct demonstration of why
-  `.claude/rules/brewfile.md` says tools enter a machine through a `brew` entry,
-  applied by `just`, never raw `brew install` ([#212](https://github.com/tgautier/dotfiles/pull/212)).
-- `.claude/worktrees/` in `.gitignore` — `git worktree add` under `.claude/`
-  otherwise leaves the checkout showing as untracked, one `git add .` away from
-  committing a whole worktree. `.claude/rules/` stays tracked ([#212](https://github.com/tgautier/dotfiles/pull/212)).
-- `opencode` in `Brewfile` and `Brewfile.linux` — terminal AI coding agent from
-  homebrew-core. Same shape as the existing `openclaw-cli` entry (npm-tarball
-  formula, `node` dependency), so it is brew-managed on both platforms rather
-  than a native-installer tool: `just setup` installs it and `just update`
-  upgrades it.
-- `docs/homebrew.md` — Homebrew update flow plus troubleshooting for the
-  recurring `just update` failure where an interrupted cask upgrade leaves
-  something behind in the Caskroom staging directory ("It seems there is
-  already an App at ..."). The leftover can be a truncated partial, a complete
-  backup of the live app, or a wrapper directory holding a nested `.app`; the
-  documented remedy is `brew reinstall --cask <cask>` followed by re-running
-  `just update`, which handles all three without inspecting which one you have.
-  Indexed from `README.md` and `CLAUDE.md`.
-- `python@3.13` in `Brewfile` (macOS) — satisfies the `gcloud-cli` cask's
-  declared dependency, clearing the `brew missing` warning. macOS-only:
-  `gcloud-cli` is a cask, so `Brewfile.linux` (native gcloud installer) is
-  unaffected.
-- `antigravity` and `cursor` casks in `Brewfile` (macOS, all profiles).
-- `antigravity-cli` and `antigravity-ide` casks in `Brewfile` (macOS, all
-  profiles).
-- `protonvpn` cask in the `Brewfile.personal` overlay (macOS).
-- `hermes-agent` via native installer in `just setup`, with cross-references in
-  both Brewfiles; document the native-installer pattern (single source of truth
-  in the `setup` recipe) in `.claude/rules/brewfile.md`.
-- `uv` in `Brewfile` and `Brewfile.linux`.
-- `codex-app` and `lm-studio` casks in `Brewfile` (macOS).
-- Per-machine macOS Brewfile profiles: `Brewfile.work` and `Brewfile.personal`
-  overlays merged into `Brewfile` based on `~/.config/dotfiles/profile`. Set it
-  with `just set-profile work|personal` (interactive `just setup` prompts on
-  first run, default `work`; non-interactive runs fail instead of guessing);
-  `brew bundle` fails loud when the marker is absent or invalid so a forced
-  cleanup can never uninstall the overlay apps.
 
 ### Changed
 
-- Tailscale CLI alias in `zsh/zaliases` corrected from nonexistent `.localized` path to `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
-- README: added `chezmoi-cutover` to Scripts table, `post-commit`/`post-rewrite` to hooks table, `chezmoi.toml` to structure block; removed three dead functions from the Shell functions table.
-- `docs/chezmoi-targets.tsv`: removed rows for deleted functions.
-- `~/.config/mise/config.toml` is deployed as a symlink to the tracked `config/mise/config.toml` instead of a copy. mise owns that file and rewrites it, so a copy drifted on every `just update` and chezmoi's conflict-refusing apply then blocked `just link` and `just setup` until the bump was reconciled by hand. A mise write now lands in the checkout and shows up in `git status`. The parity manifest gains a `symlink` mode, the canary verifies such a row by its link destination rather than by content (a byte comparison follows the link and passes even when the destination is wrong), and `bin/chezmoi-cutover` includes symlinks in every chezmoi invocation, without which the operator would never deploy the target. Because mise now writes into this public repository, `just lint-mise-config-hygiene` rejects an `[env]` table or a credential-shaped key in that file, with a planted probe for every literal-token arm so a per-arm typo cannot pass unnoticed ([#267](https://github.com/tgautier/dotfiles/issues/267)).
-- Routine deployment now preserves the live chezmoi ownership split. `just link`, and therefore the linking phase of `just setup`, runs an isolated public/private parity preflight, invokes rcm without force only for the six public `defer-*` manifest rows through explicit `-d` and source operands, runs the optional private dedicated-owner aggregate with output withheld, and applies each chezmoi source twice without force. Retained targets refuse regular files and foreign links before rcm; chezmoi uses conflict errors instead of overwriting modified targets; status, diff, and dry-run must settle after each pass. A routine failure remains safely rerunnable and never silently triggers the broad rollback graph. The unchanged `rcrc` and digest-bound backup continue to provide explicit full rollback until fresh-machine and supported-profile acceptance permit rcm retirement ([#232](https://github.com/tgautier/dotfiles/issues/232)).
-
-- Elixir 1.20.2 → 1.20.3 in `config/mise/config.toml`; OTP-29 suffix unchanged.
 - The stale-symlink sweep is split in two: `_scan-stale-symlinks` finds and
   prints stale links, `cleanup-symlinks` confirms and removes them. The scan
   honours a `CLEANUP_HOME` override so fixtures can drive it against a temp
@@ -197,152 +326,10 @@ grouped by **date** rather than by semantic version. Newest first.
   slash can't silently produce a prefix that matches nothing, and a failed scan
   now aborts loudly instead of reporting a clean tree
   ([#215](https://github.com/tgautier/dotfiles/issues/215)).
-- `.roborev.toml` now uses Codex at medium reasoning as the only reviewer. An empty fallback makes unavailable-reviewer failures explicit and prevents duplicate reviews. This replaces the previous Claude-only setting, which could no longer run in the Roborev worker and produced no code review.
-- Bump mise Flutter (`vfox-flutter`) 3.44.7 → 3.44.8.
 - Bump mise `yarn` 4.17.1 → 4.18.0.
-- Tap trust is now declared in the Brewfiles: `trusted: true` on
-  `kenn-io/tap/roborev` and `terror/tap/just-lsp` (formula-level trust, as
-  Homebrew recommends), in both `Brewfile` and `Brewfile.linux`. This replaces
-  the `_trust-taps` recipe: `brew bundle cleanup --force` (run by
-  `just update-brew`) resets the trust store to exactly the Brewfile-declared
-  `trusted:` entries, so trust recorded imperatively with `brew trust` was
-  wiped on every update and `brew doctor` kept warning about untrusted taps.
-  `brew bundle install` applies the declared trust before fetching, so fresh
-  bootstraps need no separate trust step either
-  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
-- Bump mise deno 2.9.3 → 2.9.4 and Flutter (`vfox-flutter`) 3.44.6 → 3.44.7.
-- Bump mise deno 2.9.2 → 2.9.3
-  ([#198](https://github.com/tgautier/dotfiles/pull/198)).
-- Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
-  (`vfox-flutter`) 3.44.6, go 1.26.5, helm 4.2.3, ruby 4.0.6, yarn 4.17.1.
-- Rename the roborev Homebrew tap `roborev-dev/tap` → `kenn-io/tap` in
-  `Brewfile` and `Brewfile.linux` (upstream GitHub org rename; the old name
-  now redirects). Stops the "Redirected tap … Not trusted tap" warning on
-  `brew update`. Trust for these taps' formulae is declared in the Brewfiles
-  via `trusted:` options (see the entry above) — no per-machine `brew trust`
-  step is needed.
-- Bump mise tool versions: dart 3.12.2, deno 2.8.3, elixir 1.20.1-otp-29,
-  Flutter (`vfox-flutter`) 3.44.2, helm 4.2.1, python 3.14.6, yarn 4.17.0,
-  yq 4.53.3.
-- Rename `linear-linear` cask to `linear` in `Brewfile.personal` (upstream
-  Homebrew rename).
-- `CLAUDE.md` Key Commands: package installs go through `just setup` /
-  `just update-brew` — raw `brew install` / `brew bundle` is bootstrap-only,
-  before `just` itself exists.
-- `.claude/rules/brewfile.md`: grep all four Brewfiles before adding an entry —
-  promoting an overlay package to the base must remove the overlay entry in the
-  same change.
-- `lint-brewfile` now detects duplicate `brew`/`cask`/`mas` names across the
-  merged base + overlay set: the eval harness records entry names and fails on
-  a repeat, with a negative fixture test asserting the guard fires
-  ([#192](https://github.com/tgautier/dotfiles/issues/192)).
-- LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
-  (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
-- Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0
-  (OTP 28 → 29, bumped as a pair), go 1.26.4, yarn 4.16.0.
-- `just setup` is now a full idempotent bootstrap — selects the machine profile,
-  then installs packages, links dotfiles, installs mise runtimes, and enables
-  git hooks and tools — so a fresh machine is one command after `brew install just`.
-
-### Removed
-
-- Three dead shell functions (`load_env_kops`, `load_env_kubectl`, `plantuml`) and their chezmoi sources. None are installed or referenced anywhere.
-- Three stale `zshenv` entries: `DISABLE_AUTO_TITLE` (Oh My Zsh, not used), dapr PATH (not installed), dotfiles checkout root on PATH (no executables at repo root).
-- Empty `home/dot_git_template/` directory (no content, no chezmoi source).
-- Rcm deployment and all supporting artifacts. Every public target is now deployed by chezmoi; the six previously deferred targets (four Brewfiles, mise config, gitconfig) moved to chezmoi source state. Deleted: `rcrc`, `bin/rcm-links`, `tests/test_rcm_links.py`, and four migration-era docs. Removed `brew "rcm"` from both Brewfiles, twelve Justfile recipes, the `lint-rcrc` and `test-rcm-links` CI gates, and all rcm references from README, CLAUDE.md, and remaining docs ([#232](https://github.com/tgautier/dotfiles/issues/232)).
-
-- The unused `git_template/hooks/gitkeep` placeholder. The effective `init.templateDir` is unset, no repository config include points Git at this directory, and the tracked per-repository `.githooks` mechanism does not use Git's copy-on-init template mechanism ([#224](https://github.com/tgautier/dotfiles/issues/224)).
-- The retired private keyword-guard call from `just ci`. The public gate no
-  longer depends on a recipe that the companion repository does not provide
-  ([#247](https://github.com/tgautier/dotfiles/issues/247)).
-- Removed the obsolete iTerm2 cask, preferences plist, rcm inventory entry,
-  and documentation references now that Ghostty is the supported terminal.
-
-- `telnet` from `Brewfile.linux`: the Homebrew formula is now source-only
-  (`bottle: false`), a Tier 3 config on Linux that `brew bundle` refuses to
-  build, which aborted `just setup`. On Linux, install it from the distro
-  (`apt install telnet`); documented in the `Brewfile.linux` native-installers
-  block.
-- `gemini-cli` from `Brewfile` and `Brewfile.linux` — deprecated in
-  homebrew-core (unsupported upstream; disable scheduled for 2026-12-18);
-  superseded on macOS by the `antigravity-cli` cask already in `Brewfile`.
-  Linux/WSL gets no brew replacement (the cask is macOS-only) — the
-  `# Native installers` block in `Brewfile.linux` points at Google's own
-  install channel ([#199](https://github.com/tgautier/dotfiles/pull/199)).
-- `pcre` from `Brewfile` — deprecated in homebrew-core (unmaintained
-  upstream); no installed formula depends on it, and `pcre2` arrives as a
-  dependency where needed ([#199](https://github.com/tgautier/dotfiles/pull/199)).
-- `codex-app` cask from `Brewfile` — discontinued upstream (the Codex desktop
-  app merged into the ChatGPT app); the `codex` CLI cask stays
-  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
-- `_trust-taps` recipe from the `Justfile` — superseded by the Brewfile
-  `trusted:` options (see Changed)
-  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
 
 ### Fixed
 
-- Chezmoi conflict diagnostics. When a public-source apply fails, `chezmoi-cutover` now runs `chezmoi status` and prints the conflicting paths before the error message. Private-source failures continue to withhold output ([#270](https://github.com/tgautier/dotfiles/issues/270)).
-- `just setup` and `just link` no longer fail after `just update`. `mise upgrade --bump` rewrites the deployed `~/.config/mise/config.toml`, and chezmoi's conflict-refusing apply then blocked every later refresh with only an exit status to go on. The tracked mise sources now carry the bumped dart, flutter, go, and helm versions with the cross-platform dart URL template preserved, and `README.md` plus `CLAUDE.md` record that mise owns the deployed copy and that a bump must be copied back into both source paths before deploying ([#267](https://github.com/tgautier/dotfiles/issues/267)).
-- Homebrew download stall detection. `HOMEBREW_CURLRC` points at a chezmoi-deployed curlrc that aborts transfers stuck below 1000 bytes/s for 60 seconds, letting `--retry 3` reconnect and resume. Prevents `just update` from hanging indefinitely on a dead socket ([#266](https://github.com/tgautier/dotfiles/issues/266)).
-- The private companion acceptance path no longer hard-codes an uppercase Justfile filename. macOS masked the case mismatch; Linux surfaced it because the private repository tracks a lowercase `justfile`. The harness now lets `just` auto-discover the file from its working directory ([#264](https://github.com/tgautier/dotfiles/issues/264)).
-- The approval-bound chezmoi canary now invokes the exact selected `lsrc` through an owner-only wrapper instead of relocating it with a symlink. Homebrew's `lsrc` derives its support library from its invocation path, so the temporary symlink broke `../share/rcm/rcm.sh` and blocked the live approval plan before mutation. The regression fixture uses the same executable-relative layout and proves the selected real script runs ([#232](https://github.com/tgautier/dotfiles/issues/232)).
-- Live cutover backup and restore now accept the private companion's current eight-column target manifest. The public parser pins the seven-column rcm ownership prefix while accepting trailing private metadata it does not consume, and fixtures cover the current chezmoi source suffix, a further metadata suffix, and a reordered-prefix rejection ([#232](https://github.com/tgautier/dotfiles/issues/232)).
-- The Linux validation environment now installs `rcm`, whose `lsrc` command is
-  the independent rcm-side oracle for the chezmoi target-map parity guard
-  ([#248](https://github.com/tgautier/dotfiles/issues/248)).
-- The zsh aliases and completion chezmoi source names now render to the paths consumed by `zshrc`. The former names added a second dot and the hand-maintained canary accepted the wrong targets ([#248](https://github.com/tgautier/dotfiles/issues/248)).
-- `docs/homebrew.md`'s Caskroom fallback comparison is a membership test rather
-  than a versioned path
-  ([#227](https://github.com/tgautier/dotfiles/issues/227)). The Binary-conflict
-  section is scoped to casks whose CLI ships inside the app bundle; for the other
-  shape it pointed at
-  `$(brew --prefix)/Caskroom/<cask>/<version>/<source>`, which reintroduced the
-  version-lag trap the in-bundle rule exists to survive — the staged path carries
-  a version, `brew info` describes the tap version, and the stale link was made
-  by whichever version last linked it, so the reader would find no match and stop
-  on their own cask's link. It never said which version to substitute either. Now
-  `$(brew --caskroom)/<cask>/`, mirroring the in-bundle rule it parallels, which
-  is version-agnostic for the same reason.
-- `docs/homebrew.md` covers the second `just update` cask failure, "there is
-  already a **Binary** at `<prefix>/bin/<name>`" — hit on obsidian 1.12.7 →
-  1.13.4 ([#225](https://github.com/tgautier/dotfiles/issues/225)). A cask that
-  ships a CLI beside its app carries a Binary artifact in addition to the App,
-  and Homebrew replays the *installed* version's recorded artifact list to
-  uninstall it; obsidian 1.12.7's held only App and Zap, so it never unlinked
-  `/opt/homebrew/bin/obsidian` and the new version refused to overwrite it. The
-  fix is to drop the stale symlink and install, not to reinstall. Also corrects
-  the existing App-conflict section, which sold `brew reinstall --cask` as the
-  near-universal remedy for a wedged cask: its uninstall replays that same
-  recorded list, so against this failure it removes the app and *then* fails at
-  the identical point — verified the hard way before the real fix landed. A new
-  section explains why an `auto_updates` cask — an app that updates itself — is
-  upgraded at all: non-greedy checks skip such casks *unless* the installed app
-  bundle is behind the tap, which Homebrew upgrades by default.
-  `brew outdated --cask` runs that same predicate absent the greedy env vars, so
-  it previews the failure rather than disagreeing with it; where it does stay
-  quiet, `brew update && brew outdated --cask` separates a self-update from a
-  stale tap.
-- `lint-rcrc`'s coverage comment now names every flag in the filter it describes.
-  It closed the set with `-v` and `-h` but omitted `-E`, which is pinned on the
-  same footing as `-v` — drop it and the pattern becomes a BRE where `(`, `)` and
-  `|` are literal, so nothing is filtered. The `column-0 comment` table row also
-  moved into the boundary prose, since it names a redundant ingredient rather
-  than an assertion and was the only row whose `caught by` column didn't answer
-  its own header. Verified by sabotage: dropping `-E` or `-v` fails the
-  joined-needle assertion, dropping `-h` changes nothing — and the claim that
-  *both* assertions fire was itself wrong, since the first one exits, so the
-  wording now says which one
-  ([#221](https://github.com/tgautier/dotfiles/pull/221) follow-up).
-- **`kfw` and `kxec` were silently truncated to bare `kubectl`.** `zsh/zaliases`
-  defined them unquoted (`alias kfw=kubectl port-forward`), and zsh's `alias`
-  builtin treats each whitespace-separated token as its own `name[=value]`
-  argument — so it defined `kfw=kubectl` and then tried to *look up* aliases
-  named `port-forward`, `exec` and `-it`. `kfw` therefore ran bare `kubectl`
-  (printing help) instead of forwarding a port, and `kxec` likewise. Now quoted,
-  matching the already-quoted `ll` / `la` / `ls`. Found by writing the alias
-  reference table for [#219](https://github.com/tgautier/dotfiles/issues/219):
-  documenting the intended expansion is what exposed that zsh never produced it
-  ([#219](https://github.com/tgautier/dotfiles/issues/219)).
 - `docs/homebrew.md`'s cask-recovery runbook drops the bundle check instead of
   dressing it up. It asked the operator to confirm `/Applications/<App>.app` was
   "present and non-empty" while nothing branched on the answer — the prescribed
@@ -384,12 +371,61 @@ grouped by **date** rather than by semantic version. Newest first.
   scoped; `cleanup-symlinks` is the genuinely hard one, because rcm records
   absolute symlink targets, so links into a *former* checkout path must keep
   matching and a prefix built from current paths cannot see them.
-- `_ensure-profile`'s non-interactive error reports the value it actually saw
-  (`got '<absent>'` / `got 'Work'`) instead of always claiming no profile is set,
-  which conflated a missing marker with an invalid one. Its trim comment no longer
-  overstates equivalence with the Brewfile's Ruby `String#strip` — `sed` trims
-  per line, so a multi-line marker re-prompts; stricter than the guard, and safe
-  in that direction ([#181](https://github.com/tgautier/dotfiles/issues/181)).
+
+## [2026-07-28]
+
+### Added
+
+- `!.claude/worktrees/**` to the `markdownlint-cli2` globs, completing the
+  worktree hygiene begun in [#212](https://github.com/tgautier/dotfiles/pull/212).
+  The path was already gitignored, but `markdownlint-cli2` globs are not
+  gitignore-aware, so a nested worktree's Markdown was linted as the working
+  branch's content. Measured in this repo with one worktree present: **14 files
+  before the exclusion, 7 after** — the repo tracks 7 `.md` files and a nested
+  worktree is a full second checkout of them. Markdown is the only exposed lint;
+  `lint-shell`, `lint-brewfile` and
+  `lint-mise` all use explicit paths that cannot recurse into it. `CLAUDE.md` now
+  documents the `.claude/worktrees/<name>` convention, which the global
+  `git-conventions.md` rule deliberately leaves to each project
+  ([#211](https://github.com/tgautier/dotfiles/issues/211)).
+- `libreoffice` in `Brewfile.work` — headless `soffice` is the renderer that
+  converts generated `.pptx` decks to PDF for visual verification, so it belongs
+  on the work laptop only. It had been installed by hand with `brew install
+  --cask`, and `just update-brew` then removed it in two steps: `brew cleanup
+  --prune=all` dropped the cached download, and `brew bundle cleanup --force`
+  uninstalled the undeclared cask — a direct demonstration of why
+  `.claude/rules/brewfile.md` says tools enter a machine through a `brew` entry,
+  applied by `just`, never raw `brew install` ([#212](https://github.com/tgautier/dotfiles/pull/212)).
+- `.claude/worktrees/` in `.gitignore` — `git worktree add` under `.claude/`
+  otherwise leaves the checkout showing as untracked, one `git add .` away from
+  committing a whole worktree. `.claude/rules/` stays tracked ([#212](https://github.com/tgautier/dotfiles/pull/212)).
+- `opencode` in `Brewfile` and `Brewfile.linux` — terminal AI coding agent from
+  homebrew-core. Same shape as the existing `openclaw-cli` entry (npm-tarball
+  formula, `node` dependency), so it is brew-managed on both platforms rather
+  than a native-installer tool: `just setup` installs it and `just update`
+  upgrades it.
+- `python@3.13` in `Brewfile` (macOS) — satisfies the `gcloud-cli` cask's
+  declared dependency, clearing the `brew missing` warning. macOS-only:
+  `gcloud-cli` is a cask, so `Brewfile.linux` (native gcloud installer) is
+  unaffected.
+
+## [2026-07-26]
+
+### Changed
+
+- Bump mise Flutter (`vfox-flutter`) 3.44.7 → 3.44.8.
+- Bump mise deno 2.9.3 → 2.9.4 and Flutter (`vfox-flutter`) 3.44.6 → 3.44.7.
+
+### Removed
+
+- `telnet` from `Brewfile.linux`: the Homebrew formula is now source-only
+  (`bottle: false`), a Tier 3 config on Linux that `brew bundle` refuses to
+  build, which aborted `just setup`. On Linux, install it from the distro
+  (`apt install telnet`); documented in the `Brewfile.linux` native-installers
+  block.
+
+### Fixed
+
 - `zlogin` no longer prints `zcompile:4: can't write zwc file:
   ~/.zcompdump.zwc` when several login shells start together (tmux panes,
   session restore). Each backgrounded the same `zcompile ~/.zcompdump`, and
@@ -444,6 +480,50 @@ grouped by **date** rather than by semantic version. Newest first.
   the interactive shell having sourced `zshenv` — otherwise `just update` still
   hit the crash whenever the shell predated the `zshenv` change. Empty (no-op)
   on macOS.
+
+## [2026-07-17]
+
+### Changed
+
+- Tap trust is now declared in the Brewfiles: `trusted: true` on
+  `kenn-io/tap/roborev` and `terror/tap/just-lsp` (formula-level trust, as
+  Homebrew recommends), in both `Brewfile` and `Brewfile.linux`. This replaces
+  the `_trust-taps` recipe: `brew bundle cleanup --force` (run by
+  `just update-brew`) resets the trust store to exactly the Brewfile-declared
+  `trusted:` entries, so trust recorded imperatively with `brew trust` was
+  wiped on every update and `brew doctor` kept warning about untrusted taps.
+  `brew bundle install` applies the declared trust before fetching, so fresh
+  bootstraps need no separate trust step either
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- Bump mise deno 2.9.2 → 2.9.3
+  ([#198](https://github.com/tgautier/dotfiles/pull/198)).
+- Rename the roborev Homebrew tap `roborev-dev/tap` → `kenn-io/tap` in
+  `Brewfile` and `Brewfile.linux` (upstream GitHub org rename; the old name
+  now redirects). Stops the "Redirected tap … Not trusted tap" warning on
+  `brew update`. Trust for these taps' formulae is declared in the Brewfiles
+  via `trusted:` options (see the entry above) — no per-machine `brew trust`
+  step is needed.
+
+### Removed
+
+- `gemini-cli` from `Brewfile` and `Brewfile.linux` — deprecated in
+  homebrew-core (unsupported upstream; disable scheduled for 2026-12-18);
+  superseded on macOS by the `antigravity-cli` cask already in `Brewfile`.
+  Linux/WSL gets no brew replacement (the cask is macOS-only) — the
+  `# Native installers` block in `Brewfile.linux` points at Google's own
+  install channel ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- `pcre` from `Brewfile` — deprecated in homebrew-core (unmaintained
+  upstream); no installed formula depends on it, and `pcre2` arrives as a
+  dependency where needed ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- `codex-app` cask from `Brewfile` — discontinued upstream (the Codex desktop
+  app merged into the ChatGPT app); the `codex` CLI cask stays
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+- `_trust-taps` recipe from the `Justfile` — superseded by the Brewfile
+  `trusted:` options (see Changed)
+  ([#199](https://github.com/tgautier/dotfiles/pull/199)).
+
+### Fixed
+
 - `just update` now trusts the Brewfile's declared taps before `brew bundle`,
   the same fix `just setup` received: Homebrew 6's trusted-taps gate aborted
   `update-brew` with "Refusing to load formula kenn-io/tap/roborev from
@@ -452,11 +532,44 @@ grouped by **date** rather than by semantic version. Newest first.
   Superseded later in this release: trust is now declared in the Brewfiles
   via `trusted:` options and the `_trust-taps` recipe is removed (see
   Changed).
+
+## [2026-07-14]
+
+### Changed
+
+- Bump mise tool versions: deno 2.9.2, elixir 1.20.2-otp-29, Flutter
+  (`vfox-flutter`) 3.44.6, go 1.26.5, helm 4.2.3, ruby 4.0.6, yarn 4.17.1.
+
+## [2026-07-13]
+
+### Fixed
+
 - `just setup` now runs `brew bundle install --no-upgrade`, matching its
   documented "install only" contract (`just update` owns upgrades). Previously
   `brew bundle` upgraded every outdated cask/formula, so a single failing
   upgrade (e.g. `google-chrome` with a stale Caskroom app) aborted the whole
   bootstrap.
+
+## [2026-06-19]
+
+### Added
+
+- `antigravity-cli` and `antigravity-ide` casks in `Brewfile` (macOS, all
+  profiles).
+- `protonvpn` cask in the `Brewfile.personal` overlay (macOS).
+
+### Changed
+
+- `.claude/rules/brewfile.md`: grep all four Brewfiles before adding an entry —
+  promoting an overlay package to the base must remove the overlay entry in the
+  same change.
+- `lint-brewfile` now detects duplicate `brew`/`cask`/`mas` names across the
+  merged base + overlay set: the eval harness records entry names and fails on
+  a repeat, with a negative fixture test asserting the guard fires
+  ([#192](https://github.com/tgautier/dotfiles/issues/192)).
+
+### Fixed
+
 - `just setup` now trusts the Brewfile's own declared taps (`brew trust`,
   guarded on Homebrew 6+) before `brew bundle`, so the trusted-taps gate
   ($HOMEBREW_REQUIRE_TAP_TRUST) no longer aborts a fresh-machine bootstrap with
@@ -468,6 +581,17 @@ grouped by **date** rather than by semantic version. Newest first.
   now excluded — registering VS Code as their handler cascaded into the browser
   role and the `http`/`https` URL schemes, sending web links to VS Code instead
   of the browser.
+- `_ensure-profile`'s non-interactive error reports the value it actually saw
+  (`got '<absent>'` / `got 'Work'`) instead of always claiming no profile is set,
+  which conflated a missing marker with an invalid one. Its trim comment no longer
+  overstates equivalence with the Brewfile's Ruby `String#strip` — `sed` trims
+  per line, so a multi-line marker re-prompts; stricter than the guard, and safe
+  in that direction ([#181](https://github.com/tgautier/dotfiles/issues/181)).
+
+## [2026-06-18]
+
+### Fixed
+
 - `rcup` / `just setup` no longer hang for minutes with no output. rcm was
   descending into a large non-dotfile project directory (managed only via
   `dotfiles-private`) and symlinking its tens of thousands of build
@@ -480,6 +604,57 @@ grouped by **date** rather than by semantic version. Newest first.
   case-insensitive filesystems (macOS) that made every `rcup` prompt
   `overwrite ~/.Justfile?` (a silent hang when stdin is not a TTY). Brewfiles
   stay linked (`zshenv` exports `HOMEBREW_BUNDLE_FILE=~/.Brewfile[.linux]`).
+
+## [2026-06-17]
+
+### Added
+
+- `antigravity` and `cursor` casks in `Brewfile` (macOS, all profiles).
+
+### Changed
+
+- Bump mise tool versions: dart 3.12.2, deno 2.8.3, elixir 1.20.1-otp-29,
+  Flutter (`vfox-flutter`) 3.44.2, helm 4.2.1, python 3.14.6, yarn 4.17.0,
+  yq 4.53.3.
+- Rename `linear-linear` cask to `linear` in `Brewfile.personal` (upstream
+  Homebrew rename).
+
+## [2026-06-11]
+
+### Added
+
+- Per-machine macOS Brewfile profiles: `Brewfile.work` and `Brewfile.personal`
+  overlays merged into `Brewfile` based on `~/.config/dotfiles/profile`. Set it
+  with `just set-profile work|personal` (interactive `just setup` prompts on
+  first run, default `work`; non-interactive runs fail instead of guessing);
+  `brew bundle` fails loud when the marker is absent or invalid so a forced
+  cleanup can never uninstall the overlay apps.
+
+### Changed
+
+- `CLAUDE.md` Key Commands: package installs go through `just setup` /
+  `just update-brew` — raw `brew install` / `brew bundle` is bootstrap-only,
+  before `just` itself exists.
+- Bump mise tool versions: deno 2.8.2, elixir 1.20.0-otp-29 + erlang 29.0
+  (OTP 28 → 29, bumped as a pair), go 1.26.4, yarn 4.16.0.
+- `just setup` is now a full idempotent bootstrap — selects the machine profile,
+  then installs packages, links dotfiles, installs mise runtimes, and enables
+  git hooks and tools — so a fresh machine is one command after `brew install just`.
+
+## [2026-06-07]
+
+### Added
+
+- `hermes-agent` via native installer in `just setup`, with cross-references in
+  both Brewfiles; document the native-installer pattern (single source of truth
+  in the `setup` recipe) in `.claude/rules/brewfile.md`.
+- `uv` in `Brewfile` and `Brewfile.linux`.
+- `codex-app` and `lm-studio` casks in `Brewfile` (macOS).
+
+### Changed
+
+- LM Studio CLI (`lms`) PATH: reverted the installer-written `zshrc` block
+  (hardcoded home path) in favor of a guarded, portable line in `zprofile`.
 
 ## [2026-06-01]
 

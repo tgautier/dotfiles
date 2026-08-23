@@ -231,6 +231,7 @@ config/
   mise/config.toml      # Pinned tool versions (node, python, ruby, go, etc.)
   ghostty/config        # Ghostty terminal config
 tmux.conf               # tmux config (C-a prefix, vi mode, platform clipboard)
+chezmoi.toml            # chezmoi umask configuration
 gitconfig               # SSH signing via 1Password, rebase-based pulls
 gitignore               # Global gitignore (OS, editor, build noise)
 agignore                # ack/ag ignore patterns
@@ -261,12 +262,13 @@ which are self-describing.
 
 Chezmoi installs each managed script into `~/.bin`, which `zshenv` adds to `PATH` alongside `~/.bin.local` for machine-local scripts that stay out of this repository.
 
-| Script        | Description                                                                 |
-| ------------- | --------------------------------------------------------------------------- |
-| `kseal`       | Seal a value (stdin or prompt) with `kubeseal --raw`, cluster-wide scope    |
-| `kshow`       | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)     |
-| `obsidian`    | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+)   |
-| `op-ssh-sign` | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)   |
+| Script             | Description                                                                |
+| ------------------ | -------------------------------------------------------------------------- |
+| `chezmoi-cutover`  | Inspect and deploy the public and optional private dotfile sources         |
+| `kseal`            | Seal a value (stdin or prompt) with `kubeseal --raw`, cluster-wide scope   |
+| `kshow`            | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)    |
+| `obsidian`         | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+)  |
+| `op-ssh-sign`      | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)  |
 
 ## Shell functions (`zsh/functions/`)
 
@@ -280,9 +282,6 @@ file, so every one is available as a command.
 | `b64_encode`        | Base64-encode arguments                                              |
 | `cdroot`            | `cd` to the repository root (`git root`)                             |
 | `current_tt`        | Set the terminal title to the current directory's name               |
-| `load_env_kops`     | Guard `KOPS_STATE_STORE`, then export AWS creds from `aws configure` |
-| `load_env_kubectl`  | Source `kubectl` and `helm` completions on demand                    |
-| `plantuml`          | Render a PlantUML source file to PNG                                 |
 | `tt`                | Set the terminal title to an arbitrary string                        |
 | `uuid`              | Lowercase UUID via `uuidgen`, with a fallback                        |
 
@@ -310,6 +309,8 @@ Run `just git-hooks` once in each checkout or worktree. The full machine bootstr
 | `pre-push` | Rejects direct protected-branch pushes, ancestry without signature headers, dirty or wrong checkout state, and missing or stale exact-tip evidence |
 | `ci-attest` | Runs the complete gate and atomically records the unchanged clean `HEAD` under the checkout's Git directory |
 | `ci-publish` | Verifies the exact pushed SSH branch tip and current `main` ancestry, then publishes and reads back the required GitHub commit status |
+| `post-commit` | Triggers roborev per-commit review on feature branches |
+| `post-rewrite` | Triggers roborev review after rebase or amend on feature branches |
 | `lib/git-integrity.sh` | Shares identity, signature, mise, and attestation validation across the executables |
 
 ## Fresh-machine acceptance

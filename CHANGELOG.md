@@ -175,6 +175,9 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- Tailscale CLI alias in `zsh/zaliases` corrected from nonexistent `.localized` path to `/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+- README: added `chezmoi-cutover` to Scripts table, `post-commit`/`post-rewrite` to hooks table, `chezmoi.toml` to structure block; removed three dead functions from the Shell functions table.
+- `docs/chezmoi-targets.tsv`: removed rows for deleted functions.
 - `~/.config/mise/config.toml` is deployed as a symlink to the tracked `config/mise/config.toml` instead of a copy. mise owns that file and rewrites it, so a copy drifted on every `just update` and chezmoi's conflict-refusing apply then blocked `just link` and `just setup` until the bump was reconciled by hand. A mise write now lands in the checkout and shows up in `git status`. The parity manifest gains a `symlink` mode, the canary verifies such a row by its link destination rather than by content (a byte comparison follows the link and passes even when the destination is wrong), and `bin/chezmoi-cutover` includes symlinks in every chezmoi invocation, without which the operator would never deploy the target. Because mise now writes into this public repository, `just lint-mise-config-hygiene` rejects an `[env]` table or a credential-shaped key in that file, with a planted probe for every literal-token arm so a per-arm typo cannot pass unnoticed ([#267](https://github.com/tgautier/dotfiles/issues/267)).
 - Routine deployment now preserves the live chezmoi ownership split. `just link`, and therefore the linking phase of `just setup`, runs an isolated public/private parity preflight, invokes rcm without force only for the six public `defer-*` manifest rows through explicit `-d` and source operands, runs the optional private dedicated-owner aggregate with output withheld, and applies each chezmoi source twice without force. Retained targets refuse regular files and foreign links before rcm; chezmoi uses conflict errors instead of overwriting modified targets; status, diff, and dry-run must settle after each pass. A routine failure remains safely rerunnable and never silently triggers the broad rollback graph. The unchanged `rcrc` and digest-bound backup continue to provide explicit full rollback until fresh-machine and supported-profile acceptance permit rcm retirement ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 
@@ -243,6 +246,9 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- Three dead shell functions (`load_env_kops`, `load_env_kubectl`, `plantuml`) and their chezmoi sources. None are installed or referenced anywhere.
+- Three stale `zshenv` entries: `DISABLE_AUTO_TITLE` (Oh My Zsh, not used), dapr PATH (not installed), dotfiles checkout root on PATH (no executables at repo root).
+- Empty `home/dot_git_template/` directory (no content, no chezmoi source).
 - Rcm deployment and all supporting artifacts. Every public target is now deployed by chezmoi; the six previously deferred targets (four Brewfiles, mise config, gitconfig) moved to chezmoi source state. Deleted: `rcrc`, `bin/rcm-links`, `tests/test_rcm_links.py`, and four migration-era docs. Removed `brew "rcm"` from both Brewfiles, twelve Justfile recipes, the `lint-rcrc` and `test-rcm-links` CI gates, and all rcm references from README, CLAUDE.md, and remaining docs ([#232](https://github.com/tgautier/dotfiles/issues/232)).
 
 - The unused `git_template/hooks/gitkeep` placeholder. The effective `init.templateDir` is unset, no repository config include points Git at this directory, and the tracked per-repository `.githooks` mechanism does not use Git's copy-on-init template mechanism ([#224](https://github.com/tgautier/dotfiles/issues/224)).

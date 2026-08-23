@@ -338,7 +338,7 @@ _ensure-profile:
 # every indented line — comments included — is echoed and handed to a shell.
 [doc("Lint shell scripts with ShellCheck")]
 lint-shell:
-    shellcheck --severity=warning bin/op-ssh-sign bin/kshow bin/kseal
+    shellcheck --severity=warning bin/op-ssh-sign
     shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary tests/test-local-gate
     shellcheck --severity=warning .githooks/pre-commit .githooks/pre-push .githooks/ci-attest .githooks/ci-publish .githooks/lib/*.sh
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*

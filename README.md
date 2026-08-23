@@ -265,10 +265,9 @@ Chezmoi installs each managed script into `~/.bin`, which `zshenv` adds to `PATH
 | Script             | Description                                                                |
 | ------------------ | -------------------------------------------------------------------------- |
 | `chezmoi-cutover`  | Inspect and deploy the public and optional private dotfile sources         |
-| `kseal`            | Seal a value (stdin or prompt) with `kubeseal --raw`, cluster-wide scope   |
-| `kshow`            | Print ConfigMap/Secret `.data`, base64-decoding secret values (`-n` ns)    |
-| `obsidian`         | macOS-only wrapper proxying to the CLI bundled in `Obsidian.app` (v1.12+)  |
 | `op-ssh-sign`      | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)  |
+
+Additional scripts (`kseal`, `kshow`, `obsidian`) live in the private companion repository.
 
 ## Shell functions (`zsh/functions/`)
 

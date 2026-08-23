@@ -8,6 +8,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+### Fixed
+
+- Rename chezmoi source `home/dot_bin` to `home/private_dot_bin` so the public apply declares 0700, matching the private chezmoi umask 077. Resolves the `--error-on-conflict` mode clash that broke `just link` ([dotfiles-private#492](https://github.com/tgautier/dotfiles-private/issues/492)).
+
 ### Changed
 
 - Split the monolithic `[Unreleased]` CHANGELOG section (spanning June-August 2026) into date-based headings matching PR merge dates, per the rolling-repo convention in `claude/rules/versioning.md`. Each entry is now grouped under the date its shipping PR merged. `[Unreleased]` stays at the top for not-yet-dated work ([dotfiles-private#485](https://github.com/tgautier/dotfiles-private/issues/485)).

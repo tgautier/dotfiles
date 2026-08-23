@@ -372,6 +372,28 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1)
         self.assertIn("private chezmoi safe-apply failed with status 29", completed.stderr)
         self.assertTrue(self.just_log.exists())
+
+    def test_public_apply_failure_prints_conflicting_paths(self) -> None:
+        completed = self._run(
+            "link",
+            extra_environment={"FAKE_CHEZMOI_FAIL_APPLY_CWD": self.public.name},
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("public chezmoi safe-apply failed with status 29", completed.stderr)
+        self.assertIn("conflicting paths:", completed.stderr)
+
+    def test_private_apply_failure_withholds_conflict_diagnostics(self) -> None:
+        completed = self._run(
+            "link",
+            private=True,
+            extra_environment={"FAKE_CHEZMOI_FAIL_APPLY_CWD": self.private.name},
+        )
+
+        self.assertEqual(completed.returncode, 1)
+        self.assertIn("private chezmoi safe-apply failed with status 29", completed.stderr)
+        self.assertNotIn("conflicting paths:", completed.stderr)
+
     def _descendant_launcher(self, *, wait: bool) -> Path:
         launcher = self.root / f"descendant-launcher-{wait}"
         final_action = "time.sleep(60)" if wait else "raise SystemExit(0)"

@@ -16,6 +16,11 @@ grouped by **date** rather than by semantic version. Newest first.
 
 - `just lint-changelog`, wired into `just ci`, rejects duplicate subheadings (`### Added`, `### Fixed`, etc.) within any CHANGELOG date section. Uses awk for Bash 3.2 compatibility. A negative fixture asserts the guard fires on a planted duplicate ([dotfiles-private#485](https://github.com/tgautier/dotfiles-private/issues/485)).
 
+### Removed
+
+- `confuse` from Brewfile: unused by any config or script, not installed ([dotfiles-private#486](https://github.com/tgautier/dotfiles-private/issues/486)).
+- macOS `DISPLAY=:1` export from `zshenv`: XQuartz is not installed or declared in Brewfiles. WSL and Linux DISPLAY exports are retained ([dotfiles-private#486](https://github.com/tgautier/dotfiles-private/issues/486)).
+
 ## [2026-08-23]
 
 ### Changed

@@ -31,7 +31,6 @@ export SAVEHIST=50000
 # Platform-specific environment variables
 case $PLATFORM in
   macos)
-    export DISPLAY=:1
     export SSH_AUTH_SOCK=~/Library/Group\ Containers/2BUA8C4S2C.com.1password/t/agent.sock
     export HOMEBREW_BUNDLE_FILE=${HOME}/.Brewfile
     ;;

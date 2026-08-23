@@ -1,3 +1,0 @@
-#!/usr/bin/env zsh
-source <($commands[kubectl] completion zsh);
-source <($commands[helm] completion zsh);

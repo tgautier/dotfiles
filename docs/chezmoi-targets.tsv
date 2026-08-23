@@ -26,9 +26,6 @@ zsh/functions/b64_decode	.zsh/functions/b64_decode	shadow	dot_zsh/functions/b64_
 zsh/functions/b64_encode	.zsh/functions/b64_encode	shadow	dot_zsh/functions/b64_encode	file
 zsh/functions/cdroot	.zsh/functions/cdroot	shadow	dot_zsh/functions/cdroot	file
 zsh/functions/current_tt	.zsh/functions/current_tt	shadow	dot_zsh/functions/current_tt	file
-zsh/functions/load_env_kops	.zsh/functions/load_env_kops	shadow	dot_zsh/functions/load_env_kops	file
-zsh/functions/load_env_kubectl	.zsh/functions/load_env_kubectl	shadow	dot_zsh/functions/load_env_kubectl	file
-zsh/functions/plantuml	.zsh/functions/plantuml	shadow	dot_zsh/functions/plantuml	file
 zsh/functions/tt	.zsh/functions/tt	shadow	dot_zsh/functions/tt	file
 zsh/functions/uuid	.zsh/functions/uuid	shadow	dot_zsh/functions/uuid	file
 zshenv	.zshenv	shadow	dot_zshenv	file

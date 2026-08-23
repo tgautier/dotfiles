@@ -13,7 +13,6 @@ fi
 
 # Common environment variables
 export CDPATH="${CDPATH}:${HOME}/Workspace"
-export DISABLE_AUTO_TITLE="true"
 export GOPATH=~/Workspace/go
 export HOMEBREW_BUNDLE_NO_LOCK=true
 export HOMEBREW_CURLRC="${HOME}/.config/homebrew/curlrc"
@@ -107,8 +106,6 @@ path+=(
 )
 
 # Tool-specific paths (check if they exist)
-[[ -d "${HOME}/.dapr/bin" ]] && path+="${HOME}/.dapr/bin"
-[[ -d "${HOME}/Workspace/tgautier/dotfiles" ]] && path+="${HOME}/Workspace/tgautier/dotfiles"
 [[ -d "${GOPATH}/bin" ]] && path+="${GOPATH}/bin"
 
 export PATH

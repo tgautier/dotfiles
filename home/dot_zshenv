@@ -16,6 +16,7 @@ export CDPATH="${CDPATH}:${HOME}/Workspace"
 export DISABLE_AUTO_TITLE="true"
 export GOPATH=~/Workspace/go
 export HOMEBREW_BUNDLE_NO_LOCK=true
+export HOMEBREW_CURLRC="${HOME}/.config/homebrew/curlrc"
 export HOMEBREW_NO_ENV_HINTS=true
 export KERL_BUILD_DOCS=yes
 export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx"

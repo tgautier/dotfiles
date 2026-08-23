@@ -92,6 +92,22 @@ go to the matching section below; a cask upgrade can also fail for reasons that
 name none (a checksum mismatch, quarantine, a `depends_on macos` bump), and
 those are worked from the error on its own terms.
 
+## Download stall detection
+
+Homebrew passes `--retry 3` to curl, but no stall timeout. A connection that
+dies mid-transfer without returning an error leaves curl waiting indefinitely,
+and the whole `just update` chain blocks behind it.
+
+`HOMEBREW_CURLRC` points Homebrew at `~/.config/homebrew/curlrc`, which sets
+`speed-limit` and `speed-time`. Curl aborts a transfer that stays below
+1000 bytes/s for 60 consecutive seconds, and `--retry` reconnects and resumes
+from the partial file. The curlrc is deployed by chezmoi from
+`config/homebrew/curlrc`.
+
+Homebrew reads the variable and passes `--disable --config <path>`, which keeps
+the default `~/.curlrc` disabled while loading the named file. Only Homebrew's
+own curl invocations are affected.
+
 ## Troubleshooting
 
 ### Cask upgrade fails with "there is already an App at"

@@ -5,7 +5,7 @@ Brewfile.personal	.Brewfile.personal	shadow	dot_Brewfile.personal	file
 Brewfile.work	.Brewfile.work	shadow	dot_Brewfile.work	file
 CLAUDE.md	.CLAUDE.md	repository-only	-	file
 agignore	.agignore	shadow	dot_agignore	file
-bin/op-ssh-sign	.bin/op-ssh-sign	shadow	dot_bin/executable_op-ssh-sign	executable
+bin/op-ssh-sign	.bin/op-ssh-sign	shadow	private_dot_bin/executable_op-ssh-sign	executable
 config/ghostty/config	.config/ghostty/config	shadow	dot_config/ghostty/config	file
 config/homebrew/curlrc	.config/homebrew/curlrc	shadow	dot_config/homebrew/curlrc	file
 config/mise/config.toml	.config/mise/config.toml	shadow	dot_config/mise/symlink_config.toml.tmpl	symlink

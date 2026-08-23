@@ -366,7 +366,19 @@ lint-changelog:
             END { exit (errors > 0 ? 1 : 0) }
         ' "$1"
     }
+    check_unreleased_empty() {
+        awk '
+            /^## \[Unreleased\]/ { in_unreleased=1; next }
+            /^## \[/ { in_unreleased=0; next }
+            in_unreleased && /^- / {
+                printf "ERROR: bullet entry under [Unreleased] at line %d — use a date heading instead\n", NR > "/dev/stderr"
+                errors++
+            }
+            END { exit (errors > 0 ? 1 : 0) }
+        ' "$1"
+    }
     check_changelog CHANGELOG.md
+    check_unreleased_empty CHANGELOG.md
     # Negative fixture: a planted duplicate must fire the guard
     tmp=$(mktemp "${TMPDIR:-/tmp}/lint-changelog.XXXXXX")
     trap 'rm -f -- "${tmp:-}"' EXIT
@@ -376,6 +388,13 @@ lint-changelog:
         exit 1
     fi
     echo "lint-changelog negative fixture OK"
+    # Negative fixture: a bullet under [Unreleased] must fire the guard
+    printf '## [Unreleased]\n### Fixed\n- stale entry\n## [2026-01-01]\n' > "$tmp"
+    if check_unreleased_empty "$tmp" 2>/dev/null; then
+        echo "ERROR: lint-changelog unreleased-empty fixture did not fire on a bullet" >&2
+        exit 1
+    fi
+    echo "lint-changelog unreleased-empty fixture OK"
     echo "lint-changelog OK"
 
 # Set this machine's Brewfile profile (work|personal). Writes the marker the

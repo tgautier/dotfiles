@@ -18,6 +18,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- Move `bin/kseal`, `bin/kshow`, and `bin/obsidian` to the private companion repository. These are convenience utilities not needed for first-machine bootstrap ([dotfiles-private#487](https://github.com/tgautier/dotfiles-private/issues/487)).
 - `confuse` from Brewfile: unused by any config or script, not installed ([dotfiles-private#486](https://github.com/tgautier/dotfiles-private/issues/486)).
 - macOS `DISPLAY=:1` export from `zshenv`: XQuartz is not installed or declared in Brewfiles. WSL and Linux DISPLAY exports are retained ([dotfiles-private#486](https://github.com/tgautier/dotfiles-private/issues/486)).
 

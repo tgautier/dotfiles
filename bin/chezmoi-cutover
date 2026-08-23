@@ -511,6 +511,41 @@ def capture_bounded_process(
     return process.returncode, bytes(captured)
 
 
+def _print_conflict_diagnostics(
+    *,
+    executable: Path,
+    source: SourceState,
+    home: Path,
+    cache_root: Path,
+    state_root: Path,
+) -> None:
+    """Run chezmoi status against the public source and print conflicting paths."""
+
+    try:
+        environment = command_environment(home)
+        _returncode, status_output = capture_bounded_process(
+            command_arguments(
+                executable,
+                source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+                operation="status",
+            ),
+            cwd=source.root,
+            environment=environment,
+            stderr=subprocess.STDOUT,
+            timeout=CHEZMOI_TIMEOUT_SECONDS,
+            label=f"{source.label} chezmoi status (diagnostic)",
+        )
+        if status_output:
+            print("conflicting paths:", file=sys.stderr)
+            sys.stderr.buffer.write(status_output)
+            sys.stderr.buffer.flush()
+    except Exception:
+        pass
+
+
 def capture_operation(
     operation: str,
     *,
@@ -544,6 +579,14 @@ def capture_operation(
         sys.stdout.buffer.write(captured)
         sys.stdout.buffer.flush()
     if returncode != 0:
+        if source.label == "public" and operation in ("apply", "safe-apply"):
+            _print_conflict_diagnostics(
+                executable=executable,
+                source=source,
+                home=home,
+                cache_root=cache_root,
+                state_root=state_root,
+            )
         raise CutoverError(
             f"{source.label} chezmoi {operation} failed with status {returncode}"
         )

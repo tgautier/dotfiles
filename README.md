@@ -411,6 +411,7 @@ Individual targets:
 | `just lint-shell` | ShellCheck on scripts, tests, and zsh |
 | `just lint-python` | Compile Python helpers with warnings as errors |
 | `just lint-markdown` | markdownlint-cli2 |
+| `just lint-changelog` | Reject duplicate subheadings within any CHANGELOG date section |
 | `just lint-brewfile` | Ruby syntax check on Brewfiles |
 | `just lint-mise` | Validate mise config |
 | `just lint-just` | Check in-body `just <recipe>` calls resolve |

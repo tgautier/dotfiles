@@ -1,5 +1,1 @@
-.git/
-bower_components/
-build/
-node_modules/
-deps/
+../agignore

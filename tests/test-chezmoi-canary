@@ -225,7 +225,32 @@ PY
     printf 'unexpected fixture\n' > "$tmp/extra/home/dot_unexpected"
     expect_failure extra 'target map mismatch' "$checker" "$tmp/extra" "$tmp/extra/docs/chezmoi-targets.tsv"
 
-    printf 'chezmoi canary fixtures OK (companion available/conflicting-package/absent/non-directory/stale/ownership-rejected/source-rejected, misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra, wrong symlink destination)\n'
+    # Shadow sources are relative symlinks into the canonical top-level files.
+    # A regular file reintroduces the duplicated copy the symlink model
+    # removed, and it would pass every byte comparison as long as the copy is
+    # fresh — so the checker must reject the shape, not the content.
+    make_fixture "$tmp/copied-shadow"
+    rm "$tmp/copied-shadow/home/dot_zshrc"
+    cp -p "$repo_root/zshrc" "$tmp/copied-shadow/home/dot_zshrc"
+    expect_failure 'reintroduced shadow copy' 'shadow chezmoi source is not a symlink' \
+        "$checker" "$tmp/copied-shadow" "$tmp/copied-shadow/docs/chezmoi-targets.tsv"
+
+    # A link at the right path but the wrong destination ships the wrong
+    # content while staying a symlink; the resolution check must catch it.
+    make_fixture "$tmp/mispointed-shadow"
+    ln -sfn ../zshenv "$tmp/mispointed-shadow/home/dot_zshrc"
+    expect_failure 'mispointed shadow symlink' 'resolves outside its manifest source' \
+        "$checker" "$tmp/mispointed-shadow" "$tmp/mispointed-shadow/docs/chezmoi-targets.tsv"
+
+    # The template row is the inverse contract: it must stay a real file, so a
+    # symlink smuggling template content from outside the source state fails.
+    make_fixture "$tmp/linked-template"
+    ln -sfn ../../../config/mise/config.toml \
+        "$tmp/linked-template/home/dot_config/mise/symlink_config.toml.tmpl"
+    expect_failure 'linked template source' 'template chezmoi source must not be a symlink' \
+        "$checker" "$tmp/linked-template" "$tmp/linked-template/docs/chezmoi-targets.tsv"
+
+    printf 'chezmoi canary fixtures OK (companion available/conflicting-package/absent/non-directory/stale/ownership-rejected/source-rejected, misnamed, shadow/deferred omission, retired disposition, duplicate, missing, extra, wrong symlink destination, reintroduced shadow copy, mispointed shadow symlink, linked template source)\n'
 }
 
 main "$@"

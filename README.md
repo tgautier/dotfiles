@@ -242,7 +242,7 @@ Brewfile.work           # macOS work-only casks/apps
 Brewfile.personal       # macOS personal-only casks/apps
 Brewfile.linux          # Linux Homebrew packages
 .chezmoiroot            # Selects home/ as the chezmoi source state
-home/                   # Active public chezmoi source state
+home/                   # Chezmoi source state: relative symlinks to the files above
 tests/                  # Isolated parity checker and sabotage fixtures
 Justfile                # Bootstrap, CI and update recipes
 .githooks/              # Local identity, complete-CI, signature, and exact-tip push gate

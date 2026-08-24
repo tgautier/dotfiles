@@ -91,6 +91,22 @@ main() {
                         -|/*|../*|*/../*) fail "invalid chezmoi source at line $line_no: $chezmoi_source" ;;
                     esac
                     [[ -f "$repo_root/home/$chezmoi_source" ]] || fail "missing chezmoi source at line $line_no: $chezmoi_source"
+                    if [[ "$mode" == symlink ]]; then
+                        # The template that renders a symlink target is a real
+                        # file; a link here would pull template content from
+                        # outside the tracked source state.
+                        [[ -L "$repo_root/home/$chezmoi_source" ]] && fail "template chezmoi source must not be a symlink at line $line_no: $chezmoi_source"
+                    else
+                        # File and executable shadow sources are relative
+                        # symlinks into the canonical top-level files; a regular
+                        # file here reintroduces the duplicated copy the symlink
+                        # model removed, and a link elsewhere ships the wrong
+                        # content while every byte comparison still passes.
+                        [[ -L "$repo_root/home/$chezmoi_source" ]] || fail "shadow chezmoi source is not a symlink at line $line_no: $chezmoi_source"
+                        python3 -c 'import os, sys; sys.exit(0 if os.path.realpath(sys.argv[1]) == os.path.realpath(sys.argv[2]) else 1)' \
+                            "$repo_root/home/$chezmoi_source" "$repo_root/$source_col" \
+                            || fail "shadow chezmoi source resolves outside its manifest source at line $line_no: $chezmoi_source"
+                    fi
                     printf '%s\t%s\n' "$target" "$chezmoi_source" >> "$tmp/expected-map"
                     ;;
                 repository-only)

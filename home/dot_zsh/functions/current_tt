@@ -1,2 +1,1 @@
-#!/usr/bin/env zsh
-tt "$(basename "$(pwd)")"
+../../../zsh/functions/current_tt

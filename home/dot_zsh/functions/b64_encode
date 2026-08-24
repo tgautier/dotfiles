@@ -1,2 +1,1 @@
-#!/usr/bin/env zsh
-echo "$*" | base64
+../../../zsh/functions/b64_encode

@@ -10,6 +10,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [2026-08-24]
 
+### Changed
+
+- **Replace chezmoi shadow copies with symlinks (#282).** Every `file` and `executable` shadow source under `home/` is now a relative symlink to its canonical top-level file, removing ~1,100 duplicated lines. Chezmoi reads through the links and still renders regular files. The parity checker now requires the symlink shape and its resolution to the manifest source, with sabotage fixtures for a reintroduced copy and a mispointed link. The mise template stays a real file.
+
 ### Fixed
 
 - Rename chezmoi source `home/dot_bin` to `home/private_dot_bin` so the public apply declares 0700, matching the private chezmoi umask 077. Resolves the `--error-on-conflict` mode clash that broke `just link` ([dotfiles-private#492](https://github.com/tgautier/dotfiles-private/issues/492)).

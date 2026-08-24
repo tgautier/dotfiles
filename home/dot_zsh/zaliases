@@ -1,14 +1,1 @@
-alias k=kubectl
-alias kctx=kubectx
-alias kfw='kubectl port-forward'
-alias kns=kubens
-alias kxec='kubectl exec -it'
-alias la='ls -lah'
-alias ll='ls -lh'
-
-if [[ "${PLATFORM}" == "macos" ]]; then
-  alias ls='ls -G'
-  alias ts='/Applications/Tailscale.app/Contents/MacOS/Tailscale'
-else
-  alias ls='ls --color=auto'
-fi
+../../zsh/zaliases

@@ -1,7 +1,1 @@
-#!/usr/bin/env zsh
-
-if base64 --decode </dev/null >/dev/null 2>&1; then
-  echo "$*" | base64 --decode
-else
-  echo "$*" | base64 -D
-fi
+../../../zsh/functions/b64_decode

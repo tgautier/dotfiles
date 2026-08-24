@@ -1,2 +1,1 @@
-#!/usr/bin/env zsh
-echo -ne "\033];$@\007"
+../../../zsh/functions/tt

@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-08-28]
+
+### Fixed
+
+- `update-brew` auto-recovers from stale cask staging directories ("already an App at") by reinstalling the wedged cask and retrying, up to 3 casks per run. The Binary conflict still requires manual inspection per `docs/homebrew.md`.
+
 ## [2026-08-24]
 
 ### Changed

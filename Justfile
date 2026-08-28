@@ -629,9 +629,9 @@ update-brew:
     # an App at" pattern, reinstall the wedged cask, and retry.
     max_retries=3
     attempt=0
+    logfile=$(mktemp "${TMPDIR:-/tmp}/brew-bundle.XXXXXX")
+    trap 'rm -f -- "${logfile:-}"' EXIT
     while true; do
-        logfile=$(mktemp "${TMPDIR:-/tmp}/brew-bundle.XXXXXX")
-        trap 'rm -f -- "${logfile:-}"' EXIT
         if brew bundle install --file="$brewfile" 2>&1 | tee "$logfile"; then
             break
         fi

@@ -140,7 +140,16 @@ An unforced upgrade refuses to overwrite what is already sitting there, so
 every subsequent `just update` fails the same way until the leftover is
 cleared.
 
-**Fix** — reinstall the cask:
+**Automatic recovery** — `update-brew` detects this error, runs
+`brew reinstall --cask` on the wedged cask, and retries `brew bundle install`.
+Up to 3 casks are recovered per run. If the retry succeeds, the update
+continues without manual intervention.
+
+The auto-recovery handles only the App conflict. The Binary conflict below
+requires manual inspection and is not retried automatically.
+
+**Manual fix** — if auto-recovery fails or you hit this outside `just update`,
+reinstall the cask:
 
 ```sh
 brew reinstall --cask <cask>

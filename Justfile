@@ -613,13 +613,47 @@ export HOMEBREW_FORCE_VENDOR_RUBY := if os() == "macos" { "" } else { "1" }
 # lacks the entries (fresh tap clone, manual untrust), the first `brew
 # update` may warn "Not trusted tap" once — harmless, and self-healing when
 # `brew bundle install` applies the declared trust in the next step.
+#
+# Auto-recovery: when `brew bundle install` fails because a cask upgrade
+# hit a stale staging directory ("already an App at"), the recipe reinstalls
+# the wedged cask and retries. Up to 3 casks are recovered per run. The
+# Binary conflict is NOT auto-recovered — it needs manual inspection per
+# docs/homebrew.md.
 update-brew:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    brewfile={{quote(brewfile)}}
     brew update
-    brew bundle install --file={{brewfile}}
+    # brew bundle install can fail when a prior cask upgrade was interrupted,
+    # leaving an app in the Caskroom staging directory. Detect the "already
+    # an App at" pattern, reinstall the wedged cask, and retry.
+    max_retries=3
+    attempt=0
+    logfile=$(mktemp "${TMPDIR:-/tmp}/brew-bundle.XXXXXX")
+    trap 'rm -f -- "${logfile:-}"' EXIT
+    while true; do
+        if brew bundle install --file="$brewfile" 2>&1 | tee "$logfile"; then
+            break
+        fi
+        cask=$(sed -n 's/^Error: \([^:]*\): It seems there is already an App at.*/\1/p' "$logfile" | head -1)
+        if [[ -z "$cask" ]]; then
+            printf 'brew bundle install failed (not a stale staging directory)\n' >&2
+            exit 1
+        fi
+        attempt=$((attempt + 1))
+        if (( attempt > max_retries )); then
+            printf 'exceeded %d auto-recovery attempts for stale cask staging directories\n' "$max_retries" >&2
+            exit 1
+        fi
+        printf 'auto-recovering: reinstalling wedged cask %s (attempt %d/%d)\n' "$cask" "$attempt" "$max_retries"
+        brew reinstall --cask "$cask"
+    done
     brew upgrade
     brew cleanup --prune=all
-    brew bundle cleanup --force --file={{brewfile}}
-    -brew doctor
+    brew bundle cleanup --force --file="$brewfile"
+    # brew doctor is intentionally non-fatal — it reports warnings about the
+    # Homebrew installation itself, not about package correctness
+    brew doctor || true
 
 # Update Mac App Store apps (no-op on non-macOS)
 update-mas:

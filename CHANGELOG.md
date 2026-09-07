@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-09-07]
+
+### Added
+
+- Headroom (context compression for AI agents) as a native-installer tool in `just setup`, installed via `uv tool install`.
+
 ## [2026-08-28]
 
 ### Fixed

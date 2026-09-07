@@ -221,6 +221,7 @@ setup: _ensure-profile
 
     # 5. Native-installer tools (self-update through their own channels).
     command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
+    command -v headroom >/dev/null 2>&1 || uv tool install --python 3.13 "headroom-ai[all]"
     command -v hermes >/dev/null 2>&1 || curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 
     # 6. Default editor associations (macOS only; no-ops elsewhere).

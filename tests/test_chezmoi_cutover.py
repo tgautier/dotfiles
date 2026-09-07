@@ -777,5 +777,78 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn("another chezmoi operator command is already running", completed.stderr)
         self.assertEqual(self._records(), [])
 
+
+class StripExternalMutationsTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.home = Path(self.temporary.name)
+
+    def test_docker_block_at_start_is_stripped(self) -> None:
+        zprofile = self.home / ".zprofile"
+        zprofile.write_text(
+            "# The following lines were added by Docker Desktop.\n"
+            'export PATH="$PATH:/Users/me/.docker/bin"\n'
+            "# End of Docker Desktop section.\n"
+            "\n"
+            "# Login shell initialization\n"
+            "echo hello\n",
+            encoding="utf-8",
+        )
+        CUTOVER.strip_external_mutations(self.home)
+        self.assertEqual(
+            zprofile.read_text(encoding="utf-8"),
+            "# Login shell initialization\n"
+            "echo hello\n",
+        )
+
+    def test_docker_block_in_middle_is_stripped(self) -> None:
+        zprofile = self.home / ".zprofile"
+        zprofile.write_text(
+            "# first line\n"
+            "# The following lines were added by Docker Desktop.\n"
+            'export PATH="$PATH:/Users/me/.docker/bin"\n'
+            "# End of Docker Desktop section.\n"
+            "# last line\n",
+            encoding="utf-8",
+        )
+        CUTOVER.strip_external_mutations(self.home)
+        self.assertEqual(
+            zprofile.read_text(encoding="utf-8"),
+            "# first line\n"
+            "# last line\n",
+        )
+
+    def test_file_without_docker_block_is_unchanged(self) -> None:
+        zprofile = self.home / ".zprofile"
+        original = "# Login shell initialization\necho hello\n"
+        zprofile.write_text(original, encoding="utf-8")
+        CUTOVER.strip_external_mutations(self.home)
+        self.assertEqual(zprofile.read_text(encoding="utf-8"), original)
+
+    def test_missing_file_is_skipped(self) -> None:
+        CUTOVER.strip_external_mutations(self.home)
+        self.assertFalse((self.home / ".zprofile").exists())
+
+    def test_multiple_docker_blocks_are_all_stripped(self) -> None:
+        zprofile = self.home / ".zprofile"
+        zprofile.write_text(
+            "# The following lines were added by Docker Desktop.\n"
+            'export PATH="$PATH:/Users/me/.docker/bin"\n'
+            "# End of Docker Desktop section.\n"
+            "\n"
+            "real content\n"
+            "# The following lines were added by Docker Desktop.\n"
+            "source /some/docker/thing\n"
+            "# End of Docker Desktop section.\n",
+            encoding="utf-8",
+        )
+        CUTOVER.strip_external_mutations(self.home)
+        self.assertEqual(
+            zprofile.read_text(encoding="utf-8"),
+            "real content\n",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

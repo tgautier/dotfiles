@@ -80,6 +80,10 @@ Custom functions live in `zsh/functions/`, which `zsh/zcompletion` prepends to
 `fpath` and autoloads. Scripts in `bin/` are deployed by chezmoi into `~/.bin`, which
 `zshenv` puts on `PATH`.
 
+### External tool mutations
+
+Some tools (notably Docker Desktop) prepend PATH lines to `~/.zprofile` during install and upgrades. Because chezmoi owns that file in `--error-on-conflict` mode, an unstripped mutation blocks every subsequent `just link`. The `chezmoi-cutover` operator strips known mutation patterns automatically before applying. The pattern list lives in `bin/chezmoi-cutover` (`_DOCKER_DESKTOP_BLOCK_RE`). When a new external tool starts mutating a managed file, add its pattern there and a test in `tests/test_chezmoi_cutover.py`.
+
 ### Tool Version Management (mise)
 
 Runtime versions are managed by **mise**. The tracked file is `config/mise/config.toml`, and chezmoi deploys `~/.config/mise/config.toml` as a **symlink** to it, rendered from `home/dot_config/mise/symlink_config.toml.tmpl`. Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn.

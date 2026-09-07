@@ -14,6 +14,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 - Headroom (context compression for AI agents) as a native-installer tool in `just setup`, installed via `uv tool install`.
 
+### Fixed
+
+- `just link` now auto-strips Docker Desktop PATH mutations from `~/.zprofile` before chezmoi applies, preventing the conflict that blocked every `just link` after a Docker install or upgrade.
+
 ## [2026-08-28]
 
 ### Fixed

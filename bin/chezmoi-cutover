@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import fcntl
 import os
 from pathlib import Path
+import re
 import selectors
 import shutil
 import signal
@@ -705,6 +706,40 @@ def run_parity_check(
         )
 
 
+_DOCKER_DESKTOP_BLOCK_RE = re.compile(
+    r"^# The following lines were added by Docker Desktop\.\n"
+    r"(?:.*\n)*?"
+    r"# End of Docker Desktop section\.\n"
+    r"\n?",
+    re.MULTILINE,
+)
+
+_EXTERNAL_MUTATION_TARGETS = (".zprofile",)
+
+
+def strip_external_mutations(home: Path) -> None:
+    """Remove known external-tool mutations from chezmoi-managed deploy targets.
+
+    Docker Desktop prepends PATH lines to ~/.zprofile during install and
+    upgrades, which causes chezmoi's --error-on-conflict mode to reject the
+    next apply. Strip the block before chezmoi runs so the conflict never
+    occurs.
+    """
+    for name in _EXTERNAL_MUTATION_TARGETS:
+        target = home / name
+        try:
+            original = target.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+        cleaned = _DOCKER_DESKTOP_BLOCK_RE.sub("", original)
+        if cleaned != original:
+            target.write_text(cleaned, encoding="utf-8")
+            print(
+                f"stripped Docker Desktop PATH mutation from ~/{name}",
+                file=sys.stderr,
+            )
+
+
 def link_current_state(
     *,
     executable: Path,
@@ -720,6 +755,7 @@ def link_current_state(
 ) -> None:
     """Refresh each target through its current owner and prove idempotence."""
 
+    strip_external_mutations(home)
     run_parity_check(
         checker=parity_check,
         executable=executable,

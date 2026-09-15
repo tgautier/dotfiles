@@ -606,6 +606,16 @@ brewfile := dotfiles_dir / if os() == "macos" { "Brewfile" } else { "Brewfile.li
 # too. Empty (and thus a no-op) on macOS, where vendored ruby is already default.
 export HOMEBREW_FORCE_VENDOR_RUBY := if os() == "macos" { "" } else { "1" }
 
+# Casks marked `auto_updates` update themselves, sometimes as root: Google
+# Chrome's updater runs through a privileged helper and leaves the bundle owned
+# by root:wheel. Homebrew would otherwise upgrade such a cask whenever the
+# bundle version lags the tap, fighting the app's own updater, and cannot
+# remove a root-owned bundle from a terminal without the App Management
+# permission. All three cask failures recorded in docs/homebrew.md were on
+# auto_updates casks. Leave them to their own updaters; zshenv exports the same
+# variable for interactive brew.
+export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS := "1"
+
 # Update Homebrew packages and clean up. Tap trust is declared in the
 # Brewfile (`trusted: true` on tap-prefixed formulae), never via an
 # imperative `brew trust` step: `brew bundle cleanup --force` resets the
@@ -620,6 +630,14 @@ export HOMEBREW_FORCE_VENDOR_RUBY := if os() == "macos" { "" } else { "1" }
 # the wedged cask and retries. Up to 3 casks are recovered per run. The
 # Binary conflict is NOT auto-recovered — it needs manual inspection per
 # docs/homebrew.md.
+#
+# Neither path reaches a root-owned app (Google Chrome after its own updater
+# ran): Homebrew's `sudo chown` is denied without the App Management permission,
+# so the reinstall fails at the same point. The HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS
+# export above keeps such casks out of the upgrade; docs/homebrew.md covers the
+# manual repair. The [doc] attribute carries the summary because `just --list`
+# would otherwise show only the last line of this comment.
+[doc("Update Homebrew packages and clean up")]
 update-brew:
     #!/usr/bin/env bash
     set -euo pipefail

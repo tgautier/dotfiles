@@ -8,6 +8,13 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-09-15]
+
+### Changed
+
+- `just update` no longer upgrades casks marked `auto_updates`: `zshenv` and the Justfile export `HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1`, so those apps are left to their own updaters. Homebrew's attempt to replace Google Chrome after Chrome had updated itself as root failed with `Operation not permitted` on every run, out of reach of the #285 auto-recovery. `docs/homebrew.md` documents the new behavior, the per-cask escape hatch, and the App Management permission Homebrew needs to replace a root-owned app (#291).
+- Pinned runtimes bumped by `mise upgrade --bump`: dart 3.13.2, deno 2.9.6, flutter 3.47.2, go 1.27.0, yq 4.53.6 (#291).
+
 ## [2026-09-07]
 
 ### Added

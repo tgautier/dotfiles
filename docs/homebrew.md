@@ -34,63 +34,16 @@ paper over it with `|| true` or `continue-on-error` — a red `just update` mean
 a package really is broken, and silencing it hides a half-installed app until
 something else breaks.
 
-### Why an auto-updating cask is upgraded at all
+### Auto-updating casks are left to their own updaters
 
-Both failures below were observed on casks marked `auto_updates`
-(`brew info --cask <cask>` prints it next to the version), which raises the
-obvious question — those apps update themselves, so why is Homebrew touching
-them at all? The flag is why the upgrade is *surprising*, not why it happened —
-and not why it then failed either. Neither failure requires it: the App conflict
-lists interruption triggers in its own section, and the Binary conflict turns on
-a stale recorded artifact list.
+Every cask failure recorded in this doc happened on a cask marked `auto_updates` (`brew info --cask <cask>` prints it next to the version). Such an app rewrites its own bundle between Homebrew runs. Homebrew's default is to upgrade it anyway whenever the version inside the bundle lags the tap, so two updaters end up managing one bundle, and the interrupted or contested swaps behind the App conflict below are the result. Google Chrome goes further: its updater runs as root through a privileged helper, which leaves the bundle owned by `root:wheel`, and Homebrew then cannot remove it from a terminal without the App Management permission. That failure has its own section below, and the auto-recovery in `update-brew` cannot reach it.
 
-What puts one of these casks in an upgrade is a version lag. A non-greedy check
-suppresses an `auto_updates` cask *unless* the version inside the installed app
-bundle is behind the tap, which Homebrew upgrades by default (opt out with
-`HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`). So one reaches an upgrade exactly
-when the app has *not* self-updated.
+`HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1` turns that default off. `zshenv` exports it for interactive `brew` and the Justfile exports it for recipes, so the two never disagree. `brew bundle install`, `brew upgrade`, and `brew outdated --cask` share one non-greedy check, and with the variable set that check skips every `auto_updates` cask. Homebrew still installs those casks on a fresh machine, and `brew bundle cleanup --force` still removes one that leaves the Brewfile.
 
-Absent `HOMEBREW_UPGRADE_GREEDY` and `HOMEBREW_UPGRADE_GREEDY_CASKS`,
-`brew outdated --cask` runs the same non-greedy predicate as
-the `brew bundle install` and `brew upgrade` steps of `update-brew` — so it
-previews the update rather than offering a second opinion, and the cask that
-fails is listed there too. (Set either variable and it stops being a preview:
-`outdated` and `upgrade` honour them, `brew bundle install` does not. A
-`greedy: true` option on a Brewfile entry pulls the other way, making `bundle`
-greedier than `outdated` for that one cask. If you ever see the three disagree,
-those are the two places to look.)
+Two things follow:
 
-Add `--greedy` and, for `auto_updates` casks, the list grows by every one whose
-bundle is current and whose Homebrew metadata is merely stale. Those are the
-ones `just update` leaves alone. (`--greedy` widens other classes too — notably
-`version :latest` casks whose downloaded artifact changed — on rules of their
-own.) Within `update-brew`, whose `upgrade` and `bundle` passes name no casks,
-the contrast is only ever between greedy and non-greedy, not between `outdated`
-and the update itself. Naming a cask changes that, but only for the verbs that
-act: `brew install --cask <cask>` and `brew upgrade --cask <cask>` check a named
-cask greedily, so either can upgrade one `brew outdated --cask` never listed.
-What does *not* change `outdated` is naming a cask:
-`brew outdated --cask <cask>` runs the same non-greedy predicate as the bare
-form. Only a greedy invocation makes it look harder — `--greedy`, the narrower
-`--greedy-latest` / `--greedy-auto-updates`, `HOMEBREW_UPGRADE_GREEDY`, or
-`HOMEBREW_UPGRADE_GREEDY_CASKS`.
-
-A cask that fails the update while `brew outdated --cask` stays quiet has two
-possible causes, and one command tells them apart:
-
-```sh
-brew update && brew outdated --cask
-```
-
-Still empty means the app self-updated between the two runs — re-run
-`just update`. Now listed means the earlier check read a stale tap:
-`update-brew` refreshes it with `brew update` first, so a bare `brew outdated`
-beforehand answers from whatever the last refresh left behind. The cask really
-is outdated and `just update` will fail again on it, so work the failure rather
-than re-running the update. If the error names an artifact — `App` or `Binary` —
-go to the matching section below; a cask upgrade can also fail for reasons that
-name none (a checksum mismatch, quarantine, a `depends_on macos` bump), and
-those are worked from the error on its own terms.
+- `brew list --cask --versions` reports the version Homebrew installed, not the one the app updated itself to. Read the running version from the app: `defaults read "/Applications/<App>.app/Contents/Info.plist" CFBundleShortVersionString`.
+- Homebrew upgrades such an app only when asked by name. `brew upgrade --cask <cask>` checks a named cask greedily and ignores the variable, so it upgrades the cask whenever the tap is ahead of Homebrew's record. `--greedy` on the bare `brew upgrade` does the same for all of them, and `greedy: true` on a Brewfile entry does it for that cask inside `brew bundle install`. A root-owned app still needs the App Management permission first.
 
 ## Download stall detection
 
@@ -369,6 +322,38 @@ that variable.
 
 **Finish the update.** As with the App conflict, the rest of `update-brew` never
 ran — re-run `just update` so the direct `brew` calls stay a one-off.
+
+### Cask upgrade fails with `Operation not permitted` on `chown`
+
+macOS only.
+
+**Symptom**: `just update` dies in `update-brew` while removing the old app. Homebrew asks for your password, then prints one `chown` line per file in the bundle:
+
+```text
+==> Removing App '/Applications/<App>.app'
+Password:
+==> Using sudo to gain ownership of path '/Applications/<App>.app'
+chown: /Applications/<App>.app/Contents/Info.plist: Operation not permitted
+...
+Error: <cask>: Permission denied @ apply2files - /Applications/<App>.app/Contents/CodeResources
+```
+
+It usually arrives wrapped in the App conflict: the first attempt left a backup in the Caskroom, so the next run fails on "already an App at", the auto-recovery reinstalls, and the reinstall fails here.
+
+**Cause**: the bundle is owned by root. `ls -ld "/Applications/<App>.app"` shows `root wheel`, because the app's own updater installed the last version through a privileged helper. Homebrew installed the app as you and needs to move it, so it runs `sudo chown -R` to take ownership back. Since macOS Ventura, changing another developer's app in `/Applications` requires the calling terminal to hold the App Management permission (Full Disk Access also works), and `sudo` does not bypass that check. Every `chown` fails. As long as the whole bundle is root-owned, Homebrew aborts before it deletes anything, and the app keeps working.
+
+With `HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS` set (see the section above), `just update` no longer upgrades the cask, so the failure stops recurring on its own. What remains is a stale Homebrew record and a leftover backup in the Caskroom.
+
+**Fix**: grant the permission, then let Homebrew realign itself.
+
+1. Open System Settings > Privacy & Security > App Management and enable your terminal (Ghostty in this Brewfile). Open a new terminal window afterwards.
+1. Reinstall the cask. The forced uninstall now succeeds and clears the Caskroom leftover, and Homebrew's record moves to the tap version. Homebrew asks for your password for the `chown`.
+
+   ```sh
+   brew reinstall --cask <cask>
+   ```
+
+The permission is also what lets `brew bundle cleanup --force` remove such an app when it leaves the Brewfile, so grant it once per machine rather than per incident. Do not delete the Caskroom leftover by hand; the App conflict section explains why.
 
 ### `brew bundle` fails on a missing profile marker
 

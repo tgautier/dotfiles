@@ -50,17 +50,19 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, deployed with [chezmoi]
    installs mise and the pinned runtimes, and enables git hooks and tools.
    It is idempotent — re-run it anytime.
 
-5. **Set up 1Password SSH agent:**
+5. **Grant the terminal App Management** (System Settings > Privacy & Security > App Management). Some apps install their own updates as root, and Homebrew cannot replace or remove such an app without this permission. `sudo` does not bypass it. See [docs/homebrew.md](docs/homebrew.md) for the failure it prevents.
+
+6. **Set up 1Password SSH agent:**
    Open 1Password, sign in, and enable the SSH agent under
    Settings > Developer > SSH Agent.
 
-6. **Switch git remote to SSH** (now that 1Password SSH is configured):
+7. **Switch git remote to SSH** (now that 1Password SSH is configured):
 
    ```sh
    git -C ~/Workspace/tgautier/dotfiles remote set-url origin git@github.com:tgautier/dotfiles.git
    ```
 
-7. **Keep everything current** (later, for maintenance):
+8. **Keep everything current** (later, for maintenance):
 
    ```sh
    just update

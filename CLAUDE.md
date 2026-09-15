@@ -90,6 +90,8 @@ Runtime versions are managed by **mise**. The tracked file is `config/mise/confi
 
 The symlink exists because mise owns this file and rewrites it: `mise upgrade --bump` (which `just update` runs), `mise use`, and `mise settings set` all edit it in place. A deployed copy therefore drifted from tracked source on every update, and chezmoi's conflict-refusing apply then blocked `just link` and `just setup` permanently (#267). With the symlink, a mise write lands in the checkout and shows up in `git status`, so the fix is to commit it.
 
+Read that diff before committing it. `mise upgrade --bump` has rewritten the dart entry's `{{ os() }}-{{ arch() }}` URL template into the literal `macos-arm64` of the machine it ran on, which would hand Linux the macOS archive; restore the template and keep the version bump (#291).
+
 That makes mise a writer into this public repository, so `just lint-mise-config-hygiene` rejects an `[env]` table or a credential-shaped key in that file. Never route a secret through mise config here: put it in `dotfiles-private` and let mise read it from the environment.
 
 ### Performance

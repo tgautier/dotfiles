@@ -17,6 +17,9 @@ export GOPATH=~/Workspace/go
 export HOMEBREW_BUNDLE_NO_LOCK=true
 export HOMEBREW_CURLRC="${HOME}/.config/homebrew/curlrc"
 export HOMEBREW_NO_ENV_HINTS=true
+# Casks marked auto_updates update themselves; leave them to it. The Justfile
+# exports the same variable for recipes. See docs/homebrew.md.
+export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1
 export KERL_BUILD_DOCS=yes
 export KERL_CONFIGURE_OPTIONS="--disable-debug --without-javac --with-wx"
 export LANG=en_US.UTF-8

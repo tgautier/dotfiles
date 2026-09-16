@@ -307,7 +307,7 @@ Run `just git-hooks` once in each checkout or worktree. The full machine bootstr
 | Entry | Runs |
 | --- | --- |
 | `pre-commit` | Checks the effective Git identity and runs the complete `mise x -- just ci` gate |
-| `pre-push` | Rejects direct protected-branch pushes, ancestry without signature headers, dirty or wrong checkout state, and missing or stale exact-tip evidence |
+| `pre-push` | Flushes pending roborev review batches, then rejects direct protected-branch pushes, ancestry without signature headers, dirty or wrong checkout state, and missing or stale exact-tip evidence |
 | `ci-attest` | Runs the complete gate and atomically records the unchanged clean `HEAD` under the checkout's Git directory |
 | `ci-publish` | Verifies the exact pushed SSH branch tip and current `main` ancestry, then publishes and reads back the required GitHub commit status |
 | `post-commit` | Triggers roborev per-commit review on feature branches |

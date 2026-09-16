@@ -316,7 +316,7 @@ refs/heads/other $other_signed refs/heads/two $zero_sha" \
 printf '%s\n' "$head_sha" >"$marker"
 if output=$(
   cd "$repo" || exit 1
-  source "$source_root/.githooks/pre-push"
+  source "$source_root/.githooks/pre-push" </dev/null
   run_local_gate "$head_sha" 2>&1
 ); then
   record_fail "hook from another checkout was accepted" "$output"

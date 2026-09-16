@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# roborev pre-push hook v3 - flushes pending post-commit batches before push
+_roborev_flush() {
+ROBOREV="/opt/homebrew/bin/roborev"
+if [ ! -x "$ROBOREV" ]; then
+    ROBOREV=$(command -v roborev 2>/dev/null)
+    [ -z "$ROBOREV" ] || [ ! -x "$ROBOREV" ] && return 0
+fi
+_roborev_input=$(mktemp "${TMPDIR:-/tmp}/roborev-pre-push.XXXXXX") || return 0
+cat > "$_roborev_input"
+"$ROBOREV" post-commit --flush-push < "$_roborev_input" 2>/dev/null || true
+exec 0< "$_roborev_input"
+rm -f "$_roborev_input"
+}
+_roborev_flush
+# roborev hook end
 # Require signature headers on pushed ancestry and exact-tip local CI evidence.
 
 set -euo pipefail

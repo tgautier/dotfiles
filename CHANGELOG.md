@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-09-16]
+
+### Changed
+
+- `.githooks/pre-push` now tracks the block that `roborev install-hook` prepends, which flushes pending post-commit review batches before the shipping-gate checks. The other roborev-generated hooks are whole files and stay gitignored, but pre-push is the tracked gate hook, so the block can only be tracked or repeatedly re-added as an uncommitted change that dirties the checkout and blocks every push. The wiring check in `tests/test-local-gate` sources the hook with stdin from `/dev/null`, since the block reads stdin to completion (#293).
+
 ## [2026-09-15]
 
 ### Changed

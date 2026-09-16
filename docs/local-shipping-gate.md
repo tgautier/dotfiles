@@ -38,7 +38,7 @@ just ci-publish
 
 After those checks pass, the command writes the full commit SHA atomically under the checkout's Git directory. Linked worktrees therefore keep separate evidence.
 
-Pre-push accepts one checked-out branch tip. It rejects direct pushes to `main` or `master`, dirty state, stale evidence, wrong-tip evidence, pushed commits without Git signature headers, shallow history, and hooks from another checkout.
+The roborev-managed block at the top of `pre-push` first flushes pending post-commit review batches and exits quietly when roborev is not installed. Pre-push then accepts one checked-out branch tip. It rejects direct pushes to `main` or `master`, dirty state, stale evidence, wrong-tip evidence, pushed commits without Git signature headers, shallow history, and hooks from another checkout.
 
 After the SSH push succeeds, `just ci-publish` verifies the same clean local attestation, canonical SSH fetch and push URLs, the exact remote branch SHA, and current `origin/main` ancestry. It then publishes `local/exact-tip=success` through the GitHub commit-status API and reads that status back. Strict branch protection invalidates merge readiness if `main` advances after publication; update the branch, create a new signed commit, and repeat all three commands.
 

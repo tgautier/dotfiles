@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-10-12]
+
+### Changed
+
+- Pinned runtimes bumped by `mise upgrade --bump`: chezmoi 2.73.1, dart 3.13.5, deno 2.9.7, erlang 29.1, flutter 3.47.7, go 1.27.2, python 3.15.0, yarn 4.18.1, yq 4.54.1. The dart URL keeps its `{{ os() }}-{{ arch() }}` template, and erlang stays on OTP 29 so the elixir `-otp-29` pin still matches (#295).
+
 ## [2026-09-16]
 
 ### Changed

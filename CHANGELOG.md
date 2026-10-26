@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-10-26]
+
+### Removed
+
+- Headroom is no longer installed by `just setup`. Nothing used it, and its proxy would sit in the path of every agent prompt. On a machine that already has it, run `uv tool uninstall headroom-ai`.
+
 ## [2026-10-12]
 
 ### Changed

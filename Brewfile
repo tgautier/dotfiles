@@ -34,7 +34,6 @@ brew "git"
 brew "glab"
 brew "glib"
 brew "gnupg"
-## headroom: native installer via `just setup` (uv tool; context compression for AI agents)
 ## hermes-agent: native installer via `just setup` (self-updates via `hermes update`)
 brew "hivemind"
 brew "htop"

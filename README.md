@@ -174,7 +174,7 @@ Or run individual update steps:
 | `just update`      | Run all update steps below                        |
 | `just update-brew` | Update Homebrew packages and clean up             |
 | `just update-mas`  | Update Mac App Store apps (skipped if no `mas`)   |
-| `just update-mise` | Show outdated mise tools and upgrade them         |
+| `just update-mise` | Update mise, then upgrade outdated mise tools     |
 | `just update-rust` | Update Rust toolchain                             |
 
 ### Applying config changes

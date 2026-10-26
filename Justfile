@@ -677,8 +677,12 @@ update-brew:
 update-mas:
     {{ if os() == "macos" { "if command -v mas >/dev/null 2>&1; then mas upgrade; fi" } else { "true" } }}
 
-# Show outdated mise tools and upgrade them
+# `just setup` installs mise once through mise.run and never updates it, so
+# the binary itself is updated here before the tools it manages. The [doc]
+# attribute carries the summary for `just --list`.
+[doc("Update mise, then upgrade outdated mise tools")]
 update-mise:
+    mise self-update --yes
     mise outdated
     mise upgrade --bump
 

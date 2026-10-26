@@ -375,8 +375,9 @@ appear to be a git repository` in `update-mise` is self-healing — mise reclone
 the cached pyenv checkout in the same run and continues.
 
 To confirm, re-run `mise outdated` on its own and check that the warning does
-not recur. Use `mise outdated`, not `just update-mise`: the recipe also runs
-`mise upgrade --bump`, which upgrades tools and rewrites the version pins — far
+not recur. Use `mise outdated`, not `just update-mise`: the recipe also updates
+mise itself and runs `mise upgrade --bump`, which upgrades tools and rewrites
+the version pins — far
 more than a diagnostic should do. Judge by the warning text, not the exit
 code: `mise outdated` exits 0 whether or not tools are outdated, which is
 exactly why the recipe can run it first under just's fail-fast.

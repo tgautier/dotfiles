@@ -12,6 +12,8 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- `just update-mise`, and with it `just update`, now runs `mise self-update` before upgrading tools. `just setup` installs mise once through `mise.run` and nothing updated the binary afterwards, so it fell six months behind the tools it manages.
+
 - Pinned runtimes bumped by `mise upgrade --bump`: chezmoi 2.73.3, dart 3.13.7, deno 2.9.8, flutter 3.47.8, go 1.27.3, helm 4.3.1, python 3.15.1, ruby 4.0.9. The bump had rewritten the dart URL to the macOS arm64 archive; it is restored to the `{{ os() }}-{{ arch() }}` template so Linux and WSL still get their own SDK.
 
 ### Removed

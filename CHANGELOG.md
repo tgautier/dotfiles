@@ -18,6 +18,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 - Pinned erlang bumped to 29.1.2 by `mise upgrade --bump`. It stays on OTP 29, so the elixir `-otp-29` pin still matches.
 
+### Removed
+
+- Notion Web Clipper from `Brewfile.personal`. The App Store no longer lists it, so `mas` failed on its ID, which made `brew bundle` (and `just update`) fail and rerun every App Store install with `sudo` and `--force`. The next `just update` uninstalls an installed copy through `brew bundle cleanup --force`, and the App Store cannot reinstall it.
+
 ### Fixed
 
 - `just test-setup-helpers`, and with it `just ci` and the pre-commit gate, no longer fails when `just` on `PATH` is a mise shim. The test runs `just` under a temporary `HOME`, and the shim then rejected the real `~/.config/mise/config.toml` as an untrusted project config. The recipe now passes its own executable through `JUST`, and the test runs that binary directly.

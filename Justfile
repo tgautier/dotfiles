@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-changelog lint-brewfile lint-mise lint-mise-config-hygiene lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-chezmoi-canary test-local-gate
+ci: lint-shell lint-python lint-markdown lint-changelog lint-brewfile lint-mise lint-mise-config-hygiene lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-brew-lagging-casks test-chezmoi-canary test-local-gate
 
 [doc("Run the complete local gate and attest the exact clean HEAD")]
 ci-attest:
@@ -19,7 +19,7 @@ test-local-gate:
 
 [doc("Compile tracked Python helpers with warnings promoted to errors")]
 lint-python:
-    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "tests/private_chezmoi_bridge.py", "tests/setup_acceptance.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_setup_helpers.py")]'
+    PYTHONWARNINGS=error python3 -c 'from pathlib import Path; [compile(Path(path).read_text(encoding="utf-8"), path, "exec") for path in ("bin/chezmoi-cutover", "tests/private_chezmoi_bridge.py", "tests/setup_acceptance.py", "tests/test_chezmoi_cutover.py", "tests/test_private_chezmoi_bridge.py", "tests/test_setup_helpers.py", "bin/brew-lagging-casks", "tests/test_brew_lagging_casks.py")]'
 
 [doc("Fixture-test bounded, output-withholding private chezmoi orchestration")]
 test-private-chezmoi-bridge:
@@ -40,6 +40,10 @@ test-setup-acceptance-private:
 [doc("Fixture-test setup-owned platform compatibility links")]
 test-setup-helpers:
     JUST={{ quote(just_executable()) }} PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_setup_helpers.py' -v
+
+[doc("Fixture-test the read-only report of auto-updating casks behind the tap")]
+test-brew-lagging-casks:
+    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_brew_lagging_casks.py' -v
 
 [doc("Show how managed public and private targets differ from their source state")]
 chezmoi-status:
@@ -579,8 +583,9 @@ lint-mise-config-hygiene:
     fi
     echo "mise config hygiene OK ($caught planted secrets caught, $survived allowed lines survived)"
 
-# Update everything (brew, mac app store, mise, rust)
-update: update-brew update-mas update-mise update-rust
+# Update everything (brew, mac app store, mise, rust). The lagging-cask report
+# runs last so it lists only apps that every upgrade step left behind.
+update: update-brew update-mas update-mise update-rust brew-lagging-casks
 
 # Resolve through symlink so this works when just finds ~/.justfile
 dotfiles_dir := parent_directory(canonicalize(justfile()))
@@ -672,6 +677,16 @@ update-brew:
     # brew doctor is intentionally non-fatal — it reports warnings about the
     # Homebrew installation itself, not about package correctness
     brew doctor || true
+
+# HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS leaves auto_updates casks to their own
+# updaters, so an app whose updater cannot install a release stays behind
+# silently. This report compares each app bundle's version with the tap and
+# changes nothing. It reads the tap as of the last `brew update`, which
+# `update-brew` runs first inside `just update`. The [doc] attribute carries
+# the summary for `just --list`.
+[doc("Report auto-updating apps still behind the Homebrew tap (read-only)")]
+brew-lagging-casks:
+    python3 bin/brew-lagging-casks
 
 # Update Mac App Store apps (no-op on non-macOS)
 update-mas:

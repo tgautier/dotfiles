@@ -1,0 +1,171 @@
+#!/usr/bin/env python3
+"""Report auto-updating casks whose installed app is behind the Homebrew tap.
+
+HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS keeps `brew upgrade` and
+`brew bundle install` away from casks marked `auto_updates`, so an app whose
+own updater cannot install a release stays behind without any message. This
+report reads each app bundle's real version and compares it with the tap's.
+It never installs, upgrades, or writes anything.
+
+Homebrew's own `brew outdated --cask --greedy` is not used because it compares
+the tap with Homebrew's install record, which goes stale whenever an app
+updates itself, so it lists apps that are already current.
+"""
+
+from __future__ import annotations
+
+import argparse
+from dataclasses import dataclass
+import json
+from pathlib import Path
+import plistlib
+import re
+import subprocess
+import sys
+from typing import Any, Sequence
+
+
+# Kept apart from the docstring, which `python3 -OO` strips.
+DESCRIPTION = "Report auto-updating casks whose installed app is behind the Homebrew tap."
+BREW_TIMEOUT_SECONDS = 300
+VERSION_KEYS = ("CFBundleShortVersionString", "CFBundleVersion")
+
+
+@dataclass(frozen=True)
+class Lagging:
+    token: str
+    bundle_version: str
+    tap_version: str
+
+
+@dataclass(frozen=True)
+class Report:
+    lagging: list[Lagging]
+    unchecked: list[str]
+
+
+def version_numbers(version: str) -> tuple[int, ...]:
+    """Return the numeric components of a version, ignoring cask build suffixes.
+
+    A cask version such as `2.13.0,6362815968182272` carries a build id after the
+    comma that the bundle never shows, so only the part before it is compared.
+    """
+    return tuple(int(part) for part in re.findall(r"\d+", version.split(",", 1)[0]))
+
+
+def is_behind(bundle: tuple[int, ...], tap: tuple[int, ...]) -> bool:
+    """Compare only the components both versions carry.
+
+    Some bundles report a shortened version (Android Studio shows `2026.1` for
+    tap version `2026.1.3.8`). Treating the missing components as zero would
+    flag those apps forever, so equal common components count as current.
+    """
+    for bundle_part, tap_part in zip(bundle, tap):
+        if bundle_part != tap_part:
+            return bundle_part < tap_part
+    return False
+
+
+def app_targets(cask: dict[str, Any]) -> list[Path]:
+    targets = []
+    for artifact in cask.get("artifacts") or []:
+        if isinstance(artifact, dict) and "app" in artifact and isinstance(artifact.get("target"), str):
+            targets.append(Path(artifact["target"]))
+    return targets
+
+
+def bundle_version(app: Path) -> str | None:
+    try:
+        with (app / "Contents/Info.plist").open("rb") as handle:
+            info = plistlib.load(handle)
+    except (OSError, plistlib.InvalidFileException, ValueError):
+        return None
+    if not isinstance(info, dict):
+        return None
+    for key in VERSION_KEYS:
+        value = info.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def build_report(casks: list[dict[str, Any]]) -> Report:
+    lagging: list[Lagging] = []
+    unchecked: list[str] = []
+    for cask in casks:
+        if not cask.get("auto_updates"):
+            # Homebrew's normal upgrade already covers these casks.
+            continue
+        token = str(cask.get("token", "?"))
+        tap_version = str(cask.get("version") or "")
+        tap = version_numbers(tap_version)
+        targets = app_targets(cask)
+        if not tap or not targets:
+            # `latest` versions, installers, fonts, and CLI-only casks have no
+            # comparable app bundle.
+            unchecked.append(token)
+            continue
+        versions = [bundle_version(target) for target in targets]
+        if any(version is None or not version_numbers(version) for version in versions):
+            unchecked.append(token)
+            continue
+        behind = [
+            version
+            for version in versions
+            if version is not None and is_behind(version_numbers(version), tap)
+        ]
+        if behind:
+            lagging.append(Lagging(token, behind[0], tap_version.split(",", 1)[0]))
+    return Report(sorted(lagging, key=lambda item: item.token), sorted(unchecked))
+
+
+def installed_casks(brew: str) -> list[dict[str, Any]]:
+    result = subprocess.run(
+        [brew, "info", "--cask", "--installed", "--json=v2"],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=BREW_TIMEOUT_SECONDS,
+    )
+    data = json.loads(result.stdout)
+    casks = data.get("casks") if isinstance(data, dict) else None
+    if not isinstance(casks, list) or not all(isinstance(cask, dict) for cask in casks):
+        raise ValueError("brew info returned JSON without a list of casks")
+    return casks
+
+
+def render(report: Report) -> str:
+    lines = []
+    if report.lagging:
+        width = max(len(item.token) for item in report.lagging)
+        lines.append(f"Auto-updating apps still behind Homebrew ({len(report.lagging)}):")
+        for item in report.lagging:
+            lines.append(f"  {item.token:<{width}}  {item.bundle_version} -> {item.tap_version}")
+        lines.append("Their own updater may still catch up. To upgrade one through Homebrew:")
+        lines.append("  brew upgrade --cask <cask>")
+    else:
+        lines.append("Every checked auto-updating app matches Homebrew.")
+    if report.unchecked:
+        lines.append(f"Not checked (no comparable app version): {', '.join(report.unchecked)}")
+    return "\n".join(lines)
+
+
+def main(argv: Sequence[str] | None = None, platform: str = sys.platform) -> int:
+    parser = argparse.ArgumentParser(description=DESCRIPTION)
+    parser.add_argument("--brew", default="brew", help="brew executable to query (default: brew on PATH)")
+    args = parser.parse_args(argv)
+    if platform != "darwin":
+        print("brew-lagging-casks: casks exist only on macOS; nothing to report.")
+        return 0
+    try:
+        casks = installed_casks(args.brew)
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        # json.JSONDecodeError is a ValueError.
+        print(f"brew-lagging-casks: could not list installed casks: {error}", file=sys.stderr)
+        return 1
+    print(render(build_report(casks)))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

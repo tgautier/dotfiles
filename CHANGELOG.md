@@ -14,6 +14,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 - GitHub Desktop (`cask "github"`) in the shared macOS `Brewfile`, so every Mac gets it on the next `just setup` or `just update`.
 
+### Changed
+
+- Pinned erlang bumped to 29.1.2 by `mise upgrade --bump`. It stays on OTP 29, so the elixir `-otp-29` pin still matches.
+
 ### Fixed
 
 - `just test-setup-helpers`, and with it `just ci` and the pre-commit gate, no longer fails when `just` on `PATH` is a mise shim. The test runs `just` under a temporary `HOME`, and the shim then rejected the real `~/.config/mise/config.toml` as an untrusted project config. The recipe now passes its own executable through `JUST`, and the test runs that binary directly.

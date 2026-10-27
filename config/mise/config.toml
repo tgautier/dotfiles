@@ -9,7 +9,7 @@ deno = "2.9.8"
 # elixir's -otp-N suffix must match erlang's OTP major. Bump these two as a
 # pair, never independently.
 elixir = "1.20.4-otp-29"
-erlang = "29.1"
+erlang = "29.1.2"
 "vfox:mise-plugins/vfox-flutter" = "3.47.8"
 go = "1.27.3"
 helm = "4.3.1"

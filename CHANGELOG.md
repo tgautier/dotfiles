@@ -13,6 +13,7 @@ grouped by **date** rather than by semantic version. Newest first.
 ### Added
 
 - GitHub Desktop (`cask "github"`) in the shared macOS `Brewfile`, so every Mac gets it on the next `just setup` or `just update`.
+- Gitify (`cask "gitify"`), a menu bar app for GitHub notifications, in the shared macOS `Brewfile`. It replaces GitHub Desktop and keeps itself updated.
 
 ### Changed
 
@@ -20,6 +21,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
+- GitHub Desktop (`cask "github"`) from the shared macOS `Brewfile`, added earlier the same day. Gitify replaces it. The next `just update` uninstalls an installed copy through `brew bundle cleanup --force`.
 - Notion Web Clipper from `Brewfile.personal`. The App Store no longer lists it, so `mas` failed on its ID, which made `brew bundle` (and `just update`) fail and rerun every App Store install with `sudo` and `--force`. The next `just update` uninstalls an installed copy through `brew bundle cleanup --force`, and the App Store cannot reinstall it.
 
 ### Fixed

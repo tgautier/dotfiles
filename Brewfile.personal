@@ -29,5 +29,4 @@ cask "tailscale-app"
 
 # Mac App Store Applications
 mas "Infuse", id: 1136220934
-mas "Notion Web Clipper", id: 1559269364
 mas "Reeder 5", id: 1529448980

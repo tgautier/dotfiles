@@ -5,7 +5,9 @@ HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS keeps `brew upgrade` and
 `brew bundle install` away from casks marked `auto_updates`, so an app whose
 own updater cannot install a release stays behind without any message. This
 report reads each app bundle's real version and compares it with the tap's.
-It never installs, upgrades, or writes anything.
+By default it never installs, upgrades, or writes anything. With
+`--offer-upgrade` on a terminal, it then asks once whether to upgrade the
+listed apps through Homebrew and changes nothing unless the answer is yes.
 
 Homebrew's own `brew outdated --cask --greedy` is not used because it compares
 the tap with Homebrew's install record, which goes stale whenever an app
@@ -22,12 +24,13 @@ import plistlib
 import re
 import subprocess
 import sys
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 
 # Kept apart from the docstring, which `python3 -OO` strips.
 DESCRIPTION = "Report auto-updating casks whose installed app is behind the Homebrew tap."
 BREW_TIMEOUT_SECONDS = 300
+UPGRADE_ANSWERS = ("y", "yes")
 VERSION_KEYS = ("CFBundleShortVersionString", "CFBundleVersion")
 
 
@@ -150,9 +153,64 @@ def render(report: Report) -> str:
     return "\n".join(lines)
 
 
-def main(argv: Sequence[str] | None = None, platform: str = sys.platform) -> int:
+def confirm_upgrade(count: int, ask: Callable[[str], str]) -> bool:
+    noun = "app" if count == 1 else "apps"
+    prompt = (
+        f"Upgrade {'this' if count == 1 else 'these'} {count} {noun} through Homebrew? "
+        "Running apps are quit and reopened. [y/N] "
+    )
+    try:
+        answer = ask(prompt)
+    except EOFError:
+        print()
+        return False
+    return answer.strip().lower() in UPGRADE_ANSWERS
+
+
+def upgrade(brew: str, tokens: list[str]) -> int:
+    """Upgrade the named casks and report any that are still behind.
+
+    Naming a cask makes `brew upgrade --cask` check it greedily, so it ignores
+    HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS. Homebrew carries on past a failed
+    cask and exits nonzero at the end, so its status is passed on. The upgrade
+    has no timeout because it downloads every app; HOMEBREW_CURLRC already
+    aborts stalled transfers.
+    """
+    try:
+        status = subprocess.run([brew, "upgrade", "--cask", *tokens], check=False).returncode
+    except OSError as error:
+        print(f"brew-lagging-casks: could not run brew upgrade: {error}", file=sys.stderr)
+        return 1
+    try:
+        remaining = [item for item in build_report(installed_casks(brew)).lagging if item.token in tokens]
+    except (OSError, subprocess.SubprocessError, ValueError) as error:
+        print(f"brew-lagging-casks: could not re-check upgraded casks: {error}", file=sys.stderr)
+        return 1
+    if remaining:
+        # Homebrew skips a named cask whose install record already matches the
+        # tap, even when the app bundle is older, and exits 0.
+        names = [item.token for item in remaining]
+        print(f"Still behind after the upgrade: {', '.join(names)}")
+        print("If Homebrew said the latest version is already installed, replace them with:")
+        print(f"  brew reinstall --cask {' '.join(names)}")
+    else:
+        print("Every upgraded app now matches Homebrew.")
+    return 1 if status else 0
+
+
+def main(
+    argv: Sequence[str] | None = None,
+    platform: str = sys.platform,
+    interactive: bool | None = None,
+    ask: Callable[[str], str] = input,
+) -> int:
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument("--brew", default="brew", help="brew executable to query (default: brew on PATH)")
+    parser.add_argument(
+        "--offer-upgrade",
+        action="store_true",
+        help="on a terminal, ask whether to upgrade the listed apps through Homebrew",
+    )
     args = parser.parse_args(argv)
     if platform != "darwin":
         print("brew-lagging-casks: casks exist only on macOS; nothing to report.")
@@ -163,8 +221,21 @@ def main(argv: Sequence[str] | None = None, platform: str = sys.platform) -> int
         # json.JSONDecodeError is a ValueError.
         print(f"brew-lagging-casks: could not list installed casks: {error}", file=sys.stderr)
         return 1
-    print(render(build_report(casks)))
-    return 0
+    report = build_report(casks)
+    print(render(report))
+    if not args.offer_upgrade or not report.lagging:
+        return 0
+    if interactive is None:
+        interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    if not interactive:
+        # Without a terminal nobody can answer, so nothing is upgraded.
+        print("No terminal to ask on, so nothing was upgraded.")
+        return 0
+    sys.stdout.flush()
+    if not confirm_upgrade(len(report.lagging), ask):
+        print("Nothing upgraded.")
+        return 0
+    return upgrade(args.brew, [item.token for item in report.lagging])
 
 
 if __name__ == "__main__":

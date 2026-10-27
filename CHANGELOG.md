@@ -18,6 +18,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Changed
 
+- `just brew-lagging-casks` is now `just update-lagging-casks`. After listing the auto-updating apps behind the Homebrew tap, it asks once whether to upgrade them with `brew upgrade --cask`, then checks them again. Only `y` or `yes` upgrades; the default answer, and a run without a terminal, change nothing. Homebrew quits and reopens a running app it upgrades.
 - Pinned erlang bumped to 29.1.2 by `mise upgrade --bump`. It stays on OTP 29, so the elixir `-otp-29` pin still matches.
 
 ### Removed

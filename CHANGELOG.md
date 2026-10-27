@@ -14,6 +14,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 - GitHub Desktop (`cask "github"`) in the shared macOS `Brewfile`, so every Mac gets it on the next `just setup` or `just update`.
 - Gitify (`cask "gitify"`), a menu bar app for GitHub notifications, in the shared macOS `Brewfile`. It replaces GitHub Desktop and keeps itself updated.
+- Pocket Casts (`cask "pocket-casts"`), a podcast app, in the shared macOS `Brewfile`. It keeps itself updated.
 - `just brew-lagging-casks`, a read-only report of auto-updating apps whose installed version is behind the Homebrew tap. `just update` runs it last, so it lists only apps the upgrade left behind, such as an app whose own updater cannot install a release.
 
 ### Changed

@@ -10,6 +10,7 @@ import plistlib
 import sys
 import tempfile
 import textwrap
+from typing import Sequence
 import unittest
 
 
@@ -106,46 +107,151 @@ class MainTests(unittest.TestCase):
 
     def fake_brew(self, body: str) -> str:
         brew = self.root / "brew"
-        brew.write_text(
-            textwrap.dedent(
-                f"""\
-                #!/bin/sh
-                printf '%s\\n' "$*" >> {str(self.calls)!r}
-                {body}
-                """
-            ),
-            encoding="utf-8",
-        )
+        # Joined rather than dedented: a multi-line body would defeat dedent.
+        header = f"#!/bin/sh\nprintf '%s\\n' \"$*\" >> {str(self.calls)!r}\n"
+        brew.write_text(header + body + "\n", encoding="utf-8")
         brew.chmod(0o755)
         return str(brew)
 
-    def run_main(self, brew: str, platform: str = "darwin") -> tuple[int, str, str]:
+    def run_main(
+        self,
+        brew: str,
+        platform: str = "darwin",
+        extra: Sequence[str] = (),
+        interactive: bool | None = False,
+        answer: str | None = None,
+    ) -> tuple[int, str, str]:
+        prompts: list[str] = []
+
+        def ask(prompt: str) -> str:
+            prompts.append(prompt)
+            if answer is None:
+                raise EOFError
+            return answer
+
         stdout, stderr = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            status = LAGGING.main(["--brew", brew], platform=platform)
+            status = LAGGING.main(["--brew", brew, *extra], platform=platform, interactive=interactive, ask=ask)
+        self.prompts = prompts
         return status, stdout.getvalue(), stderr.getvalue()
 
-    def test_queries_installed_casks_read_only(self) -> None:
-        app = self.root / "Obsidian.app/Contents"
-        app.mkdir(parents=True)
-        with (app / "Info.plist").open("wb") as handle:
-            plistlib.dump({"CFBundleShortVersionString": "1.13.7"}, handle)
+    def write_payload(self, name: str, tap_version: str) -> Path:
         payload = {
             "formulae": [],
             "casks": [
                 {
                     "token": "obsidian",
-                    "version": "1.14.5",
+                    "version": tap_version,
                     "auto_updates": True,
                     "artifacts": [{"app": ["Obsidian.app"], "target": str(self.root / "Obsidian.app")}],
                 }
             ],
         }
-        (self.root / "payload.json").write_text(json.dumps(payload), encoding="utf-8")
-        status, stdout, stderr = self.run_main(self.fake_brew(f"cat {str(self.root / 'payload.json')!r}"))
+        path = self.root / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
+    def lagging_brew(self, upgrade_status: int = 0, catches_up: bool = True) -> str:
+        """Fake brew with one app behind; `upgrade` optionally brings it level."""
+        app = self.root / "Obsidian.app/Contents"
+        app.mkdir(parents=True)
+        with (app / "Info.plist").open("wb") as handle:
+            plistlib.dump({"CFBundleShortVersionString": "1.13.7"}, handle)
+        current = self.write_payload("payload.json", "1.14.5")
+        after = self.write_payload("after.json", "1.13.7" if catches_up else "1.14.5")
+        return self.fake_brew(
+            textwrap.dedent(
+                f"""                case "$1" in
+                    info) cat {str(current)!r} ;;
+                    upgrade) cp {str(after)!r} {str(current)!r}; exit {upgrade_status} ;;
+                    *) exit 9 ;;
+                esac
+                """
+            )
+        )
+
+    def calls_made(self) -> list[str]:
+        return self.calls.read_text(encoding="utf-8").splitlines()
+
+    def test_queries_installed_casks_read_only(self) -> None:
+        status, stdout, stderr = self.run_main(self.lagging_brew(), interactive=True, answer="y")
         self.assertEqual(status, 0, stderr)
         self.assertIn("obsidian  1.13.7 -> 1.14.5", stdout)
-        self.assertEqual(self.calls.read_text(encoding="utf-8"), "info --cask --installed --json=v2\n")
+        self.assertEqual(self.prompts, [])
+        self.assertEqual(self.calls_made(), ["info --cask --installed --json=v2"])
+
+    def test_yes_upgrades_the_listed_casks_and_rechecks(self) -> None:
+        for answer in ("y", "YES", " yes \n"):
+            with self.subTest(answer=answer):
+                self.setUp()
+                status, stdout, stderr = self.run_main(
+                    self.lagging_brew(), extra=["--offer-upgrade"], interactive=True, answer=answer
+                )
+                self.assertEqual(status, 0, stderr)
+                self.assertEqual(len(self.prompts), 1)
+                self.assertIn("Upgrade this 1 app through Homebrew?", self.prompts[0])
+                self.assertIn("quit and reopened", self.prompts[0])
+                self.assertEqual(
+                    self.calls_made(),
+                    [
+                        "info --cask --installed --json=v2",
+                        "upgrade --cask obsidian",
+                        "info --cask --installed --json=v2",
+                    ],
+                )
+                self.assertIn("Every upgraded app now matches Homebrew.", stdout)
+
+    def test_anything_but_yes_upgrades_nothing(self) -> None:
+        for answer in ("", "n", "no", "yep", None):
+            with self.subTest(answer=answer):
+                self.setUp()
+                status, stdout, stderr = self.run_main(
+                    self.lagging_brew(), extra=["--offer-upgrade"], interactive=True, answer=answer
+                )
+                self.assertEqual(status, 0, stderr)
+                self.assertEqual(len(self.prompts), 1)
+                self.assertIn("Nothing upgraded.", stdout)
+                self.assertEqual(self.calls_made(), ["info --cask --installed --json=v2"])
+
+    def test_no_terminal_skips_the_prompt(self) -> None:
+        status, stdout, stderr = self.run_main(self.lagging_brew(), extra=["--offer-upgrade"], interactive=False)
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual(self.prompts, [])
+        self.assertIn("nothing was upgraded", stdout)
+        self.assertEqual(self.calls_made(), ["info --cask --installed --json=v2"])
+
+    def test_nothing_lagging_asks_nothing(self) -> None:
+        brew = self.fake_brew("echo '{\"formulae\": [], \"casks\": []}'")
+        status, stdout, stderr = self.run_main(brew, extra=["--offer-upgrade"], interactive=True, answer="y")
+        self.assertEqual(status, 0, stderr)
+        self.assertEqual(self.prompts, [])
+        self.assertIn("matches Homebrew", stdout)
+        self.assertEqual(self.calls_made(), ["info --cask --installed --json=v2"])
+
+    def test_failed_upgrade_fails_and_still_rechecks(self) -> None:
+        status, stdout, _ = self.run_main(
+            self.lagging_brew(upgrade_status=1, catches_up=False),
+            extra=["--offer-upgrade"],
+            interactive=True,
+            answer="y",
+        )
+        self.assertEqual(status, 1)
+        self.assertEqual(len(self.calls_made()), 3)
+        self.assertIn("Still behind after the upgrade: obsidian", stdout)
+
+    def test_prompt_counts_several_apps(self) -> None:
+        prompts: list[str] = []
+        self.assertFalse(LAGGING.confirm_upgrade(18, lambda prompt: prompts.append(prompt) or "n"))
+        self.assertTrue(prompts[0].startswith("Upgrade these 18 apps through Homebrew?"))
+        self.assertTrue(prompts[0].endswith("[y/N] "))
+
+    def test_skipped_upgrade_names_the_reinstall_remedy(self) -> None:
+        status, stdout, _ = self.run_main(
+            self.lagging_brew(catches_up=False), extra=["--offer-upgrade"], interactive=True, answer="y"
+        )
+        self.assertEqual(status, 0)
+        self.assertIn("Still behind after the upgrade: obsidian", stdout)
+        self.assertIn("brew reinstall --cask obsidian", stdout)
 
     def test_brew_failure_is_reported_and_fails(self) -> None:
         status, stdout, stderr = self.run_main(self.fake_brew("echo boom >&2; exit 3"))

@@ -169,16 +169,16 @@ just update
 
 Or run individual update steps:
 
-| Recipe                    | Description                                                       |
-| ------------------------- | ----------------------------------------------------------------- |
-| `just update`             | Run all update steps below                                        |
-| `just update-brew`        | Update Homebrew packages and clean up                             |
-| `just update-mas`         | Update Mac App Store apps (skipped if no `mas`)                   |
-| `just update-mise`        | Update mise, then upgrade outdated mise tools                     |
-| `just update-rust`        | Update Rust toolchain                                             |
-| `just brew-lagging-casks` | List auto-updating apps still behind the Homebrew tap (read-only) |
+| Recipe                      | Description                                                               |
+| --------------------------- | ------------------------------------------------------------------------- |
+| `just update`               | Run all update steps below                                                |
+| `just update-brew`          | Update Homebrew packages and clean up                                     |
+| `just update-mas`           | Update Mac App Store apps (skipped if no `mas`)                           |
+| `just update-mise`          | Update mise, then upgrade outdated mise tools                             |
+| `just update-rust`          | Update Rust toolchain                                                     |
+| `just update-lagging-casks` | List auto-updating apps behind the Homebrew tap and offer to upgrade them |
 
-`just update` runs `brew-lagging-casks` last, so the list shows only apps that every upgrade step left behind. See [Homebrew](docs/homebrew.md#auto-updating-casks-are-left-to-their-own-updaters) for how to read it.
+`just update` runs `update-lagging-casks` last, so the list shows only apps that every upgrade step left behind. It then asks once whether to upgrade them, and the default answer changes nothing. See [Homebrew](docs/homebrew.md#auto-updating-casks-are-left-to-their-own-updaters) for how to read the list.
 
 ### Applying config changes
 
@@ -422,7 +422,7 @@ Individual targets:
 | `just lint-cleanup-symlinks` | Fixture-test the stale-symlink scanner |
 | `just test-private-chezmoi-bridge` | Fixture-test bounded companion checks and output withholding |
 | `just test-chezmoi-operator` | Fixture-test guarded public/private operation, approval, idempotence, and recovery |
-| `just test-brew-lagging-casks` | Fixture-test the read-only lagging-cask report |
+| `just test-brew-lagging-casks` | Fixture-test the lagging-cask report and its upgrade prompt |
 | `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
 | `just test-setup-acceptance` | Run `just setup` twice from a fresh public checkout into an isolated HOME |

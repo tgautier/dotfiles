@@ -583,9 +583,9 @@ lint-mise-config-hygiene:
     fi
     echo "mise config hygiene OK ($caught planted secrets caught, $survived allowed lines survived)"
 
-# Update everything (brew, mac app store, mise, rust). The lagging-cask report
+# Update everything (brew, mac app store, mise, rust). The lagging-cask step
 # runs last so it lists only apps that every upgrade step left behind.
-update: update-brew update-mas update-mise update-rust brew-lagging-casks
+update: update-brew update-mas update-mise update-rust update-lagging-casks
 
 # Resolve through symlink so this works when just finds ~/.justfile
 dotfiles_dir := parent_directory(canonicalize(justfile()))
@@ -680,13 +680,14 @@ update-brew:
 
 # HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS leaves auto_updates casks to their own
 # updaters, so an app whose updater cannot install a release stays behind
-# silently. This report compares each app bundle's version with the tap and
-# changes nothing. It reads the tap as of the last `brew update`, which
-# `update-brew` runs first inside `just update`. The [doc] attribute carries
-# the summary for `just --list`.
-[doc("Report auto-updating apps still behind the Homebrew tap (read-only)")]
-brew-lagging-casks:
-    python3 bin/brew-lagging-casks
+# silently. This compares each app bundle's version with the tap, lists the
+# apps behind it, and on a terminal asks once whether to upgrade them; the
+# default answer changes nothing. It reads the tap as of the last
+# `brew update`, which `update-brew` runs first inside `just update`. The
+# [doc] attribute carries the summary for `just --list`.
+[doc("List auto-updating apps behind the Homebrew tap and offer to upgrade them")]
+update-lagging-casks:
+    python3 bin/brew-lagging-casks --offer-upgrade
 
 # Update Mac App Store apps (no-op on non-macOS)
 update-mas:

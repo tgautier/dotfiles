@@ -26,6 +26,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Fixed
 
+- `jq` and `shellcheck` run from any directory again. Other projects pin them in mise, so mise puts their shims ahead of Homebrew on `PATH`, and since mise 2026.10.20 a shim with no active version refuses to run. Test harnesses that copy these tools from `PATH` into a temporary directory failed with `No version is set for shim`. The global mise config now pins jq 1.8.2 and shellcheck 0.11.0, the installed versions, so the shims resolve everywhere ([#307](https://github.com/tgautier/dotfiles/issues/307)).
 - `just test-setup-helpers`, and with it `just ci` and the pre-commit gate, no longer fails when `just` on `PATH` is a mise shim. The test runs `just` under a temporary `HOME`, and the shim then rejected the real `~/.config/mise/config.toml` as an untrusted project config. The recipe now passes its own executable through `JUST`, and the test runs that binary directly.
 
 ## [2026-10-26]

@@ -86,7 +86,7 @@ Some tools (notably Docker Desktop) prepend PATH lines to `~/.zprofile` during i
 
 ### Tool Version Management (mise)
 
-Runtime versions are managed by **mise**. The tracked file is `config/mise/config.toml`, and chezmoi deploys `~/.config/mise/config.toml` as a **symlink** to it, rendered from `home/dot_config/mise/symlink_config.toml.tmpl`. Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn.
+Runtime versions are managed by **mise**. The tracked file is `config/mise/config.toml`, and chezmoi deploys `~/.config/mise/config.toml` as a **symlink** to it, rendered from `home/dot_config/mise/symlink_config.toml.tmpl`. Mise is activated in `zshrc`. Pinned tools include node, python, ruby, go, erlang, elixir, deno, helm, and yarn. jq and shellcheck are pinned too although the Brewfiles also install them: other projects pin them in mise, which puts global shims ahead of Homebrew on `PATH`, and a shim with no active version refuses to run outside those projects (#307).
 
 The symlink exists because mise owns this file and rewrites it: `mise upgrade --bump` (which `just update` runs), `mise use`, and `mise settings set` all edit it in place. A deployed copy therefore drifted from tracked source on every update, and chezmoi's conflict-refusing apply then blocked `just link` and `just setup` permanently (#267). With the symlink, a mise write lands in the checkout and shows up in `git status`, so the fix is to commit it.
 

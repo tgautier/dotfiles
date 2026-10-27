@@ -12,6 +12,17 @@ REPOSITORY = Path(__file__).resolve().parents[1]
 
 
 class SetupHelperTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        # Run the just binary that started the suite. Resolving `just` on PATH
+        # under the fixture HOME can hit a version-manager shim that reads HOME.
+        just = Path(os.environ.get("JUST", ""))
+        if not just.is_absolute() or not os.access(just, os.X_OK):
+            raise RuntimeError(
+                "JUST must name the running just executable; run `just test-setup-helpers`"
+            )
+        cls.just = just
+
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
@@ -49,7 +60,7 @@ class SetupHelperTests(unittest.TestCase):
 
     def run_helper(self) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["just", "_link-libsqlite3"],
+            [str(self.just), "_link-libsqlite3"],
             cwd=REPOSITORY,
             env=self.environment,
             check=False,

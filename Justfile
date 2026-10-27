@@ -39,7 +39,7 @@ test-setup-acceptance-private:
 
 [doc("Fixture-test setup-owned platform compatibility links")]
 test-setup-helpers:
-    PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_setup_helpers.py' -v
+    JUST={{ quote(just_executable()) }} PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_setup_helpers.py' -v
 
 [doc("Show how managed public and private targets differ from their source state")]
 chezmoi-status:

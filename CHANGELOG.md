@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-10-27]
+
+### Fixed
+
+- `just test-setup-helpers`, and with it `just ci` and the pre-commit gate, no longer fails when `just` on `PATH` is a mise shim. The test runs `just` under a temporary `HOME`, and the shim then rejected the real `~/.config/mise/config.toml` as an untrusted project config. The recipe now passes its own executable through `JUST`, and the test runs that binary directly.
+
 ## [2026-10-26]
 
 ### Changed

@@ -45,6 +45,10 @@ Two things follow:
 - `brew list --cask --versions` reports the version Homebrew installed, not the one the app updated itself to. Read the running version from the app: `defaults read "/Applications/<App>.app/Contents/Info.plist" CFBundleShortVersionString`.
 - Homebrew upgrades such an app only when asked by name. `brew upgrade --cask <cask>` checks a named cask greedily and ignores the variable, so it upgrades the cask whenever the tap is ahead of Homebrew's record. `--greedy` on the bare `brew upgrade` does the same for all of them, and `greedy: true` on a Brewfile entry does it for that cask inside `brew bundle install`. A root-owned app still needs the App Management permission first.
 
+Because of the variable, an app whose own updater cannot install a release (Obsidian 1.14 needed a manual download) stays behind without any message. `just update` therefore ends with `just brew-lagging-casks`, a report that changes nothing. It reads the version from each `auto_updates` cask's app bundle and lists the apps older than the tap's version. It runs after every upgrade step, so the list holds only apps that are still behind. `brew outdated --cask --greedy` is no substitute: it compares the tap with Homebrew's install record, which goes stale whenever an app updates itself, so it lists apps that are already current.
+
+Read the list as a prompt, not a failure. An app one patch behind usually catches up through its own updater within days. An app that stays listed across runs, or is a major version behind, likely needs `brew upgrade --cask <cask>`. Set `greedy: true` on a cask that keeps getting stuck. The report compares only the version components both sides carry, because some bundles show a shortened version (Android Studio reports `2026.1` for tap version `2026.1.3.8`). It lists casks it cannot compare under "Not checked": installers, fonts, CLI-only casks, and `latest` versions.
+
 ## Download stall detection
 
 Homebrew passes `--retry 3` to curl, but no stall timeout. A connection that

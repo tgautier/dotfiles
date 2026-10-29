@@ -221,7 +221,7 @@ setup: _ensure-profile
 
     # 4. Git hooks + review tooling.
     just git-hooks
-    if command -v roborev >/dev/null 2>&1; then roborev install-hook; fi
+    just _roborev-install-hook
 
     # 5. Native-installer tools (self-update through their own channels).
     command -v claude >/dev/null 2>&1 || curl -fsSL https://claude.ai/install.sh | bash
@@ -237,6 +237,54 @@ setup: _ensure-profile
 git-hooks:
     git config --local core.hooksPath .githooks
     @echo "Git hooks wired for this checkout"
+
+# Install roborev's hooks without dirtying the tracked pre-push (#319).
+# `roborev install-hook` bakes the local binary path into its block, so on
+# Linux it swaps the tracked macOS `ROBOREV="/opt/homebrew/bin/roborev"` line
+# for the Linuxbrew path. The block falls back to `command -v roborev` when the
+# baked path is missing, so the tracked line works everywhere. Restore it only
+# when pre-push was clean beforehand and that one line is the whole change; any
+# other diff (a new block version, your own edits) is left for review.
+_roborev-install-hook repo=justfile_directory():
+    #!/usr/bin/env bash
+    set -euo pipefail
+    repo={{ quote(repo) }}
+    hook=.githooks/pre-push
+    command -v roborev >/dev/null 2>&1 || exit 0
+    # Exit 0 means unchanged, 1 means changed; anything else is a Git failure.
+    hook_state() {
+        local rc=0
+        git -C "$repo" diff --quiet HEAD -- "$hook" || rc=$?
+        case $rc in
+            0) echo clean ;;
+            1) echo changed ;;
+            *) echo "cannot inspect $hook (git diff exit $rc)" >&2; return 1 ;;
+        esac
+    }
+    before=$(hook_state)
+    (cd "$repo" && roborev install-hook)
+    after=$(hook_state)
+    [[ "$after" == clean ]] && exit 0
+    if [[ "$before" != clean ]]; then
+        echo "$hook had local changes before roborev install-hook; left as is" >&2
+        exit 0
+    fi
+    diff=$(git -C "$repo" diff --no-color --unified=0 HEAD -- "$hook")
+    path_line='^ROBOREV="[^"]*"$'
+    removed=0 added=0 other=0
+    while IFS= read -r line; do
+        case $line in
+            "--- a/$hook" | "+++ b/$hook") ;;
+            -*) if [[ "${line#-}" =~ $path_line ]]; then removed=$((removed + 1)); else other=1; fi ;;
+            +*) if [[ "${line#+}" =~ $path_line ]]; then added=$((added + 1)); else other=1; fi ;;
+        esac
+    done <<<"$diff"
+    if (( removed == 1 && added == 1 && other == 0 )); then
+        git -C "$repo" restore --source=HEAD -- "$hook"
+        echo "Kept the tracked roborev path in $hook (the hook falls back to command -v roborev)"
+    else
+        echo "roborev install-hook changed $hook beyond its binary path; review the diff and commit the new block" >&2
+    fi
 
 # Run this after editing managed config. The operator validates public/private
 # ownership in isolation, applies the public and private chezmoi sources without

@@ -20,6 +20,16 @@ case "$(uname -s)" in
         for f in "/mnt/c/Program Files/WindowsApps"/Agilebits.1Password_*/op-ssh-sign-wsl; do
             [ -x "$f" ] && exec "$f" "$@"
         done
+        # The Store package directory is often unreadable from WSL; the current
+        # user's app execution alias and the direct installer's copy are not.
+        localappdata=$(/mnt/c/Windows/System32/cmd.exe /d /c 'echo %LOCALAPPDATA%' 2>/dev/null | tr -d '\r')
+        localappdata=$(wslpath -u "$localappdata" 2>/dev/null) || localappdata=
+        if [ -n "$localappdata" ]; then
+            for f in "$localappdata/Microsoft/WindowsApps/op-ssh-sign-wsl.exe" \
+                "$localappdata"/1Password/app/*/op-ssh-sign-wsl.exe; do
+                [ -x "$f" ] && exec "$f" "$@"
+            done
+        fi
         echo "op-ssh-sign-wsl not found" >&2
         exit 1
         ;;

@@ -8,6 +8,14 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-10-29]
+
+### Fixed
+
+- Commit signing on WSL finds 1Password's `op-ssh-sign-wsl` again. `bin/op-ssh-sign` looked only in the Microsoft Store package directory under `C:\Program Files\WindowsApps`, which WSL often cannot read, so every signed commit failed with `op-ssh-sign-wsl not found`. It now also tries the current Windows user's app execution alias under `%LOCALAPPDATA%\Microsoft\WindowsApps` and the direct installer's copy under `%LOCALAPPDATA%\1Password\app`, resolving `%LOCALAPPDATA%` through `cmd.exe` so it never runs another profile's binary.
+- The WSL quick start's apt step now installs `libncurses-dev`, `libssl-dev`, `autoconf`, and `m4`. mise compiles the pinned Erlang from source, and on a fresh Ubuntu its configure step failed with `No curses library functions found`, so `just setup` stopped with Erlang and Elixir missing.
+- `just test-local-gate`, and with it `just ci` and the pre-commit gate, passes on Linux again. Its `file_mode` helper tried BSD `stat -f '%Lp'` first, but GNU `stat -f` prints filesystem status to stdout before failing, so the attestation-mode check compared that output against `600` and failed. The helper now tries GNU `stat -c '%a'` first.
+
 ## [2026-10-27]
 
 ### Added

@@ -101,8 +101,13 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, deployed with [chezmoi]
 3. **Install essential tools:**
 
    ```sh
-   sudo apt install -y coreutils zsh git curl build-essential libffi-dev libyaml-dev zlib1g-dev
+   sudo apt install -y coreutils zsh git curl build-essential libffi-dev libyaml-dev zlib1g-dev \
+     libncurses-dev libssl-dev autoconf m4
    ```
+
+   mise compiles Erlang from source. Without `libncurses-dev`, its configure
+   step fails with `No curses library functions found`, and mise then skips
+   Elixir.
 
 4. **Install Homebrew:**
 

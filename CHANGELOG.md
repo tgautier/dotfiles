@@ -10,6 +10,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [2026-10-29]
 
+### Added
+
+- Codex (`cask "codex"`) in `Brewfile.linux`, the first cask there. The cask ships a native Linux binary, and declaring it keeps `brew bundle cleanup --force` in `just update` from uninstalling it on Linux and WSL.
+
 ### Fixed
 
 - Commit signing on WSL finds 1Password's `op-ssh-sign-wsl` again. `bin/op-ssh-sign` looked only in the Microsoft Store package directory under `C:\Program Files\WindowsApps`, which WSL often cannot read, so every signed commit failed with `op-ssh-sign-wsl not found`. It now also tries the current Windows user's app execution alias under `%LOCALAPPDATA%\Microsoft\WindowsApps` and the direct installer's copy under `%LOCALAPPDATA%\1Password\app`, resolving `%LOCALAPPDATA%` through `cmd.exe` so it never runs another profile's binary.

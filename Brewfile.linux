@@ -89,6 +89,9 @@ brew "yt-dlp"
 brew "ytt"
 brew "zsh-completions"
 
+# Applications
+cask "codex"
+
 # Native installers (preferred over Homebrew casks on Linux):
 # - Claude Code: installed by `just setup`
 # - Hermes Agent: installed by `just setup`

@@ -261,13 +261,20 @@ def operator_lock(state_root: Path) -> Iterator[None]:
 
 
 def resolve_executable(value: str, *, label: str) -> Path:
-    """Resolve one selected executable once before any source runs."""
+    """Resolve one selected executable once before any source runs.
+
+    Only the containing directory is canonicalized. A final symlink keeps its
+    name because multi-call binaries dispatch on it: a mise shim is a symlink
+    to `mise`, and running the target directly hands chezmoi's arguments to
+    mise (#325).
+    """
 
     candidate = shutil.which(value)
     if candidate is None:
         raise CutoverError(f"{label} is not installed or is not executable")
+    found = Path(candidate)
     try:
-        path = Path(candidate).resolve(strict=True)
+        path = found.parent.resolve(strict=True) / found.name
     except OSError as exc:
         raise CutoverError(f"cannot resolve {label} executable: {exc}") from exc
     if not path.is_file() or not os.access(path, os.X_OK):

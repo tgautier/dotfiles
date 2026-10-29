@@ -187,12 +187,23 @@ def clean_environment(home: Path, fake_bin: Path, log_path: Path) -> dict[str, s
             "ZDOTDIR",
         }
     }
+    # The inherited PATH can reach chezmoi or just through a mise shim. Point
+    # mise at the host's installed tools, read-only and offline, so the
+    # isolated XDG directories cannot make a shim download and install a tool
+    # mid-run, whose progress output would also reach captured chezmoi
+    # output (#325).
+    mise_data = os.environ.get("MISE_DATA_DIR") or str(
+        Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share") / "mise"
+    )
     environment.update(
         {
             "GIT_CONFIG_GLOBAL": os.devnull,
             "GIT_CONFIG_NOSYSTEM": "1",
             "HOME": str(home),
             "LC_ALL": "C.UTF-8",
+            "MISE_AUTO_INSTALL": "0",
+            "MISE_DATA_DIR": mise_data,
+            "MISE_OFFLINE": "1",
             "NO_COLOR": "1",
             "PATH": f"{fake_bin}{os.pathsep}{environment.get('PATH', '')}",
             "PYTHONDONTWRITEBYTECODE": "1",
@@ -287,7 +298,11 @@ def verify_public_targets(public: Path, home: Path) -> set[Path]:
     for row in read_manifest(public / "docs/chezmoi-targets.tsv"):
         target = home / row["target"]
         disposition = row["disposition"]
-        if disposition == "shadow":
+        if disposition == "shadow" and row["mode"] == "symlink":
+            # A symlink_ source deploys a link into the checkout (#269).
+            assert_symlink_target(target, public / row["source"])
+            targets.add(target)
+        elif disposition == "shadow":
             mode = 0o755 if row["mode"] == "executable" else 0o644
             assert_regular_target(target, public / "home" / row["chezmoi_source"], mode)
             targets.add(target)

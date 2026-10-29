@@ -565,6 +565,51 @@ class ChezmoiCutoverTests(unittest.TestCase):
         self.assertIn("chezmoi is not installed or is not executable", completed.stderr)
         self.assertEqual(self._records(), [])
 
+    def _multi_call_link(self) -> Path:
+        """Return a `chezmoi` symlink to a binary that dispatches on its name."""
+
+        multi_call = self.root / "multi-call"
+        multi_call.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env python3
+                import os
+                import sys
+
+                if os.path.basename(sys.argv[0]) != "chezmoi":
+                    print("usage: multi-call [TOOL]", file=sys.stderr)
+                    raise SystemExit(2)
+                os.execv({str(self.fake_chezmoi)!r}, [{str(self.fake_chezmoi)!r}, *sys.argv[1:]])
+                """
+            ),
+            encoding="utf-8",
+        )
+        multi_call.chmod(0o700)
+        shims = self.root / "shims"
+        shims.mkdir()
+        link = shims / "chezmoi"
+        link.symlink_to(multi_call)
+        return link
+
+    def test_executable_symlink_keeps_its_name(self) -> None:
+        link = self._multi_call_link()
+
+        resolved = CUTOVER.resolve_executable(str(link), label="chezmoi")
+
+        self.assertEqual(resolved, link.parent.resolve() / "chezmoi")
+        self.assertTrue(resolved.is_symlink())
+
+    def test_link_runs_a_multi_call_shim_by_its_name(self) -> None:
+        link = self._multi_call_link()
+
+        completed = self._run("link", extra_arguments=["--chezmoi", str(link)])
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertNotIn("usage: multi-call", completed.stderr)
+        self.assertTrue(
+            any(record["operation"] == "apply" for record in self._records())
+        )
+
     def test_invalid_existing_private_path_fails_instead_of_skipping(self) -> None:
         self.private.write_text("not a checkout\n", encoding="utf-8")
 

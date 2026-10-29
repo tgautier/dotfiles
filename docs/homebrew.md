@@ -71,8 +71,7 @@ own curl invocations are affected.
 
 ### Cask upgrade fails with "there is already an App at"
 
-macOS only — `Brewfile.linux` declares no casks, so there is no Caskroom
-staging directory to wedge.
+macOS only. The casks in `Brewfile.linux` ship plain binaries, not `.app` bundles, so there is no app staging directory to wedge.
 
 Paths below are shown for the Apple Silicon prefix `/opt/homebrew`; Intel Macs
 use `/usr/local`. The commands all derive it via `$(brew --prefix)`.

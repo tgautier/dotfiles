@@ -15,18 +15,18 @@ The Brewfiles must stay in sync and sorted. Tools enter a machine through exactl
 
 - `Brewfile` — macOS **shared base**: every package common to all Macs, plus a profile-overlay tail that merges the machine-specific overlay via `instance_eval`
 - `Brewfile.work` / `Brewfile.personal` — macOS **per-machine overlays**: casks/mas/brew that belong on only that profile. Each Mac picks one via the marker at `~/.config/dotfiles/profile` (set with `just set-profile work|personal`; interactive `just setup` prompts on first run, default `work` — non-interactive runs fail instead of guessing). An absent/empty/unknown marker makes `brew bundle` fail loud — never silently merge the wrong overlay, since `brew bundle cleanup --force` would then uninstall every overlay app
-- `Brewfile.linux` — Linux base (no casks/mas)
+- `Brewfile.linux` — Linux base: formulae plus the few casks that ship a Linux binary (no mas)
 
 Because the overlay is merged into the same `brew bundle` evaluation, both `brew bundle install` and `brew bundle cleanup` operate on the full per-machine set — cleanup never uninstalls a sibling profile's apps on that machine.
 
 ## Rules
 
 - Before adding an entry to **any** Brewfile, grep all four (`grep -n "<name>" Brewfile Brewfile.work Brewfile.personal Brewfile.linux`) for an existing entry — the package may already live in an overlay. Promoting an overlay package to the base means **removing** the overlay entry in the same change. `lint-brewfile` now catches a duplicate `brew`/`cask`/`mas` name across the merged base + overlay set (its harness records entry names during the eval), but grep first — a clear diff beats a CI failure
-- A package shared by **all** machines goes in the base (`Brewfile` for macOS, and also `Brewfile.linux` unless it's a cask/mas or platform-specific tool)
+- A package shared by **all** machines goes in the base (`Brewfile` for macOS, and also `Brewfile.linux` unless it's a mas entry, a macOS-only cask, or a platform-specific tool)
 - A package for **one Mac profile only** goes in `Brewfile.work` or `Brewfile.personal` — never in the shared `Brewfile` base
-- Casks (`cask`) and Mac App Store (`mas`) entries never appear in `Brewfile.linux` — they are not available on Linux
+- Mac App Store (`mas`) entries never appear in `Brewfile.linux`. A cask goes there only when `brew info --cask <name>` on Linux lists a Linux artifact and it installs cleanly (e.g. `codex`, a plain binary); most casks are macOS `.app` bundles and stay out. An undeclared cask on Linux is uninstalled by `brew bundle cleanup --force` in `just update`
 - The macOS `Brewfile` base is organized into comment-delimited blocks: `# CLI Tools & Development`, `# Applications`, `# Fonts`, `# Mac App Store Applications`. The overlays use the same block names in the same order, but carry only the blocks they need — a `brew` formula in an overlay goes under `# CLI Tools & Development`, never into `# Applications`
-- `Brewfile.linux` is organized into a `# CLI Tools & Development` block
+- `Brewfile.linux` is organized into a `# CLI Tools & Development` block followed by an `# Applications` block for casks
 - Within each block in each file, entries are sorted alphabetically (a-z) by package name
 - Tap entries (`tap`) come before all blocks
 - For tap-prefixed formulae (e.g., `brew "terror/tap/just-lsp"`), sort by the full string including the tap prefix

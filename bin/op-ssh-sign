@@ -17,7 +17,11 @@ case "$(uname -s)" in
             echo "native 1Password op-ssh-sign not found" >&2
             exit 1
         fi
-        for f in "/mnt/c/Program Files/WindowsApps"/Agilebits.1Password_*/op-ssh-sign-wsl; do
+        # The Store package directory is often unreadable from WSL; its per-user
+        # app execution alias and the direct installer's copy are not.
+        for f in "/mnt/c/Program Files/WindowsApps"/Agilebits.1Password_*/op-ssh-sign-wsl \
+            /mnt/c/Users/*/AppData/Local/Microsoft/WindowsApps/op-ssh-sign-wsl.exe \
+            /mnt/c/Users/*/AppData/Local/1Password/app/*/op-ssh-sign-wsl.exe; do
             [ -x "$f" ] && exec "$f" "$@"
         done
         echo "op-ssh-sign-wsl not found" >&2

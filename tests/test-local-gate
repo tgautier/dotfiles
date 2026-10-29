@@ -47,7 +47,8 @@ record_fail() {
 }
 
 file_mode() {
-  stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1"
+  # GNU first: GNU `stat -f` prints filesystem status to stdout before failing.
+  stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"
 }
 
 mkdir -p "$repo/.githooks/lib" "$tools" "$home"

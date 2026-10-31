@@ -10,7 +10,6 @@ RUN apt-get update \
         curl \
         git \
         jq \
-        libsqlite3-0 \
         python3 \
         ruby \
         zsh \

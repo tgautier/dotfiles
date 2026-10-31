@@ -506,10 +506,9 @@ lint-mise:
 # literal-token arm of the pattern carries its own probe, because a per-arm
 # typo is invisible to a probe that another arm happens to catch: review 177
 # found `github_pat_` and `xoxb-` unprobed while both still worked, which is
-# the state a later edit turns into a silent hole. The `dartsdk-` case is the
-# near miss that motivated anchoring the OpenAI-key arm to a length: an
-# unanchored `sk-` matches nothing in `dartsdk-`, but the arm is one careless
-# edit away from doing so.
+# the state a later edit turns into a silent hole. The `desk-` line is a near
+# miss for the OpenAI-key arm, which is anchored to a length: the arm matches
+# nothing in `desk-release`, but an unanchored `sk-` would.
 lint-mise-config-hygiene:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -562,7 +561,7 @@ lint-mise-config-hygiene:
         fi
         survived=$((survived + 1))
     done <<'ALLOWED'
-    dart = { url = "https://x/dartsdk-macos-arm64-release.zip" }
+    tool = { url = "https://x/desk-release.zip" }
     trusted_config_paths = ["~/Workspace/tgautier"]
     node = "26"
     not_found_auto_install = true
@@ -754,7 +753,6 @@ set-default-editor:
         sol move
         css scss sass less styl
         sql graphql gql proto thrift avsc
-        dart
         tf hcl tfvars
         dockerfile containerfile
         gitignore gitattributes editorconfig nvmrc tool-versions

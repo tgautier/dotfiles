@@ -16,7 +16,7 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ### Removed
 
-- Flutter and Dart tooling, which these dotfiles no longer need. The `vfox-flutter` and `dart` mise pins are gone, and so is the Linux/WSL `libsqlite3.so` symlink for Drift FFI: `just setup` no longer runs `_link-libsqlite3`, and `zshenv` no longer prepends `~/.local/lib/flutter-ffi` to `LD_LIBRARY_PATH`. An existing machine keeps the old symlink until you delete it with `rm -r ~/.local/lib/flutter-ffi` and runs mise's installed Flutter and Dart until `mise prune` removes them (#327).
+- Flutter and Dart tooling, which these dotfiles no longer need. The `vfox-flutter` and `dart` mise pins are gone, and so is the Linux/WSL `libsqlite3.so` symlink for Drift FFI: `just setup` no longer runs `_link-libsqlite3`, and `zshenv` no longer prepends `~/.local/lib/flutter-ffi` to `LD_LIBRARY_PATH`. `just set-default-editor` no longer associates `.dart` files with VS Code. An existing machine keeps the old symlink until you delete it with `rm -r ~/.local/lib/flutter-ffi`, and keeps the installed SDKs until you remove them with `mise uninstall --all dart vfox:mise-plugins/vfox-flutter` (#327).
 
 ## [2026-10-29]
 

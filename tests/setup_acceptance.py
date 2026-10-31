@@ -470,8 +470,6 @@ def run_case(
                 managed_targets.update(verify_private_targets(private, home, environment))
             if platform.system() == "Darwin":
                 managed_targets.add(home / ".config/dotfiles/profile")
-            else:
-                managed_targets.add(home / ".local/lib/flutter-ffi/libsqlite3.so")
 
             current_state = {target: target_state(target) for target in managed_targets}
             if first_state is None:

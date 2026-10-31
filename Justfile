@@ -37,7 +37,7 @@ test-setup-acceptance:
 test-setup-acceptance-private:
     PYTHONDONTWRITEBYTECODE=1 python3 tests/setup_acceptance.py --private-source {{quote(private_dir)}}
 
-[doc("Fixture-test setup-owned platform compatibility links")]
+[doc("Fixture-test setup-owned helper recipes")]
 test-setup-helpers:
     JUST={{ quote(just_executable()) }} PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_setup_helpers.py' -v
 
@@ -230,9 +230,6 @@ setup: _ensure-profile
     # 6. Default editor associations (macOS only; no-ops elsewhere).
     just set-default-editor
 
-    # 7. Linux/WSL: symlink libsqlite3 for Dart/Flutter FFI (no-op on macOS).
-    {{ if os() == "macos" { "true" } else { "just _link-libsqlite3" } }}
-
 [doc("Wire the tracked Git hooks in this checkout or worktree")]
 git-hooks:
     git config --local core.hooksPath .githooks
@@ -298,56 +295,6 @@ _roborev-install-hook repo=justfile_directory():
 [doc("Refresh dotfiles through their manifest-declared owners")]
 link:
     python3 bin/chezmoi-cutover link --public-dir {{quote(public_dir)}} --private-dir {{quote(private_dir)}}
-
-# Symlink the system libsqlite3 into a dedicated ~/.local/lib/flutter-ffi dir for
-# Dart/Flutter (Drift) FFI, which dlopen()s the unversioned 'libsqlite3.so' the
-# distro doesn't ship. Dedicated dir so only this symlink is ever on the loader
-# path (see zshenv). Linux/WSL only; resolves the real path via ldconfig, preferring
-# the entry matching the native arch so a multiarch box (e.g. amd64 + i386) can't
-# select a wrong-arch lib. Falls back to the first match on unrecognized arches.
-_link-libsqlite3:
-    #!/usr/bin/env sh
-    set -eu
-    # ldconfig usually lives in /sbin, which isn't always on a non-root PATH.
-    ldconfig_bin=$(command -v ldconfig || echo /sbin/ldconfig)
-    if [ ! -x "$ldconfig_bin" ]; then
-        echo "ldconfig not found (looked on PATH and /sbin) — cannot locate libsqlite3.so.0" >&2
-        exit 0
-    fi
-    # ldconfig -p tags each entry with its ABI, e.g. '(libc6,x86-64)'. Prefer the
-    # entry matching this machine's arch; fall back to the first match otherwise.
-    case "$(uname -m)" in
-        x86_64)  abi='x86-64' ;;
-        aarch64) abi='AArch64' ;;
-        *)       abi='' ;;
-    esac
-    src=$("$ldconfig_bin" -p | awk -v abi="$abi" '
-        /libsqlite3\.so\.0/ {
-            if (first == "") first = $NF
-            if (abi != "" && index($0, "(libc6," abi)) { print $NF; found = 1; exit }
-        }
-        END { if (!found) print first }')
-    if [ -z "$src" ]; then
-        echo "libsqlite3.so.0 not in ldconfig cache — install it (e.g. apt install libsqlite3-0) for Flutter Drift FFI" >&2
-        exit 0
-    fi
-    target="$HOME/.local/lib/flutter-ffi/libsqlite3.so"
-    mkdir -p "$(dirname "$target")"
-    if [ -L "$target" ]; then
-        current=$(readlink "$target")
-        if [ "$current" = "$src" ]; then
-            echo "link already current: $target -> $src"
-            exit 0
-        fi
-        echo "refusing to replace foreign symlink: $target -> $current" >&2
-        exit 1
-    fi
-    if [ -e "$target" ]; then
-        echo "refusing to replace non-symlink target: $target" >&2
-        exit 1
-    fi
-    ln -s "$src" "$target"
-    echo "linked $src -> $target"
 
 # Ensure a valid Brewfile profile marker exists (macOS only — Brewfile.linux
 # never reads it); prompt on first interactive setup (default: work). A
@@ -559,10 +506,9 @@ lint-mise:
 # literal-token arm of the pattern carries its own probe, because a per-arm
 # typo is invisible to a probe that another arm happens to catch: review 177
 # found `github_pat_` and `xoxb-` unprobed while both still worked, which is
-# the state a later edit turns into a silent hole. The `dartsdk-` case is the
-# near miss that motivated anchoring the OpenAI-key arm to a length: an
-# unanchored `sk-` matches nothing in `dartsdk-`, but the arm is one careless
-# edit away from doing so.
+# the state a later edit turns into a silent hole. The `desk-` line is a near
+# miss for the OpenAI-key arm, which is anchored to a length: the arm matches
+# nothing in `desk-release`, but an unanchored `sk-` would.
 lint-mise-config-hygiene:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -615,7 +561,7 @@ lint-mise-config-hygiene:
         fi
         survived=$((survived + 1))
     done <<'ALLOWED'
-    dart = { url = "https://x/dartsdk-macos-arm64-release.zip" }
+    tool = { url = "https://x/desk-release.zip" }
     trusted_config_paths = ["~/Workspace/tgautier"]
     node = "26"
     not_found_auto_install = true
@@ -807,7 +753,6 @@ set-default-editor:
         sol move
         css scss sass less styl
         sql graphql gql proto thrift avsc
-        dart
         tf hcl tfvars
         dockerfile containerfile
         gitignore gitattributes editorconfig nvmrc tool-versions

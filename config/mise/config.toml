@@ -4,13 +4,11 @@ trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
 chezmoi = "2.73.3"
-dart = { version = "3.13.7", url = "https://storage.googleapis.com/dart-archive/channels/stable/release/{{ version }}/sdk/dartsdk-{{ os() }}-{{ arch() }}-release.zip", version_list_url = "https://storage.googleapis.com/storage/v1/b/dart-archive/o?prefix=channels/stable/release/&delimiter=/", version_regex = 'channels/stable/release/(\d+\.\d+\.\d+)/', version_expr = 'fromJSON(body).prefixes | filter({ # matches "^channels/stable/release/(\\d+\\.\\d+\\.\\d+)/$" }) | map({split(#, "/")[3]}) | sortVersions()' }
 deno = "2.9.8"
 # elixir's -otp-N suffix must match erlang's OTP major. Bump these two as a
 # pair, never independently.
-elixir = "1.20.4-otp-29"
+elixir = "1.20.5-otp-29"
 erlang = "29.1.2"
-"vfox:mise-plugins/vfox-flutter" = "3.47.8"
 go = "1.27.3"
 helm = "4.3.1"
 # jq and shellcheck are also in the Brewfiles, but projects pin them in mise

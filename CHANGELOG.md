@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-11-02]
+
+### Fixed
+
+- `just update` no longer fails when 1Password does not approve an SSH key prompt. The global `gitconfig` rewrote every `https://github.com/` URL to SSH, so `brew update` fetched public taps such as `kenn-io/tap` over SSH and needed an interactive key approval. The rewrite now applies to pushes only (`pushInsteadOf`): fetches from HTTPS remotes use HTTPS, with the `gh` credential helper for private repositories, and pushes still use SSH. Remotes already set to SSH are unchanged.
+
 ## [2026-10-31]
 
 ### Changed

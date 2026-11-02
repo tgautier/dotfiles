@@ -360,6 +360,18 @@ With `HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS` set (see the section above), `just
 
 The permission is also what lets `brew bundle cleanup --force` remove such an app when it leaves the Brewfile, so grant it once per machine rather than per incident. Do not delete the Caskroom leftover by hand; the App conflict section explains why.
 
+### `brew update` fails with "agent refused operation"
+
+`brew update` fetches each tap with git. If git sends that fetch over SSH, 1Password must approve the key, and a dismissed or timed-out prompt fails the fetch with `sign_and_send_pubkey: signing failed ... agent refused operation` and `Fetching ... failed!`. `update-brew` then stops before `brew bundle`.
+
+The tracked `gitconfig` rewrites `https://github.com/` to SSH for pushes only (`pushInsteadOf`), so tap fetches use HTTPS and need no SSH key. If this error comes back, check that the deployed config has no fetch rewrite:
+
+```sh
+git config --global --get-all url.git@github.com:.insteadOf
+```
+
+The output should list only `git://github.com/`. If it lists `https://github.com/`, run `just link` to deploy the tracked config.
+
 ### `brew bundle` fails on a missing profile marker
 
 macOS only — `Brewfile.linux` has no profile overlay and never reads the

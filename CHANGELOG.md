@@ -8,6 +8,16 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-11-03]
+
+### Added
+
+- Caffeine cask in the shared macOS `Brewfile`, a menu bar app that keeps the Mac awake on demand. It is macOS-only, so `Brewfile.linux` does not list it (#334).
+
+### Changed
+
+- Pinned chezmoi bumped by a mise upgrade to 2.74.0.
+
 ## [2026-11-02]
 
 ### Fixed

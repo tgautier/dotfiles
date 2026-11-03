@@ -115,6 +115,7 @@ cask "android-studio"
 cask "antigravity"
 cask "antigravity-cli"
 cask "antigravity-ide"
+cask "caffeine"
 cask "claude"
 ## claude-code: native installer via `just setup` (auto-updates, no deps)
 cask "codex"

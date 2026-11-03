@@ -3,7 +3,7 @@ not_found_auto_install = true
 trusted_config_paths = ["~/Workspace/tgautier"]
 
 [tools]
-chezmoi = "2.73.3"
+chezmoi = "2.74.0"
 deno = "2.9.8"
 # elixir's -otp-N suffix must match erlang's OTP major. Bump these two as a
 # pair, never independently.

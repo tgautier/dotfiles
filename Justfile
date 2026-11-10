@@ -3,7 +3,7 @@
 zsh_excludes := "SC1036,SC1087,SC1090,SC2128,SC2145,SC2154,SC2155,SC2168,SC2179,SC2206,SC2211,SC2296"
 
 # Run all CI checks
-ci: lint-shell lint-python lint-markdown lint-changelog lint-brewfile lint-mise lint-mise-config-hygiene lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-brew-lagging-casks test-chezmoi-canary test-local-gate
+ci: lint-shell lint-python lint-markdown lint-changelog lint-brewfile lint-mise lint-mise-config-hygiene lint-just lint-cleanup-symlinks test-private-chezmoi-bridge test-chezmoi-operator test-setup-helpers test-brew-lagging-casks test-chezmoi-canary test-local-gate test-op-wsl lint-winget
 
 [doc("Run the complete local gate and attest the exact clean HEAD")]
 ci-attest:
@@ -60,6 +60,29 @@ chezmoi-apply-dry-run:
 [doc("Render the chezmoi canary in an isolated HOME and verify source equivalence plus idempotence")]
 test-chezmoi-canary:
     ./tests/test-chezmoi-canary
+
+[doc("Fixture-test the WSL op wrapper for the WinGet 1Password CLI")]
+test-op-wsl:
+    ./tests/test-op-wsl
+
+# On a WSL host, install the Windows packages declared in windows/winget.json.
+# --no-upgrade leaves installed packages alone, so a rerun changes nothing.
+# cmd.exe starts in /mnt/c: from a \\wsl$ UNC directory it warns and falls back.
+[doc("Install the Windows-side packages a WSL host needs through WinGet")]
+winget-import:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! grep -qi microsoft /proc/version 2>/dev/null; then
+        echo "winget-import: this recipe runs only under WSL" >&2
+        exit 1
+    fi
+    import_file=$(wslpath -w windows/winget.json)
+    cd /mnt/c
+    /mnt/c/Windows/System32/cmd.exe /d /c winget import --import-file "$import_file" --no-upgrade --accept-source-agreements --accept-package-agreements
+
+[doc("Validate the Windows WinGet import file for WSL hosts")]
+lint-winget:
+    python3 -c 'import json, sys; d = json.load(open("windows/winget.json", encoding="utf-8")); ids = [p["PackageIdentifier"] for s in d["Sources"] for p in s["Packages"]]; sys.exit(0 if "AgileBits.1Password.CLI" in ids else "windows/winget.json: AgileBits.1Password.CLI is not declared")'
 
 [doc("Remove the retired iTerm2 symlink after migrating to Ghostty")]
 cleanup-retired-iterm:
@@ -337,8 +360,8 @@ _ensure-profile:
 # every indented line — comments included — is echoed and handed to a shell.
 [doc("Lint shell scripts with ShellCheck")]
 lint-shell:
-    shellcheck --severity=warning bin/op-ssh-sign
-    shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary tests/test-local-gate
+    shellcheck --severity=warning bin/op-ssh-sign bin/wsl/op
+    shellcheck --severity=warning tests/check-chezmoi-targets tests/test-chezmoi-canary tests/test-local-gate tests/test-op-wsl
     shellcheck --severity=warning .githooks/pre-commit .githooks/pre-push .githooks/ci-attest .githooks/ci-publish .githooks/lib/*.sh
     shellcheck --severity=warning --shell=bash --exclude={{zsh_excludes}} zshenv zprofile zshrc zsh/zaliases zsh/zcompletion zsh/functions/*
 

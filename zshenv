@@ -88,6 +88,8 @@ if [[ $PLATFORM == "wsl" ]]; then
   [[ -d "/mnt/c/Windows/System32" ]] && path+="/mnt/c/Windows/System32"
   [[ -d "/mnt/c/Windows" ]] && path+="/mnt/c/Windows"
   [[ -d "/mnt/c/Program Files/PowerShell/7" ]] && path+="/mnt/c/Program Files/PowerShell/7"
+  # WSL-only wrappers for Windows tools, such as `op` for the WinGet 1Password CLI
+  [[ -d "${HOME}/.bin/wsl" ]] && path+="${HOME}/.bin/wsl"
   unset _vscode
 fi
 

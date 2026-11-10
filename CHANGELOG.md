@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-11-10]
+
+### Added
+
+- The 1Password CLI for WSL hosts. `windows/winget.json` declares the Windows package, and `just winget-import` installs it through WinGet without upgrading installed packages. A WSL-only `op` wrapper in `~/.bin/wsl`, which `zshenv` puts on `PATH` only on WSL, runs the WinGet copy of `op.exe`. The README documents the desktop "Integrate with 1Password CLI" setting and the stdin and CRLF interop details. `just ci` adds `test-op-wsl` and `lint-winget` (#330).
+
 ## [2026-11-03]
 
 ### Added

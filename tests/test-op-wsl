@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Fixture-test bin/wsl/op: WinGet path resolution, argument, stdin, and exit
+# status passthrough, and the not-installed failure. Runs on any platform by
+# pointing LOCALAPPDATA at a fake Windows profile directory.
+set -euo pipefail
+
+cleanup_root=
+
+cleanup() {
+    if [[ -n "$cleanup_root" && -d "$cleanup_root" ]]; then
+        rm -rf -- "$cleanup_root"
+    fi
+}
+
+fail() {
+    printf 'ERROR: %s\n' "$*" >&2
+    exit 1
+}
+
+main() {
+    local script_dir wrapper tmp package output status
+    script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+    wrapper="$script_dir/../bin/wsl/op"
+    [[ -x "$wrapper" ]] || fail "wrapper is missing or not executable: $wrapper"
+
+    tmp=$(mktemp -d)
+    cleanup_root=$tmp
+    trap cleanup EXIT
+
+    # Not installed: the package directory is absent.
+    mkdir -p "$tmp/empty"
+    status=0
+    output=$(LOCALAPPDATA="$tmp/empty" "$wrapper" whoami 2>&1) || status=$?
+    [[ "$status" -eq 127 ]] || fail "missing op.exe: expected exit 127, got $status"
+    [[ "$output" == *"op.exe not found under $tmp/empty/Microsoft/WinGet/Packages"* ]] \
+        || fail "missing op.exe: unexpected diagnostic: $output"
+
+    # Installed: a fake op.exe records its arguments and stdin, then exits 3.
+    package="$tmp/profile/Microsoft/WinGet/Packages/AgileBits.1Password.CLI_Microsoft.Winget.Source_fixture"
+    mkdir -p "$package"
+    cat > "$package/op.exe" <<'FAKE'
+#!/usr/bin/env bash
+printf 'args:'
+printf ' [%s]' "$@"
+printf '\nstdin:%s\n' "$(cat)"
+exit 3
+FAKE
+    chmod 0755 "$package/op.exe"
+
+    status=0
+    output=$(printf '{"title":"x"}' | LOCALAPPDATA="$tmp/profile" "$wrapper" item create --vault 'My Vault' -) || status=$?
+    [[ "$status" -eq 3 ]] || fail "installed op.exe: expected exit 3 passthrough, got $status"
+    [[ "$output" == $'args: [item] [create] [--vault] [My Vault] [-]\nstdin:{"title":"x"}' ]] \
+        || fail "installed op.exe: arguments or stdin not passed through: $output"
+
+    # A non-executable match is skipped, not executed.
+    chmod 0644 "$package/op.exe"
+    status=0
+    LOCALAPPDATA="$tmp/profile" "$wrapper" whoami >/dev/null 2>&1 || status=$?
+    [[ "$status" -eq 127 ]] || fail "non-executable op.exe: expected exit 127, got $status"
+
+    printf 'op WSL wrapper OK (resolution, passthrough, missing install)\n'
+}
+
+main "$@"

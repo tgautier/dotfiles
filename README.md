@@ -158,11 +158,21 @@ Cross-platform dotfiles for macOS and Linux/WSL2 Ubuntu, deployed with [chezmoi]
    git -C ~/Workspace/tgautier/dotfiles remote set-url origin git@github.com:tgautier/dotfiles.git
    ```
 
-9. **Keep everything current** (later, for maintenance):
+9. **Install the 1Password CLI on Windows** and reach it from WSL as `op`:
 
    ```sh
-   just update
+   just winget-import
    ```
+
+   The recipe imports `windows/winget.json` through WinGet on the Windows host. It skips packages that are already installed and never upgrades them. In the 1Password desktop app, enable Settings > Developer > Integrate with 1Password CLI so the app approves CLI requests. Open a new shell, then check the setup with `op whoami` or `op vault list`.
+
+   `op` is the `~/.bin/wsl/op` wrapper, which `zshenv` puts on `PATH` only on WSL. It runs the WinGet copy of `op.exe` from `%LOCALAPPDATA%\Microsoft\WinGet\Packages`, so scripts never name the package directory. Two Windows interop details matter in scripts. First, `op.exe` reads a redirected stdin as a JSON item template, so `op item create ... </dev/null` fails with `invalid JSON in piped input`; pipe a template instead. Second, its output can use CRLF line endings, so strip `\r` (for example with `tr -d '\r'`) before writing values to files.
+
+10. **Keep everything current** (later, for maintenance):
+
+    ```sh
+    just update
+    ```
 
 ## Day-to-Day Updates
 
@@ -251,6 +261,7 @@ Brewfile                # macOS shared base + profile-overlay tail
 Brewfile.work           # macOS work-only casks/apps
 Brewfile.personal       # macOS personal-only casks/apps
 Brewfile.linux          # Linux Homebrew packages
+windows/winget.json     # Windows packages for WSL hosts (just winget-import)
 .chezmoiroot            # Selects home/ as the chezmoi source state
 home/                   # Chezmoi source state: relative symlinks to the files above
 tests/                  # Isolated parity checker and sabotage fixtures
@@ -276,6 +287,7 @@ Chezmoi installs each managed script into `~/.bin`, which `zshenv` adds to `PATH
 | ------------------ | -------------------------------------------------------------------------- |
 | `chezmoi-cutover`  | Inspect and deploy the public and optional private dotfile sources         |
 | `op-ssh-sign`      | Cross-platform 1Password SSH signing (WSL delegates to `op-ssh-sign-wsl`)  |
+| `wsl/op`           | WSL-only `op` that runs the WinGet-installed Windows 1Password CLI         |
 
 Additional scripts (`kseal`, `kshow`, `obsidian`) live in the private companion repository.
 
@@ -430,6 +442,8 @@ Individual targets:
 | `just test-brew-lagging-casks` | Fixture-test the lagging-cask report and its upgrade prompt |
 | `just test-chezmoi-canary` | Run public parity plus optional private ownership and source canaries in isolation |
 | `just test-local-gate` | Fixture-test identity, signature-header ancestry, and exact-tip evidence |
+| `just test-op-wsl` | Fixture-test the WSL `op` wrapper's path resolution and passthrough |
+| `just lint-winget` | Check `windows/winget.json` parses and declares the 1Password CLI |
 | `just test-setup-acceptance` | Run `just setup` twice from a fresh public checkout into an isolated HOME |
 | `just test-setup-acceptance-private` | Fresh setup acceptance with and without the private companion |
 | `just test-setup-acceptance-linux` | Run the same harness inside a pinned Linux container (public-only) |

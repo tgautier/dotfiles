@@ -1,0 +1,31 @@
+#!/usr/bin/env sh
+# WSL wrapper for the Windows 1Password CLI installed by WinGet.
+#
+# WinGet installs op.exe under a versioned package directory and registers a
+# Windows alias that WSL cannot see. zshenv puts ~/.bin/wsl on PATH only on
+# WSL, so this wrapper never shadows a native `op` on macOS or Linux.
+#
+# The Windows profile directory comes from LOCALAPPDATA when it is set (a WSL
+# path, or a Windows path that wslpath converts), else from cmd.exe.
+# stdin, stdout, and the exit status pass through unchanged: op.exe reads a
+# redirected stdin as an item template, and its output may use CRLF endings.
+set -u
+
+localappdata=${LOCALAPPDATA:-}
+if [ -z "$localappdata" ]; then
+    localappdata=$(/mnt/c/Windows/System32/cmd.exe /d /c 'echo %LOCALAPPDATA%' </dev/null 2>/dev/null | tr -d '\r')
+fi
+case "$localappdata" in
+    /*) ;;
+    ?*) localappdata=$(wslpath -u "$localappdata" 2>/dev/null) || localappdata= ;;
+esac
+if [ -z "$localappdata" ]; then
+    echo "op: cannot resolve the Windows LOCALAPPDATA directory" >&2
+    exit 127
+fi
+
+for f in "$localappdata"/Microsoft/WinGet/Packages/AgileBits.1Password.CLI_*/op.exe; do
+    [ -x "$f" ] && exec "$f" "$@"
+done
+echo "op: op.exe not found under $localappdata/Microsoft/WinGet/Packages; install it with the WinGet import in README.md (Windows + WSL2)" >&2
+exit 127

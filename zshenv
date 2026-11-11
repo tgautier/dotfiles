@@ -81,7 +81,7 @@ elif [[ $PLATFORM == "linux" ]] || [[ $PLATFORM == "wsl" ]]; then
   # directories, so it cannot see apt's .pc files (WebKitGTK, libsoup for Tauri).
   # Rust's pkg-config crate runs $PKG_CONFIG when it is set, so Rust builds
   # resolve native libraries from apt alone, GTK included, while other tools keep
-  # the first pkg-config on PATH. Unset when apt's pkg-config is absent.
+  # the first pkg-config on PATH. Not exported when apt's pkg-config is absent.
   [[ -x /usr/bin/pkg-config ]] && export PKG_CONFIG=/usr/bin/pkg-config
 fi
 

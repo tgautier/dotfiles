@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-11-11]
+
+### Added
+
+- Tauri 2 build prerequisites on Linux and WSL. The `Brewfile.linux` native-installers block lists the apt packages Tauri needs (WebKitGTK, libsoup, and the rest of its Debian and Ubuntu list) plus the system `pkg-config`. On Linux and WSL, `zshenv` exports `PKG_CONFIG=/usr/bin/pkg-config` when that binary exists, so Rust's `pkg-config` crate resolves native libraries from apt instead of Homebrew's `pkg-config`, which cannot see apt's `.pc` files. Other tools keep the first `pkg-config` on `PATH`, and macOS is unchanged (#338).
+
 ## [2026-11-10]
 
 ### Added

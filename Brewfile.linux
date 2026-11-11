@@ -101,5 +101,10 @@ cask "codex"
 # - gemini-cli: npm install -g @google/gemini-cli (Homebrew formula deprecated
 #   upstream; the brew replacement, antigravity-cli, is a macOS-only cask)
 # - Ghostty: https://ghostty.org/docs/install/binary
+# - Tauri 2 build libraries (WebKitGTK, libsoup) and the system pkg-config that
+#   `zshenv` points Rust builds at: apt install pkg-config libwebkit2gtk-4.1-dev
+#   build-essential curl wget file libxdo-dev libssl-dev
+#   libayatana-appindicator3-dev librsvg2-dev
+#   (https://v2.tauri.app/start/prerequisites/)
 # - telnet: apt install telnet (Homebrew formula is source-only / Tier 3 on Linux)
 # - VS Code: https://code.visualstudio.com/docs/setup/linux

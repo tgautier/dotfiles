@@ -77,6 +77,15 @@ if [[ $PLATFORM == "macos" ]]; then
 elif [[ $PLATFORM == "linux" ]] || [[ $PLATFORM == "wsl" ]]; then
   # Homebrew on Linux (optional)
   [[ -d "/home/linuxbrew/.linuxbrew/bin" ]] && path+="/home/linuxbrew/.linuxbrew/bin"
+  # Homebrew's pkg-config comes first on PATH and searches only Homebrew's
+  # directories, so it cannot see apt's .pc files (WebKitGTK, libsoup for Tauri).
+  # Rust's pkg-config crate runs $HOST_PKG_CONFIG for native builds, so Rust
+  # resolves native libraries from apt alone, GTK included. autotools, CMake and
+  # meson read PKG_CONFIG instead, so they (and mise's source builds) keep the
+  # first pkg-config on PATH. PKG_CONFIG itself stays unexported because the crate
+  # treats it as permission to cross-compile with host libraries.
+  # Not exported when apt's pkg-config is absent.
+  [[ -x /usr/bin/pkg-config ]] && export HOST_PKG_CONFIG=/usr/bin/pkg-config
 fi
 
 # WSL: Add Windows interop paths

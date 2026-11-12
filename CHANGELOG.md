@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-11-12]
+
+### Added
+
+- Windows App cask (Microsoft's Remote Desktop client) in the personal macOS overlay `Brewfile.personal`. It is macOS-only, so `Brewfile.linux` does not list it (#340).
+
 ## [2026-11-11]
 
 ### Added

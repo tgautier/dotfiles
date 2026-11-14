@@ -658,11 +658,23 @@ export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS := "1"
 # export above keeps such casks out of the upgrade; docs/homebrew.md covers the
 # manual repair. The [doc] attribute carries the summary because `just --list`
 # would otherwise show only the last line of this comment.
+#
+# On macOS, upgrading a cask that ships a .pkg (windows-app) runs Homebrew's
+# uninstall step through sudo. Without a terminal, sudo cannot ask for the
+# password and the whole bundle pass fails midway. `sudo -v` asks once before
+# anything changes and stops the recipe cleanly when no terminal is attached.
+# Homebrew on Linux and WSL does not use sudo, so they skip it.
 [doc("Update Homebrew packages and clean up")]
 update-brew:
     #!/usr/bin/env bash
     set -euo pipefail
     brewfile={{quote(brewfile)}}
+    if [[ "$(uname -s)" == Darwin ]]; then
+        if ! sudo -v; then
+            printf 'update-brew: sudo authentication failed; .pkg cask upgrades need it. Run "just update" from a terminal.\n' >&2
+            exit 1
+        fi
+    fi
     brew update
     # brew bundle install can fail when a prior cask upgrade was interrupted,
     # leaving an app in the Caskroom staging directory. Detect the "already

@@ -169,5 +169,85 @@ class RoborevInstallHookTests(unittest.TestCase):
         self.assertIn(LINUXBREW_ROBOREV_LINE, lines)
 
 
+class UpdateBrewSudoTests(unittest.TestCase):
+    """Pin the sudo pre-authentication at the start of update-brew."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        just = Path(os.environ.get("JUST", ""))
+        if not just.is_absolute() or not os.access(just, os.X_OK):
+            raise RuntimeError(
+                "JUST must name the running just executable; run `just test-setup-helpers`"
+            )
+        cls.just = just
+
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        root = Path(self.temporary.name)
+        fake_bin = root / "bin"
+        fake_bin.mkdir()
+        self.calls = root / "calls"
+        self.calls.touch()
+        stubs = {
+            "uname": 'printf "%s\\n" "$FAKE_UNAME"\n',
+            "sudo": 'printf "sudo %s\\n" "$*" >> "$FAKE_CALLS"\nexit "$FAKE_SUDO_STATUS"\n',
+            "brew": 'printf "brew %s\\n" "$*" >> "$FAKE_CALLS"\n',
+        }
+        for name, body in stubs.items():
+            stub = fake_bin / name
+            stub.write_text("#!/bin/sh\n" + body, encoding="utf-8")
+            stub.chmod(0o755)
+        self.environment = {
+            key: value
+            for key, value in os.environ.items()
+            if not key.startswith("GIT_") and key not in {"BASH_ENV", "ENV"}
+        }
+        self.environment.update(
+            {
+                "HOME": str(root),
+                "PATH": f"{fake_bin}{os.pathsep}{self.environment['PATH']}",
+                "FAKE_CALLS": str(self.calls),
+            }
+        )
+
+    def run_recipe(self, uname: str, sudo_status: int) -> subprocess.CompletedProcess[str]:
+        environment = dict(self.environment, FAKE_UNAME=uname, FAKE_SUDO_STATUS=str(sudo_status))
+        return subprocess.run(
+            [str(self.just), "--justfile", str(REPOSITORY / "Justfile"), "update-brew"],
+            env=environment,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+    def calls_made(self) -> list[str]:
+        return self.calls.read_text(encoding="utf-8").splitlines()
+
+    def test_macos_without_sudo_stops_before_brew(self) -> None:
+        completed = self.run_recipe("Darwin", 1)
+
+        self.assertNotEqual(completed.returncode, 0)
+        self.assertIn("sudo authentication failed", completed.stderr)
+        self.assertEqual(self.calls_made(), ["sudo -v"])
+
+    def test_macos_with_sudo_authenticates_before_brew_update(self) -> None:
+        completed = self.run_recipe("Darwin", 0)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        calls = self.calls_made()
+        self.assertEqual(calls[:2], ["sudo -v", "brew update"])
+        self.assertIn("brew upgrade", calls)
+
+    def test_linux_skips_sudo(self) -> None:
+        completed = self.run_recipe("Linux", 1)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        calls = self.calls_made()
+        self.assertEqual(calls[0], "brew update")
+        self.assertNotIn("sudo -v", calls)
+
+
 if __name__ == "__main__":
     unittest.main()

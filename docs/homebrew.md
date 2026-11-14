@@ -14,13 +14,16 @@ native-installer pattern), see `.claude/rules/brewfile.md`. This doc covers
 because it touches the network and mutates installed apps:
 
 ```sh
+sudo -v                         # macOS only: ask for the password up front
 brew update                     # refresh formula/cask definitions
 brew bundle install --file=...  # install missing AND upgrade outdated
 brew upgrade                    # upgrade whatever the Brewfile pass left
 brew cleanup --prune=all
 brew bundle cleanup --force --file=...
-brew doctor                     # non-fatal: prefixed with `-` in the Justfile
+brew doctor                     # non-fatal: `|| true` in the Justfile
 ```
+
+On macOS, upgrading a cask that ships a `.pkg` installer, such as `windows-app`, makes Homebrew run its uninstall step through `sudo`. Without a terminal, `sudo` cannot ask for the password, so the cask fails partway through `brew bundle install` after other packages have already been upgraded. `update-brew` therefore runs `sudo -v` before anything else: it asks for the password once, or stops the recipe with `update-brew: sudo authentication failed` when no terminal is attached. Run `just update` from a terminal. macOS forgets the password after 5 minutes by default, so a long run can ask again later. Homebrew on Linux and WSL does not use `sudo`, so the recipe skips the step there.
 
 Note the asymmetry with `just setup`, which runs `brew bundle install` **with**
 `--no-upgrade`. Bootstrap is deliberately install-only, so a fresh machine does

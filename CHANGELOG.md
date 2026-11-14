@@ -10,6 +10,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [2026-11-14]
 
+### Changed
+
+- Pinned runtimes bumped by `mise upgrade --bump`: chezmoi 2.74.1, go 1.27.4, helm 4.3.2, yq 4.54.3.
+
 ### Fixed
 
 - `just update` no longer fails partway through `brew bundle install`, after other packages have already been upgraded, when a `.pkg` cask such as `windows-app` needs `sudo` and no terminal is attached. On macOS, `update-brew` now runs `sudo -v` first: it asks for the password once before anything changes, or stops with a clear message when there is no terminal (#342).

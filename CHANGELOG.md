@@ -8,6 +8,12 @@ grouped by **date** rather than by semantic version. Newest first.
 
 ## [Unreleased]
 
+## [2026-11-25]
+
+### Added
+
+- RustDesk cask (open-source remote desktop client) in the personal macOS overlay `Brewfile.personal`. It is a macOS `.app` cask, so `Brewfile.linux` does not list it (#345).
+
 ## [2026-11-14]
 
 ### Changed

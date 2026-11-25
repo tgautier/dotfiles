@@ -14,6 +14,10 @@ grouped by **date** rather than by semantic version. Newest first.
 
 - RustDesk cask (open-source remote desktop client) in the personal macOS overlay `Brewfile.personal`. It is a macOS `.app` cask, so `Brewfile.linux` does not list it (#345).
 
+### Changed
+
+- Pinned runtimes bumped by `mise upgrade --bump`: chezmoi 2.74.2, erlang 29.1.3, ruby 4.0.10, yarn 4.19.0. Erlang stays on OTP 29, so the elixir `-otp-29` pin still matches.
+
 ## [2026-11-14]
 
 ### Changed
